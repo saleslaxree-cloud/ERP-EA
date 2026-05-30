@@ -1,290 +1,244 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { StatusBadge, PriorityBadge } from '@/components/status-badge'
-import { useWorkflowStore } from '@/stores/workflow-store'
-import { Plus, Search, Eye } from 'lucide-react'
-import { WorkflowStatus } from '@prisma/client'
 import { useState } from 'react'
-import { WorkflowDetail } from '@/components/workflow-detail'
-import { CreateWorkflowDialog } from '@/components/create-workflow-dialog'
-import { formatDistanceToNow, format } from 'date-fns'
 
 interface Workflow {
   id: string
   title: string
   description: string | null
-  status: WorkflowStatus
+  status: string
   priority: string
-  currentStepOrder: number
   dueDate: string | null
   createdAt: string
-  template: { id: string; name: string; category: string }
-  creator: { id: string; name: string; email: string; role: string }
-  steps: {
-    id: string
-    name: string
-    order: number
-    status: WorkflowStatus
-    assignee: { id: string; name: string } | null
-  }[]
-  _count: { approvals: number; comments: number }
+  currentStepOrder: number
+  template: { name: string }
+  creator: { name: string; department: string | null }
+  steps: { id: string; name: string; status: string; stepType: string; order: number }[]
+}
+
+interface Template {
+  id: string
+  name: string
+  description: string | null
+  category: string | null
 }
 
 export function WorkflowList() {
-  const { currentUserId, selectedWorkflowId, setSelectedWorkflowId } = useWorkflowStore()
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [newTemplateId, setNewTemplateId] = useState('')
+  const [newPriority, setNewPriority] = useState('MEDIUM')
+  const queryClient = useQueryClient()
 
   const { data: workflows = [], isLoading } = useQuery<Workflow[]>({
-    queryKey: ['workflows', statusFilter],
-    queryFn: () => {
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      return fetch(`/api/workflows?${params}`).then((r) => r.json())
+    queryKey: ['workflows'],
+    queryFn: () => fetch('/api/workflows').then(r => r.json()),
+  })
+
+  const { data: templates = [] } = useQuery<Template[]>({
+    queryKey: ['workflow-templates'],
+    queryFn: () => fetch('/api/workflow-templates').then(r => r.json()),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: { title: string; description: string; templateId: string; priority: string }) =>
+      fetch('/api/workflows', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] })
+      setShowCreate(false)
+      setNewTitle('')
+      setNewDesc('')
     },
   })
 
-  const queryClient = useQueryClient()
-
-  const filteredWorkflows = workflows.filter(
-    (w) =>
-      w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      w.creator.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const getCurrentStep = (workflow: Workflow) => {
-    const step = workflow.steps.find(
-      (s) => s.order === workflow.currentStepOrder
-    )
-    return step?.name || '-'
+  const getBadgeClass = (status: string) => {
+    const map: Record<string, string> = {
+      PENDING: 's-pending', IN_PROGRESS: 's-inprog', COMPLETED: 's-done',
+      CANCELLED: 's-cancelled', ESCALATED: 'b-red', APPROVED: 'b-green',
+      REJECTED: 'b-red', ON_HOLD: 's-waiting', DRAFT: 's-pending',
+      IN_REVIEW: 'b-blue', EXTERNAL_HOLD: 's-exthold', RE_OPENED: 'b-amber',
+    }
+    return map[status] || 'b-gray'
   }
 
-  const isOverdue = (dueDate: string | null) => {
-    if (!dueDate) return false
-    return new Date(dueDate) < new Date()
+  const getPriorityBadge = (p: string) => {
+    const map: Record<string, string> = { CRITICAL: 'p-critical', HIGH: 'p-high', MEDIUM: 'p-med', LOW: 'p-low' }
+    return map[p] || 'p-med'
+  }
+
+  const filtered = workflows.filter(w => {
+    const matchesSearch = w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (w.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+    if (!matchesSearch) return false
+    if (activeTab === 'all') return true
+    if (activeTab === 'active') return !['COMPLETED', 'CANCELLED'].includes(w.status)
+    if (activeTab === 'completed') return w.status === 'COMPLETED'
+    return true
+  })
+
+  const counts = {
+    all: workflows.length,
+    active: workflows.filter(w => !['COMPLETED', 'CANCELLED'].includes(w.status)).length,
+    completed: workflows.filter(w => w.status === 'COMPLETED').length,
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-4">
-              <div className="h-12 bg-gray-100 rounded" />
-            </CardContent>
-          </Card>
-        ))}
+      <div>
+        <div className="ph"><div className="ph-left"><h2>Workflows</h2></div></div>
+        <div className="lcard"><div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading workflows…</div></div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with filters */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex flex-col sm:flex-row gap-2 flex-1 w-full">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search workflows..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="IN_REVIEW">In Review</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-              <SelectItem value="ESCALATED">Escalated</SelectItem>
-              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-              <SelectItem value="ON_HOLD">On Hold</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-              <SelectItem value="CANCELLED">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+    <div>
+      {/* Page Header */}
+      <div className="ph">
+        <div className="ph-left">
+          <h2>Workflows</h2>
+          <p>Manage and track enterprise workflows</p>
         </div>
-        <Button
-          onClick={() => setShowCreateDialog(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Workflow
-        </Button>
+        <div className="ph-right">
+          <button className="btn btn-gold" onClick={() => setShowCreate(true)}>+ Create Workflow</button>
+        </div>
+      </div>
+      <div className="page-accent" />
+
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        {(['all', 'active', 'completed'] as const).map(tab => (
+          <div
+            key={tab}
+            className={`tab ${activeTab === tab ? 'active' : ''}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            <span className="tab-cnt">{counts[tab]}</span>
+          </div>
+        ))}
       </div>
 
-      {/* Desktop Table */}
-      <div className="hidden md:block">
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[200px]">Title</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Current Step</TableHead>
-                <TableHead>Creator</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="w-[60px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredWorkflows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-gray-400">
-                    No workflows found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredWorkflows.map((workflow) => (
-                  <TableRow
-                    key={workflow.id}
-                    className="cursor-pointer hover:bg-gray-50"
-                    onClick={() => setSelectedWorkflowId(workflow.id)}
-                  >
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-gray-900">{workflow.title}</p>
-                        <p className="text-xs text-gray-400">{workflow.template.name}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={workflow.status} />
-                    </TableCell>
-                    <TableCell>
-                      <PriorityBadge priority={workflow.priority} />
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-600">{getCurrentStep(workflow)}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-600">{workflow.creator.name}</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs text-gray-400">
-                        {formatDistanceToNow(new Date(workflow.createdAt), { addSuffix: true })}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {workflow.dueDate ? (
-                        <span
-                          className={`text-xs ${
-                            isOverdue(workflow.dueDate) ? 'text-red-600 font-medium' : 'text-gray-500'
-                          }`}
-                        >
-                          {format(new Date(workflow.dueDate), 'MMM d, yyyy')}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-300">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Eye className="h-4 w-4 text-gray-400" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+      {/* Search */}
+      <div className="search" style={{ maxWidth: 320, marginBottom: 14 }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input type="text" placeholder="Search workflows…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
       </div>
 
-      {/* Mobile Cards */}
-      <div className="md:hidden space-y-3">
-        {filteredWorkflows.length === 0 ? (
-          <Card>
-            <CardContent className="p-8 text-center text-gray-400">
-              No workflows found
-            </CardContent>
-          </Card>
-        ) : (
-          filteredWorkflows.map((workflow) => (
-            <Card
-              key={workflow.id}
-              className="cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => setSelectedWorkflowId(workflow.id)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{workflow.title}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{workflow.template.name}</p>
+      {/* Workflow Cards */}
+      {filtered.length > 0 ? (
+        filtered.map(w => {
+          const progress = w.steps.length > 0
+            ? Math.round((w.steps.filter(s => s.status === 'COMPLETED').length / w.steps.length) * 100)
+            : 0
+          return (
+            <div key={w.id} className="appr-card">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div className="appr-title">{w.title}</div>
+                  <div className="appr-meta" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                    <span className={`badge ${getBadgeClass(w.status)}`}>{w.status.replace(/_/g, ' ')}</span>
+                    <span className={`badge ${getPriorityBadge(w.priority)}`}>{w.priority}</span>
+                    <span style={{ fontSize: 10, color: 'var(--t4)' }}>Template: {w.template?.name || '—'}</span>
                   </div>
-                  <StatusBadge status={workflow.status} />
-                </div>
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <PriorityBadge priority={workflow.priority} />
-                  <span className="text-xs text-gray-400">•</span>
-                  <span className="text-xs text-gray-500">{workflow.creator.name}</span>
-                </div>
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs text-gray-400">
-                    Step: {getCurrentStep(workflow)}
-                  </span>
-                  {workflow.dueDate && (
-                    <span
-                      className={`text-xs ${
-                        isOverdue(workflow.dueDate) ? 'text-red-600 font-medium' : 'text-gray-400'
-                      }`}
-                    >
-                      Due: {format(new Date(workflow.dueDate), 'MMM d')}
-                    </span>
+                  {w.description && (
+                    <div style={{ fontSize: 11.5, color: 'var(--t2)', marginTop: 6 }}>{w.description}</div>
                   )}
+                  <div style={{ fontSize: 10.5, color: 'var(--t3)', marginTop: 4 }}>
+                    Created by {w.creator?.name || '—'} · {new Date(w.createdAt).toLocaleDateString()}
+                    {w.dueDate && ` · Due: ${new Date(w.dueDate).toLocaleDateString()}`}
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      {/* Workflow Detail Drawer */}
-      {selectedWorkflowId && (
-        <WorkflowDetail
-          workflowId={selectedWorkflowId}
-          onClose={() => setSelectedWorkflowId(null)}
-        />
+                <div style={{ minWidth: 120 }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--t3)', marginBottom: 4 }}>
+                    Progress {progress}%
+                  </div>
+                  <div className="prog">
+                    <div className="prog-bg" style={{ height: 6 }}>
+                      <div className="prog-fill" style={{
+                        width: `${progress}%`,
+                        background: progress >= 70 ? 'var(--green)' : progress >= 40 ? 'var(--amber)' : 'var(--red)',
+                        height: '100%',
+                      }} />
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4 }}>
+                    Steps: {w.steps.filter(s => s.status === 'COMPLETED').length}/{w.steps.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })
+      ) : (
+        <div className="lcard">
+          <div className="cb empty">
+            <h3>No workflows found</h3>
+            <p>Create your first workflow to get started</p>
+          </div>
+        </div>
       )}
 
-      {/* Create Workflow Dialog */}
-      <CreateWorkflowDialog
-        open={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        onSuccess={() => {
-          setShowCreateDialog(false)
-          queryClient.invalidateQueries({ queryKey: ['workflows'] })
-        }}
-      />
+      {/* Create Modal */}
+      {showCreate && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }}>
+          <div className="modal modal-md">
+            <button className="mx" onClick={() => setShowCreate(false)}>✕</button>
+            <div className="mt">Create New Workflow</div>
+            <div className="ms">Start a new workflow from a template</div>
+
+            <div className="fg">
+              <label>Title <span>*</span></label>
+              <input className="fi" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Enter workflow title" />
+            </div>
+
+            <div className="fg">
+              <label>Description</label>
+              <textarea className="fi" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Optional description" rows={3} />
+            </div>
+
+            <div className="form-row fr-2">
+              <div className="fg">
+                <label>Template</label>
+                <select className="sel" value={newTemplateId} onChange={e => setNewTemplateId(e.target.value)}>
+                  <option value="">Select template…</option>
+                  {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="fg">
+                <label>Priority</label>
+                <select className="sel" value={newPriority} onChange={e => setNewPriority(e.target.value)}>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button className="btn btn-out" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button
+                className="btn btn-gold"
+                disabled={!newTitle || !newTemplateId}
+                onClick={() => createMutation.mutate({ title: newTitle, description: newDesc, templateId: newTemplateId, priority: newPriority })}
+              >
+                {createMutation.isPending ? 'Creating…' : 'Create Workflow'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

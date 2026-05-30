@@ -2,16 +2,7 @@
 
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
-import { Menu, Bell, ChevronDown } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { useEffect, useRef, useState } from 'react'
 
 interface User {
   id: string
@@ -21,113 +12,196 @@ interface User {
   department: string | null
 }
 
+interface NotificationItem {
+  id: string
+  title: string
+  message: string
+  isRead: boolean
+  createdAt: string
+  type: string
+}
+
 export function AppHeader() {
-  const { currentUserId, setCurrentUserId, toggleSidebar } = useWorkflowStore()
+  const { currentUserId, setCurrentUserId, setCurrentUserName, toggleSidebar, darkMode, toggleDarkMode, notifPanelOpen, toggleNotifPanel, setActiveView } = useWorkflowStore()
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ['users'],
-    queryFn: () => fetch('/api/users').then((r) => r.json()),
+    queryFn: () => fetch('/api/users').then(r => r.json()),
   })
 
-  const { data: notifData } = useQuery({
-    queryKey: ['notifications-count', currentUserId],
-    queryFn: () => fetch(`/api/notifications?userId=${currentUserId}`).then((r) => r.json()),
+  const { data: notifData } = useQuery<NotificationItem[]>({
+    queryKey: ['notifications', currentUserId],
+    queryFn: () => fetch(`/api/notifications?userId=${currentUserId}`).then(r => r.json()),
     refetchInterval: 30000,
   })
 
-  const currentUser = users.find((u) => u.id === currentUserId)
-  const unreadCount = notifData?.unreadCount || 0
+  const currentUser = users.find(u => u.id === currentUserId)
+  const notifications = Array.isArray(notifData) ? notifData : []
+  const unreadCount = notifications.filter(n => !n.isRead).length
 
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
+  const getInitials = (name: string) =>
+    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'ADMIN': return 'bg-emerald-100 text-emerald-700'
-      case 'DIRECTOR': return 'bg-amber-100 text-amber-700'
-      case 'EA': return 'bg-purple-100 text-purple-700'
-      case 'MANAGER': return 'bg-cyan-100 text-cyan-700'
-      default: return 'bg-slate-100 text-slate-700'
+  useEffect(() => {
+    if (currentUser) setCurrentUserName(currentUser.name)
+  }, [currentUser, setCurrentUserName])
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false)
+      }
     }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleUserSelect = (user: User) => {
+    setCurrentUserId(user.id)
+    setCurrentUserName(user.name)
+    setUserDropdownOpen(false)
   }
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
-      <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
+    <header className="topbar">
+      {/* Brand */}
+      <div className="tb-brand">
+        <button
           onClick={toggleSidebar}
+          style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--t2)', marginRight: 6 }}
+          className="sidebar-toggle-btn"
+          title="Menu"
         >
-          <Menu className="h-5 w-5" />
-        </Button>
-        <h1 className="text-lg font-semibold text-gray-900 hidden sm:block">Enterprise Workflow Management</h1>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <span className="tb-brand-name">LAXREE</span>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Notification bell */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          onClick={() => useWorkflowStore.getState().setActiveView('notifications')}
-        >
-          <Bell className="h-5 w-5 text-gray-500" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
-          )}
-        </Button>
+      {/* Search */}
+      <div className="tb-center">
+        <div className="tb-search">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--t4)' }}>
+            <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input type="text" placeholder="Search tasks, people, modules…" readOnly style={{ cursor: 'pointer' }} />
+        </div>
+      </div>
 
-        {/* User selector */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2 max-w-[260px]">
-              <Avatar className="h-7 w-7">
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs">
-                  {currentUser ? getInitials(currentUser.name) : '??'}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden sm:inline text-sm font-medium truncate">
-                {currentUser?.name || 'Select User'}
-              </span>
-              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 hidden md:inline-flex ${getRoleBadgeColor(currentUser?.role || '')}`}>
-                {currentUser?.role || ''}
-              </Badge>
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-64 max-h-80 overflow-y-auto">
-            {users.map((user) => (
-              <DropdownMenuItem
-                key={user.id}
-                onClick={() => setCurrentUserId(user.id)}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Avatar className="h-7 w-7">
-                  <AvatarFallback className={`text-xs ${user.id === currentUserId ? 'bg-emerald-200 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+      {/* Right */}
+      <div className="tb-right">
+        {/* Notification bell */}
+        <div className="tb-icon-btn" onClick={toggleNotifPanel} title="Notifications">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          {unreadCount > 0 && <span className="tb-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+        </div>
+
+        {/* Dark toggle */}
+        <button
+          className={`dark-toggle ${darkMode ? 'on' : ''}`}
+          onClick={toggleDarkMode}
+          title="Toggle dark mode"
+        />
+
+        {/* User label */}
+        <div
+          style={{
+            fontSize: '11.5px', fontWeight: 700, color: 'var(--g2)',
+            padding: '6px 12px', background: 'var(--g5)',
+            border: '1px solid var(--gbr)', borderRadius: 20,
+            cursor: 'pointer',
+          }}
+          onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+          ref={dropdownRef}
+        >
+          {currentUser?.name || 'Select User'}
+          {userDropdownOpen && users.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 8,
+              background: 'var(--card)', border: '1px solid var(--b2)',
+              borderRadius: 'var(--r)', boxShadow: 'var(--s3)',
+              minWidth: 240, maxHeight: 320, overflowY: 'auto', zIndex: 700,
+            }}>
+              {users.map(user => (
+                <div
+                  key={user.id}
+                  onClick={(e) => { e.stopPropagation(); handleUserSelect(user) }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px', cursor: 'pointer',
+                    borderBottom: '1px solid var(--b1)',
+                    background: user.id === currentUserId ? 'var(--g5)' : 'transparent',
+                    transition: 'background .1s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg2)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = user.id === currentUserId ? 'var(--g5)' : 'transparent' }}
+                >
+                  <div className="ua" style={{ width: 28, height: 28, fontSize: 10 }}>
                     {getInitials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{user.name}</p>
-                  <p className="text-xs text-gray-400 truncate">{user.role} · {user.department}</p>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)' }}>{user.name}</div>
+                    <div style={{ fontSize: 10, color: 'var(--t3)' }}>{user.role} · {user.department || '—'}</div>
+                  </div>
+                  {user.id === currentUserId && (
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', flexShrink: 0 }} />
+                  )}
                 </div>
-                {user.id === currentUserId && (
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* User avatar */}
+        <div className="ua">
+          {currentUser ? getInitials(currentUser.name) : '??'}
+        </div>
+      </div>
+
+      {/* Notification Panel */}
+      <div className={`np ${notifPanelOpen ? 'show' : ''}`}>
+        <div className="np-hdr">
+          <span>🔔 Notifications</span>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <span
+              style={{ fontSize: 11, color: 'var(--g2)', cursor: 'pointer', fontWeight: 700 }}
+              onClick={async () => {
+                const unread = notifications.filter(n => !n.isRead)
+                for (const n of unread.slice(0, 10)) {
+                  await fetch('/api/notifications', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notificationId: n.id }),
+                  })
+                }
+              }}
+            >
+              All read
+            </span>
+            <span
+              style={{ fontSize: 11, color: 'var(--t3)', cursor: 'pointer' }}
+              onClick={() => setActiveView('notifications')}
+            >
+              View all
+            </span>
+          </div>
+        </div>
+        {notifications.length > 0 ? (
+          notifications.slice(0, 8).map(n => (
+            <div key={n.id} className={`np-item ${!n.isRead ? 'unread' : ''}`}>
+              <div className="np-title">{n.title}</div>
+              <div className="np-time">{new Date(n.createdAt).toLocaleString()}</div>
+            </div>
+          ))
+        ) : (
+          <div className="np-empty">🎉 All caught up!</div>
+        )}
       </div>
     </header>
   )

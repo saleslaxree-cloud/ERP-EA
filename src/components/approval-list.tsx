@@ -1,276 +1,210 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { StatusBadge, PriorityBadge } from '@/components/status-badge'
-import { ApprovalActionDialog } from '@/components/approval-action-dialog'
-import { useWorkflowStore } from '@/stores/workflow-store'
-import {
-  ShieldCheck,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  User,
-} from 'lucide-react'
 import { useState } from 'react'
-import { formatDistanceToNow, format } from 'date-fns'
-import { WorkflowStatus } from '@prisma/client'
+import { useWorkflowStore } from '@/stores/workflow-store'
 
-interface StepInstance {
+interface Approval {
   id: string
-  name: string
-  stepType: string
-  order: number
-  status: WorkflowStatus
-  slaDeadline: string | null
-  isEscalated: boolean
-  workflow: {
-    id: string
-    title: string
-    description: string | null
-    status: WorkflowStatus
-    priority: string
-    dueDate: string | null
-    createdAt: string
-    creator: { id: string; name: string; email: string; role: string }
-  }
-  assignee: { id: string; name: string; email: string; role: string } | null
-  approvals: {
-    id: string
-    action: WorkflowStatus
-    comments: string | null
-    createdAt: string
-    approver: { id: string; name: string; role: string }
-  }[]
-}
-
-interface ApprovalHistory {
-  id: string
-  action: WorkflowStatus
+  action: string
   comments: string | null
   level: number
   isDelegated: boolean
   createdAt: string
-  workflow: { id: string; title: string; status: WorkflowStatus; priority: string }
-  stepInstance: { id: string; name: string; order: number }
+  stepInstance: {
+    id: string
+    name: string
+    stepType: string
+    status: string
+    workflow: { id: string; title: string }
+  }
+  approver: { name: string; role: string; department: string | null }
 }
 
 export function ApprovalList() {
-  const { currentUserId, setSelectedWorkflowId, setActiveView } = useWorkflowStore()
-  const [actionDialog, setActionDialog] = useState<{
-    stepInstanceId: string
-    workflowId: string
-    workflowTitle: string
-    stepName: string
-  } | null>(null)
-
+  const { currentUserId } = useWorkflowStore()
+  const [activeTab, setActiveTab] = useState<'pending' | 'history'>('pending')
+  const [actionDialog, setActionDialog] = useState<{ approval: Approval; action: 'APPROVED' | 'REJECTED' } | null>(null)
+  const [comment, setComment] = useState('')
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery<{
-    pending: StepInstance[]
-    history: ApprovalHistory[]
-  }>({
+  const { data: approvals = [], isLoading } = useQuery<Approval[]>({
     queryKey: ['approvals', currentUserId],
-    queryFn: () => fetch(`/api/approvals?userId=${currentUserId}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/approvals?userId=${currentUserId}`).then(r => r.json()),
   })
 
-  const isOverdue = (date: string | null) => {
-    if (!date) return false
-    return new Date(date) < new Date()
+  const actionMutation = useMutation({
+    mutationFn: (data: { approvalId: string; action: string; comments: string }) =>
+      fetch('/api/approvals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setActionDialog(null)
+      setComment('')
+    },
+  })
+
+  const pendingApprovals = approvals.filter(a => a.action === 'PENDING' || a.stepInstance?.status === 'PENDING')
+  const historyApprovals = approvals.filter(a => a.action !== 'PENDING' && a.stepInstance?.status !== 'PENDING')
+
+  const displayList = activeTab === 'pending' ? pendingApprovals : historyApprovals
+
+  const getBadgeClass = (status: string) => {
+    const map: Record<string, string> = {
+      PENDING: 's-pending', IN_PROGRESS: 's-inprog', COMPLETED: 's-done',
+      APPROVED: 'b-green', REJECTED: 'b-red', ON_HOLD: 's-waiting',
+    }
+    return map[status] || 'b-gray'
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-4">
-              <div className="h-24 bg-gray-100 rounded" />
-            </CardContent>
-          </Card>
-        ))}
+      <div>
+        <div className="ph"><div className="ph-left"><h2>Approvals</h2></div></div>
+        <div className="lcard"><div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading approvals…</div></div>
       </div>
     )
   }
 
-  const pendingItems = data?.pending.filter(
-    (s) => s.status === WorkflowStatus.PENDING || s.status === WorkflowStatus.IN_REVIEW
-  ) || []
-  const historyItems = data?.history || []
-
   return (
-    <div className="space-y-4">
-      <Tabs defaultValue="pending">
-        <TabsList>
-          <TabsTrigger value="pending" className="gap-1">
-            <ShieldCheck className="h-4 w-4" />
-            Pending
-            {pendingItems.length > 0 && (
-              <Badge className="ml-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-[10px]">
-                {pendingItems.length}
-              </Badge>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1">
-            <CheckCircle2 className="h-4 w-4" />
-            History
-          </TabsTrigger>
-        </TabsList>
+    <div>
+      {/* Page Header */}
+      <div className="ph">
+        <div className="ph-left">
+          <h2>Approval Center</h2>
+          <p>Department-wise task completion reviews — intelligent workflow engine</p>
+        </div>
+        <div className="ph-right">
+          <span className="badge b-gold" style={{ fontSize: 12, padding: '5px 14px' }}>
+            {pendingApprovals.length} Pending
+          </span>
+        </div>
+      </div>
+      <div className="page-accent" />
 
-        <TabsContent value="pending" className="mt-4">
-          {pendingItems.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <CheckCircle2 className="h-12 w-12 text-emerald-300 mx-auto mb-3" />
-                <p className="text-gray-500 font-medium">All caught up!</p>
-                <p className="text-sm text-gray-400 mt-1">No pending approvals</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {pendingItems.map((step) => (
-                <Card key={step.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-medium text-gray-900 truncate">
-                            {step.workflow.title}
-                          </h3>
-                          {step.isEscalated && (
-                            <Badge className="bg-rose-100 text-rose-700 text-[10px]">
-                              <AlertTriangle className="h-3 w-3 mr-1" />
-                              Escalated
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                          <StatusBadge status={step.workflow.status} />
-                          <PriorityBadge priority={step.workflow.priority} />
-                        </div>
-                        <div className="mt-2 space-y-1">
-                          <p className="text-sm text-gray-600">
-                            <span className="font-medium">Step:</span> {step.name}
-                          </p>
-                          <p className="text-sm text-gray-500 flex items-center gap-1">
-                            <User className="h-3 w-3" />
-                            Requested by {step.workflow.creator.name}
-                          </p>
-                          {step.slaDeadline && (
-                            <p
-                              className={`text-sm flex items-center gap-1 ${
-                                isOverdue(step.slaDeadline) ? 'text-red-600 font-medium' : 'text-gray-500'
-                              }`}
-                            >
-                              <Clock className="h-3 w-3" />
-                              {isOverdue(step.slaDeadline) ? 'Overdue! ' : 'SLA: '}
-                              {formatDistanceToNow(new Date(step.slaDeadline), {
-                                addSuffix: !isOverdue(step.slaDeadline),
-                              })}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+      {/* Workflow Flow Diagram */}
+      <div className="lcard" style={{ padding: '14px 18px', marginBottom: 14, background: 'linear-gradient(135deg,var(--g5),var(--card))' }}>
+        <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--g2)', marginBottom: 10 }}>Workflow Engine</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+          <div style={{ background: 'var(--blue-l)', color: 'var(--blue)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>👤 Employee</div>
+          <span style={{ color: 'var(--g3)', fontSize: 14, fontWeight: 900 }}>→</span>
+          <div style={{ background: 'var(--amber-l)', color: 'var(--amber)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>📋 EA Review</div>
+          <span style={{ color: 'var(--g3)', fontSize: 14, fontWeight: 900 }}>→</span>
+          <div style={{ background: 'var(--purple-l)', color: 'var(--purple)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>👔 Director</div>
+          <span style={{ color: 'var(--g3)', fontSize: 14, fontWeight: 900 }}>→</span>
+          <div style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>✅ Complete</div>
+        </div>
+      </div>
 
-                      <div className="flex sm:flex-col gap-2 shrink-0">
-                        <Button
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 sm:flex-initial"
-                          onClick={() =>
-                            setActionDialog({
-                              stepInstanceId: step.id,
-                              workflowId: step.workflow.id,
-                              workflowTitle: step.workflow.title,
-                              stepName: step.name,
-                            })
-                          }
-                        >
-                          <CheckCircle2 className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50 flex-1 sm:flex-initial"
-                          onClick={() =>
-                            setActionDialog({
-                              stepInstanceId: step.id,
-                              workflowId: step.workflow.id,
-                              workflowTitle: step.workflow.title,
-                              stepName: step.name,
-                            })
-                          }
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        <div className={`tab ${activeTab === 'pending' ? 'active' : ''}`} onClick={() => setActiveTab('pending')}>
+          Pending <span className="tab-cnt">{pendingApprovals.length}</span>
+        </div>
+        <div className={`tab ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+          History <span className="tab-cnt">{historyApprovals.length}</span>
+        </div>
+      </div>
+
+      {/* Approval Cards */}
+      {displayList.length > 0 ? displayList.map(a => (
+        <div key={a.id} className="appr-card">
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+            <div className="ua" style={{ width: 32, height: 32, fontSize: 11 }}>
+              {a.approver?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+            </div>
+            <div className="appr-info">
+              <div className="appr-title">{a.stepInstance?.workflow?.title || 'Workflow'}</div>
+              <div className="appr-meta" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 4 }}>
+                <span className={`badge ${getBadgeClass(a.stepInstance?.status || 'PENDING')}`}>
+                  {(a.stepInstance?.status || 'PENDING').replace(/_/g, ' ')}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--t4)' }}>
+                  Step: {a.stepInstance?.name || '—'}
+                </span>
+                <span style={{ fontSize: 10, color: 'var(--t4)' }}>
+                  Approver: {a.approver?.name || '—'}
+                </span>
+              </div>
+              {a.comments && (
+                <div style={{ fontSize: 11, color: 'var(--t2)', marginTop: 4, fontStyle: 'italic' }}>
+                  &ldquo;{a.comments}&rdquo;
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 4 }}>
+                {new Date(a.createdAt).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {activeTab === 'pending' && (
+            <div className="appr-actions">
+              <button
+                className="btn btn-green btn-sm"
+                onClick={() => setActionDialog({ approval: a, action: 'APPROVED' })}
+              >
+                ✓ Approve
+              </button>
+              <button
+                className="btn btn-red btn-sm"
+                onClick={() => setActionDialog({ approval: a, action: 'REJECTED' })}
+              >
+                ✕ Reject
+              </button>
             </div>
           )}
-        </TabsContent>
+        </div>
+      )) : (
+        <div className="lcard">
+          <div className="cb empty">
+            <h3>{activeTab === 'pending' ? 'No pending approvals' : 'No approval history'}</h3>
+            <p>{activeTab === 'pending' ? 'All caught up! No approvals pending.' : 'Approval actions will appear here once processed.'}</p>
+          </div>
+        </div>
+      )}
 
-        <TabsContent value="history" className="mt-4">
-          {historyItems.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-gray-400">No approval history yet</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {historyItems.map((approval) => (
-                <Card key={approval.id}>
-                  <CardContent className="p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
-                          {approval.workflow.title}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          Step: {approval.stepInstance.name}
-                        </p>
-                        {approval.comments && (
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">
-                            &quot;{approval.comments}&quot;
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <StatusBadge status={approval.action} />
-                        <span className="text-xs text-gray-300 whitespace-nowrap">
-                          {formatDistanceToNow(new Date(approval.createdAt), { addSuffix: true })}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
-      </Tabs>
-
-      {/* Approval Action Dialog */}
+      {/* Action Dialog */}
       {actionDialog && (
-        <ApprovalActionDialog
-          stepInstanceId={actionDialog.stepInstanceId}
-          workflowId={actionDialog.workflowId}
-          workflowTitle={actionDialog.workflowTitle}
-          stepName={actionDialog.stepName}
-          onClose={() => setActionDialog(null)}
-          onSuccess={() => {
-            setActionDialog(null)
-            queryClient.invalidateQueries({ queryKey: ['approvals', currentUserId] })
-            queryClient.invalidateQueries({ queryKey: ['workflows'] })
-            queryClient.invalidateQueries({ queryKey: ['dashboard', currentUserId] })
-          }}
-        />
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setActionDialog(null) }}>
+          <div className="modal modal-sm">
+            <button className="mx" onClick={() => setActionDialog(null)}>✕</button>
+            <div className="mt">
+              {actionDialog.action === 'APPROVED' ? '✓ Approve' : '✕ Reject'} Step
+            </div>
+            <div className="ms">
+              {actionDialog.approval.stepInstance?.workflow?.title} — {actionDialog.approval.stepInstance?.name}
+            </div>
+
+            <div className="fg">
+              <label>Comment</label>
+              <textarea
+                className="fi"
+                value={comment}
+                onChange={e => setComment(e.target.value)}
+                placeholder={actionDialog.action === 'APPROVED' ? 'Optional approval comments…' : 'Reason for rejection…'}
+                rows={3}
+              />
+            </div>
+
+            <div className="form-actions">
+              <button className="btn btn-out" onClick={() => setActionDialog(null)}>Cancel</button>
+              <button
+                className={`btn ${actionDialog.action === 'APPROVED' ? 'btn-green' : 'btn-red'}`}
+                onClick={() => actionMutation.mutate({
+                  approvalId: actionDialog.approval.id,
+                  action: actionDialog.action,
+                  comments: comment,
+                })}
+              >
+                {actionMutation.isPending ? 'Processing…' : actionDialog.action === 'APPROVED' ? 'Confirm Approval' : 'Confirm Rejection'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

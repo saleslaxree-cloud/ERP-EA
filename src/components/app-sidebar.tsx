@@ -1,96 +1,174 @@
 'use client'
 
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { cn } from '@/lib/utils'
-import {
-  LayoutDashboard,
-  GitBranch,
-  CheckSquare,
-  Bell,
-  ShieldCheck,
-  X,
-  Workflow,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useQuery } from '@tanstack/react-query'
 
-const navItems = [
-  { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'workflows' as const, label: 'Workflows', icon: GitBranch },
-  { id: 'approvals' as const, label: 'Approvals', icon: ShieldCheck },
-  { id: 'tasks' as const, label: 'Tasks', icon: CheckSquare },
-  { id: 'notifications' as const, label: 'Notifications', icon: Bell },
-]
+interface ApprovalData { pendingCount?: number }
+interface TaskData { tasks?: unknown[] }
 
 export function AppSidebar() {
   const { activeView, setActiveView, sidebarOpen, setSidebarOpen } = useWorkflowStore()
 
+  const { data: approvalData } = useQuery<ApprovalData>({
+    queryKey: ['approvals-count'],
+    queryFn: () => fetch('/api/approvals?userId=user-admin').then(r => r.json()),
+  })
+
+  const { data: taskData } = useQuery<TaskData>({
+    queryKey: ['tasks-count'],
+    queryFn: () => fetch('/api/tasks').then(r => r.json()),
+  })
+
+  const approvalCount = Array.isArray(approvalData) ? approvalData.length : (approvalData?.pendingCount || 0)
+  const taskCount = Array.isArray(taskData?.tasks) ? (taskData!.tasks as unknown[]).length : (Array.isArray(taskData) ? taskData.length : 0)
+
+  const nav = (view: string) => {
+    setActiveView(view as any)
+    setSidebarOpen(false)
+  }
+
+  const navItems = [
+    {
+      section: 'Command Center',
+      items: [
+        {
+          id: 'dashboard',
+          label: 'Dashboard',
+          view: 'dashboard',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>,
+          badge: null,
+        },
+        {
+          id: 'executive',
+          label: 'Executive View',
+          view: 'executive',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+          badge: <span className="nb nb-new">CEO</span>,
+        },
+        {
+          id: 'approvals',
+          label: 'Approvals',
+          view: 'approvals',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+          badge: approvalCount > 0 ? <span className="nb nb-alert">{approvalCount}</span> : null,
+        },
+      ],
+    },
+    {
+      section: 'Weekly Review',
+      items: [
+        {
+          id: 'workflows',
+          label: 'Workflows',
+          view: 'workflows',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+          badge: <span className="nb" style={{ background: 'var(--gb)', color: 'var(--g2)' }}>Score</span>,
+        },
+      ],
+    },
+    {
+      section: 'Task Management',
+      items: [
+        {
+          id: 'tasks',
+          label: 'All Tasks',
+          view: 'tasks',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+          badge: taskCount > 0 ? <span className="nb nb-live">{taskCount}</span> : null,
+        },
+        {
+          id: 'cancelled',
+          label: 'Cancelled',
+          view: 'cancelled',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+          badge: null,
+        },
+      ],
+    },
+    {
+      section: 'Intelligence',
+      items: [
+        {
+          id: 'analytics',
+          label: 'Analytics & Reports',
+          view: 'analytics',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+          badge: <span className="nb nb-warn">Live</span>,
+        },
+        {
+          id: 'performance',
+          label: 'Performance',
+          view: 'performance',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/></svg>,
+          badge: null,
+        },
+        {
+          id: 'departments',
+          label: 'Departments',
+          view: 'departments',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><path d="M13 17h8M17 13v8"/></svg>,
+          badge: null,
+        },
+      ],
+    },
+    {
+      section: 'Management',
+      items: [
+        {
+          id: 'team',
+          label: 'Team Members',
+          view: 'team',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+          badge: null,
+        },
+        {
+          id: 'escalations',
+          label: 'Director Dependency',
+          view: 'director-dependency',
+          icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#6D28D9' }}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+          badge: null,
+          special: true,
+        },
+      ],
+    },
+  ]
+
   return (
     <>
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 399 }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
-
-      <aside
-        className={cn(
-          'fixed top-0 left-0 z-50 h-full bg-white border-r border-gray-200 transition-all duration-300 flex flex-col',
-          'lg:relative lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:w-64 lg:translate-x-0'
-        )}
-      >
-        {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-600">
-              <Workflow className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-lg font-bold text-gray-900">WorkflowPro</span>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
-        {/* Navigation */}
-        <ScrollArea className="flex-1 px-3 py-4">
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = activeView === item.id
+      <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        {navItems.map((section) => (
+          <div className="sb-section" key={section.section}>
+            <div className="sb-label">{section.section}</div>
+            {section.items.map((item) => {
+              const isActive = activeView === item.view
               return (
-                <button
+                <div
                   key={item.id}
-                  onClick={() => {
-                    setActiveView(item.id)
-                    setSidebarOpen(false)
-                  }}
-                  className={cn(
-                    'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-emerald-50 text-emerald-700'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  )}
+                  className={`nav-item ${isActive ? 'active' : ''}`}
+                  onClick={() => nav(item.view)}
+                  style={item.special ? {
+                    background: isActive ? 'var(--gb)' : 'linear-gradient(90deg,rgba(109,40,217,.09),transparent)',
+                    borderLeftColor: isActive ? 'var(--g2)' : 'rgba(109,40,217,.5)',
+                  } : undefined}
                 >
-                  <Icon className={cn('h-5 w-5', isActive ? 'text-emerald-600' : 'text-gray-400')} />
-                  {item.label}
-                </button>
+                  {item.icon}
+                  <span style={item.special ? { color: '#6D28D9', fontWeight: 700 } : undefined}>
+                    {item.label}
+                  </span>
+                  {item.badge}
+                </div>
               )
             })}
-          </nav>
-        </ScrollArea>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
-          <p className="text-xs text-gray-400 text-center">WorkflowPro v1.0</p>
+          </div>
+        ))}
+        <div className="sb-footer">
+          <button className="logout-btn">⏏ Sign Out</button>
         </div>
       </aside>
     </>

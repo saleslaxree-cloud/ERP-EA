@@ -1,458 +1,319 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { StatusBadge, PriorityBadge } from '@/components/status-badge'
-import { useWorkflowStore } from '@/stores/workflow-store'
-import {
-  Plus,
-  Clock,
-  ChevronRight,
-  ChevronDown,
-  Link2,
-  CheckCircle2,
-  Play,
-  AlertTriangle,
-} from 'lucide-react'
 import { useState } from 'react'
-import { formatDistanceToNow, format } from 'date-fns'
-import { WorkflowStatus } from '@prisma/client'
+import { useWorkflowStore } from '@/stores/workflow-store'
 
-interface TaskItem {
+interface Task {
   id: string
   title: string
   description: string | null
-  status: WorkflowStatus
+  status: string
   priority: string
   dueDate: string | null
   completedAt: string | null
   createdAt: string
-  ownerId: string
-  parentTaskId: string | null
-  workflowId: string | null
-  owner: { id: string; name: string; email: string; role: string; avatar: string | null }
-  workflow: { id: string; title: string; status: WorkflowStatus } | null
-  subTasks: {
-    id: string
-    title: string
-    status: WorkflowStatus
-    priority: string
-    owner: { id: string; name: string }
-  }[]
-  dependencies: {
-    id: string
-    dependencyType: string
-    dependsOnTask: { id: string; title: string; status: WorkflowStatus }
-  }[]
-  dependents: {
-    id: string
-    dependencyType: string
-    task: { id: string; title: string; status: WorkflowStatus }
-  }[]
+  owner: { id: string; name: string; department: string | null }
+  workflow: { id: string; title: string } | null
+}
+
+interface User {
+  id: string
+  name: string
+  role: string
+  department: string | null
 }
 
 export function TaskList() {
-  const { currentUserId } = useWorkflowStore()
-  const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set())
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const { activeView } = useWorkflowStore()
+  const [activeTab, setActiveTab] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [newPriority, setNewPriority] = useState('MEDIUM')
+  const [newOwnerId, setNewOwnerId] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
   const queryClient = useQueryClient()
 
-  const { data: tasks = [], isLoading } = useQuery<TaskItem[]>({
-    queryKey: ['tasks', currentUserId, statusFilter],
-    queryFn: () => {
-      const params = new URLSearchParams({ userId: currentUserId })
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      return fetch(`/api/tasks?${params}`).then((r) => r.json())
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({
+    queryKey: ['tasks'],
+    queryFn: () => fetch('/api/tasks').then(r => r.json()),
+  })
+
+  const { data: users = [] } = useQuery<User[]>({
+    queryKey: ['users-list'],
+    queryFn: () => fetch('/api/users').then(r => r.json()),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (data: { title: string; description: string; priority: string; ownerId: string; dueDate: string }) =>
+      fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setShowCreate(false)
+      setNewTitle('')
+      setNewDesc('')
     },
   })
 
-  const taskMutation = useMutation({
-    mutationFn: async ({ taskId, status }: { taskId: string; status: WorkflowStatus }) => {
-      const res = await fetch(`/api/tasks/${taskId}`, {
+  const updateMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      fetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Failed to update task')
-      }
-      return res.json()
-    },
+      }).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks', currentUserId] })
+      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 
-  const toggleExpand = (taskId: string) => {
-    setExpandedTasks((prev) => {
-      const next = new Set(prev)
-      if (next.has(taskId)) next.delete(taskId)
-      else next.add(taskId)
-      return next
-    })
+  const getBadgeClass = (status: string) => {
+    const map: Record<string, string> = {
+      PENDING: 's-pending', IN_PROGRESS: 's-inprog', COMPLETED: 's-done',
+      CANCELLED: 's-cancelled', ESCALATED: 'b-red', ON_HOLD: 's-waiting',
+      DRAFT: 's-pending', IN_REVIEW: 'b-blue', EXTERNAL_HOLD: 's-exthold',
+      RE_OPENED: 'b-amber', APPROVED: 'b-green', REJECTED: 'b-red',
+    }
+    return map[status] || 'b-gray'
   }
 
-  const isOverdue = (dueDate: string | null, status: WorkflowStatus) => {
-    if (!dueDate || status === WorkflowStatus.COMPLETED) return false
-    return new Date(dueDate) < new Date()
+  const getPriorityBadge = (p: string) => {
+    const map: Record<string, string> = { CRITICAL: 'p-critical', HIGH: 'p-high', MEDIUM: 'p-med', LOW: 'p-low' }
+    return map[p] || 'p-med'
   }
+
+  const isCancelledView = activeView === 'cancelled'
+
+  const filtered = tasks.filter(t => {
+    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!matchesSearch) return false
+
+    if (isCancelledView) return t.status === 'CANCELLED'
+
+    switch (activeTab) {
+      case 'all': return true
+      case 'in_progress': return t.status === 'IN_PROGRESS'
+      case 'pending': return t.status === 'PENDING'
+      case 'completed': return t.status === 'COMPLETED'
+      case 'overdue': return t.dueDate ? new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) : false
+      default: return true
+    }
+  })
+
+  const counts: Record<string, number> = {
+    all: tasks.length,
+    in_progress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
+    pending: tasks.filter(t => t.status === 'PENDING').length,
+    completed: tasks.filter(t => t.status === 'COMPLETED').length,
+    overdue: tasks.filter(t => t.dueDate ? new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) : false).length,
+  }
+
+  const tabs = isCancelledView ? [] : [
+    { id: 'all', label: 'All' },
+    { id: 'in_progress', label: 'In Progress' },
+    { id: 'pending', label: 'Pending' },
+    { id: 'completed', label: 'Completed' },
+    { id: 'overdue', label: 'Overdue' },
+  ]
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[...Array(3)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-4">
-              <div className="h-20 bg-gray-100 rounded" />
-            </CardContent>
-          </Card>
-        ))}
+      <div>
+        <div className="ph"><div className="ph-left"><h2>Tasks</h2></div></div>
+        <div className="lcard"><div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading tasks…</div></div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-              <SelectItem value="ON_HOLD">On Hold</SelectItem>
-            </SelectContent>
-          </Select>
+    <div>
+      {/* Page Header */}
+      <div className="ph">
+        <div className="ph-left">
+          <h2>{isCancelledView ? 'Cancelled Tasks' : 'Task Management'}</h2>
+          <p>{isCancelledView ? 'Archived and cancelled task registry' : 'Complete operational task registry with SLA tracking'}</p>
         </div>
-        <Button
-          onClick={() => setShowCreateDialog(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white w-full sm:w-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Task
-        </Button>
+        {!isCancelledView && (
+          <div className="ph-right">
+            <button className="btn btn-gold" onClick={() => setShowCreate(true)}>+ Create Task</button>
+          </div>
+        )}
+      </div>
+      <div className="page-accent" />
+
+      {/* Filters */}
+      {!isCancelledView && (
+        <div className="lcard" style={{ padding: '12px 14px', marginBottom: 12 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="search" style={{ flex: 1, minWidth: 200, maxWidth: 300 }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input type="text" placeholder="Search tasks…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+            </div>
+          </div>
+          {tabs.length > 0 && (
+            <div className="tabs mt0" style={{ marginTop: 10, marginBottom: 0 }}>
+              {tabs.map(tab => (
+                <div
+                  key={tab.id}
+                  className={`tab ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  {tab.label}
+                  <span className="tab-cnt" style={tab.id === 'overdue' ? { background: 'var(--red-l)', color: 'var(--red)' } : undefined}>
+                    {counts[tab.id] || 0}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Task Table */}
+      <div className="lcard">
+        <div className="ch">
+          <div className="ct">{isCancelledView ? 'Cancelled Tasks' : 'All Tasks'}</div>
+          <span style={{ fontSize: 11, color: 'var(--t3)' }}>{filtered.length} entries</span>
+        </div>
+        <div className="tw">
+          <table className="ltable">
+            <thead>
+              <tr>
+                <th>#</th><th>Title</th><th>Priority</th><th>Status</th>
+                <th>Due Date</th><th>Assigned To</th><th>Dept</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length > 0 ? filtered.map((t, i) => (
+                <tr key={t.id}>
+                  <td style={{ color: 'var(--t3)', fontSize: 11 }}>{i + 1}</td>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{t.title}</div>
+                    {t.description && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1 }}>{t.description.slice(0, 60)}{t.description.length > 60 ? '…' : ''}</div>}
+                  </td>
+                  <td><span className={`badge ${getPriorityBadge(t.priority)}`}>{t.priority}</span></td>
+                  <td><span className={`badge ${getBadgeClass(t.status)}`}>{t.status.replace(/_/g, ' ')}</span></td>
+                  <td style={{ fontSize: 11 }}>
+                    {t.dueDate ? (
+                      <span style={{
+                        color: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 'var(--red)' : 'var(--t2)',
+                        fontWeight: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 700 : 400,
+                      }}>
+                        {new Date(t.dueDate).toLocaleDateString()}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div className="ua" style={{ width: 22, height: 22, fontSize: 8 }}>
+                        {t.owner?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+                      </div>
+                      {t.owner?.name || '—'}
+                    </div>
+                  </td>
+                  <td style={{ fontSize: 11 }}>{t.owner?.department || '—'}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {t.status === 'PENDING' && (
+                        <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'IN_PROGRESS' })}>
+                          Start
+                        </button>
+                      )}
+                      {t.status === 'IN_PROGRESS' && (
+                        <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
+                          Done
+                        </button>
+                      )}
+                      {!['COMPLETED', 'CANCELLED'].includes(t.status) && (
+                        <button className="btn btn-red btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'CANCELLED' })}>
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )) : (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+                    No tasks found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Task List */}
-      {tasks.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <CheckCircle2 className="h-12 w-12 text-emerald-300 mx-auto mb-3" />
-            <p className="text-gray-500 font-medium">No tasks found</p>
-            <p className="text-sm text-gray-400 mt-1">Create a new task to get started</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {tasks.map((task) => (
-            <Card key={task.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-2">
-                  {/* Expand button for subtasks */}
-                  {task.subTasks.length > 0 ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 mt-0.5 shrink-0"
-                      onClick={() => toggleExpand(task.id)}
-                    >
-                      {expandedTasks.has(task.id) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                    </Button>
-                  ) : (
-                    <div className="w-6 shrink-0" />
-                  )}
+      {/* Create Task Modal */}
+      {showCreate && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }}>
+          <div className="modal modal-md">
+            <button className="mx" onClick={() => setShowCreate(false)}>✕</button>
+            <div className="mt">Create New Task</div>
+            <div className="ms">Add a new task to the system</div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-medium text-gray-900">{task.title}</h3>
-                      {task.workflow && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {task.workflow.title}
-                        </Badge>
-                      )}
-                    </div>
-                    {task.description && (
-                      <p className="text-sm text-gray-500 mt-0.5 truncate">{task.description}</p>
-                    )}
+            <div className="fg">
+              <label>Title <span>*</span></label>
+              <input className="fi" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Enter task title" />
+            </div>
 
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <StatusBadge status={task.status} />
-                      <PriorityBadge priority={task.priority} />
-                      {task.dueDate && (
-                        <span
-                          className={`text-xs flex items-center gap-1 ${
-                            isOverdue(task.dueDate, task.status)
-                              ? 'text-red-600 font-medium'
-                              : 'text-gray-400'
-                          }`}
-                        >
-                          <Clock className="h-3 w-3" />
-                          {isOverdue(task.dueDate, task.status) ? 'Overdue: ' : 'Due: '}
-                          {format(new Date(task.dueDate), 'MMM d')}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        {task.owner.name}
-                      </span>
-                    </div>
+            <div className="fg">
+              <label>Description</label>
+              <textarea className="fi" value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Optional description" rows={3} />
+            </div>
 
-                    {/* Dependencies */}
-                    {task.dependencies.length > 0 && (
-                      <div className="mt-2 flex items-center gap-1 flex-wrap">
-                        <Link2 className="h-3 w-3 text-gray-400" />
-                        <span className="text-[10px] text-gray-400">Depends on:</span>
-                        {task.dependencies.map((dep) => (
-                          <Badge
-                            key={dep.id}
-                            variant="outline"
-                            className={`text-[10px] ${
-                              dep.dependsOnTask.status === WorkflowStatus.COMPLETED
-                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                : 'bg-amber-50 text-amber-600 border-amber-200'
-                            }`}
-                          >
-                            {dep.dependsOnTask.title}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
+            <div className="form-row fr-3">
+              <div className="fg">
+                <label>Priority</label>
+                <select className="sel" value={newPriority} onChange={e => setNewPriority(e.target.value)}>
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH">High</option>
+                  <option value="CRITICAL">Critical</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label>Assign To</label>
+                <select className="sel" value={newOwnerId} onChange={e => setNewOwnerId(e.target.value)}>
+                  <option value="">Select user…</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+              <div className="fg">
+                <label>Due Date</label>
+                <input className="fi" type="date" value={newDueDate} onChange={e => setNewDueDate(e.target.value)} />
+              </div>
+            </div>
 
-                    {/* Action buttons */}
-                    <div className="flex gap-2 mt-3">
-                      {task.status === WorkflowStatus.PENDING && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-cyan-600 border-cyan-300 hover:bg-cyan-50 h-7 text-xs"
-                          onClick={() =>
-                            taskMutation.mutate({ taskId: task.id, status: WorkflowStatus.IN_PROGRESS })
-                          }
-                        >
-                          <Play className="h-3 w-3 mr-1" />
-                          Start
-                        </Button>
-                      )}
-                      {task.status === WorkflowStatus.IN_PROGRESS && (
-                        <Button
-                          size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white h-7 text-xs"
-                          onClick={() =>
-                            taskMutation.mutate({ taskId: task.id, status: WorkflowStatus.COMPLETED })
-                          }
-                        >
-                          <CheckCircle2 className="h-3 w-3 mr-1" />
-                          Complete
-                        </Button>
-                      )}
-                    </div>
-
-                    {/* Subtasks */}
-                    {expandedTasks.has(task.id) && task.subTasks.length > 0 && (
-                      <div className="mt-3 pl-4 border-l-2 border-gray-200 space-y-2">
-                        {task.subTasks.map((sub) => (
-                          <div key={sub.id} className="flex items-center gap-2">
-                            <StatusBadge status={sub.status} />
-                            <span className="text-sm text-gray-700">{sub.title}</span>
-                            <span className="text-xs text-gray-400">{sub.owner.name}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            <div className="form-actions">
+              <button className="btn btn-out" onClick={() => setShowCreate(false)}>Cancel</button>
+              <button
+                className="btn btn-gold"
+                disabled={!newTitle || !newOwnerId}
+                onClick={() => createMutation.mutate({
+                  title: newTitle,
+                  description: newDesc,
+                  priority: newPriority,
+                  ownerId: newOwnerId,
+                  dueDate: newDueDate,
+                })}
+              >
+                {createMutation.isPending ? 'Creating…' : 'Create Task'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Error display for task mutations */}
-      {taskMutation.isError && (
-        <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-red-500" />
-          <p className="text-sm text-red-600">
-            {taskMutation.error instanceof Error ? taskMutation.error.message : 'Failed to update task'}
-          </p>
-        </div>
-      )}
-
-      {/* Create Task Dialog */}
-      <CreateTaskDialog
-        open={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        onSuccess={() => {
-          setShowCreateDialog(false)
-          queryClient.invalidateQueries({ queryKey: ['tasks', currentUserId] })
-        }}
-      />
     </div>
-  )
-}
-
-function CreateTaskDialog({
-  open,
-  onClose,
-  onSuccess,
-}: {
-  open: boolean
-  onClose: () => void
-  onSuccess: () => void
-}) {
-  const { currentUserId } = useWorkflowStore()
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [priority, setPriority] = useState('MEDIUM')
-  const [dueDate, setDueDate] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const { data: users = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => fetch('/api/users').then((r) => r.json()),
-  })
-
-  const [ownerId, setOwnerId] = useState(currentUserId)
-
-  const handleSubmit = async () => {
-    if (!title.trim()) return
-    setIsSubmitting(true)
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim() || null,
-          priority,
-          ownerId,
-          dueDate: dueDate || null,
-        }),
-      })
-      if (res.ok) {
-        resetForm()
-        onSuccess()
-      }
-    } catch (error) {
-      console.error('Failed to create task:', error)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  const resetForm = () => {
-    setTitle('')
-    setDescription('')
-    setPriority('MEDIUM')
-    setDueDate('')
-    setOwnerId(currentUserId)
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <DialogTitle>Create New Task</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Title</Label>
-            <Input
-              placeholder="Enter task title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Description</Label>
-            <Textarea
-              placeholder="Describe the task"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Priority</Label>
-              <Select value={priority} onValueChange={setPriority}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LOW">Low</SelectItem>
-                  <SelectItem value="MEDIUM">Medium</SelectItem>
-                  <SelectItem value="HIGH">High</SelectItem>
-                  <SelectItem value="CRITICAL">Critical</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Due Date</Label>
-              <Input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>Assign To</Label>
-            <Select value={ownerId} onValueChange={setOwnerId}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {users.map((user: { id: string; name: string; role: string }) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name} ({user.role})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            onClick={handleSubmit}
-            disabled={!title.trim() || isSubmitting}
-          >
-            {isSubmitting ? 'Creating...' : 'Create Task'}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }
