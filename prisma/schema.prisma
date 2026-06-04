@@ -78,6 +78,7 @@ model User {
   delegatedFrom      Delegation[]        @relation("DelegatedFrom")
   comments           Comment[]           @relation("CommentAuthor")
   tasks              Task[]              @relation("TaskOwner")
+  assignedTaskSteps  TaskStep[]          @relation("StepAssigneeTask")
 }
 
 model Department {
@@ -191,6 +192,8 @@ model Task {
   status          WorkflowStatus @default(PENDING)
   priority        TaskPriority   @default(MEDIUM)
   ownerId         String
+  department      String?
+  category        String?
   dueDate         DateTime?
   parentTaskId    String?
   completedAt     DateTime?
@@ -203,6 +206,41 @@ model Task {
   subTasks        Task[]            @relation("TaskChildren")
   dependencies    TaskDependency[]  @relation("TaskDependsOn")
   dependents      TaskDependency[]  @relation("TaskRequiredBy")
+  taskSteps       TaskStep[]
+}
+
+model TaskStep {
+  id          String         @id @default(cuid())
+  taskId      String
+  title       String
+  status      WorkflowStatus @default(PENDING)
+  order       Int            @default(0)
+  assigneeId  String?
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  task        Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee    User?          @relation("StepAssigneeTask", fields: [assigneeId], references: [id])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  color       String?
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Holiday {
+  id          String   @id @default(cuid())
+  name        String
+  date        DateTime
+  type        String   @default("PUBLIC")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model TaskDependency {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 
 interface Task {
@@ -10,11 +10,18 @@ interface Task {
   description: string | null
   status: string
   priority: string
+  department: string | null
+  category: string | null
   dueDate: string | null
   completedAt: string | null
   createdAt: string
-  owner: { id: string; name: string; department: string | null }
-  workflow: { id: string; title: string } | null
+  ownerId: string
+  owner: { id: string; name: string; email: string; role: string; department: string | null; avatar: string | null }
+  workflow: { id: string; title: string; status: string } | null
+  subTasks: { id: string; title: string; status: string; ownerId: string; owner: { id: string; name: string } }[]
+  taskSteps?: { id: string; title: string; status: string; order: number }[]
+  stepsCount?: number
+  stepsDone?: number
 }
 
 interface User {
@@ -25,9 +32,13 @@ interface User {
 }
 
 export function TaskList() {
-  const { activeView } = useWorkflowStore()
+  const { activeView, currentUserId } = useWorkflowStore()
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState('')
+  const [employeeFilter, setEmployeeFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [deptFilter, setDeptFilter] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [newTitle, setNewTitle] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -77,10 +88,11 @@ export function TaskList() {
 
   const getBadgeClass = (status: string) => {
     const map: Record<string, string> = {
-      PENDING: 's-pending', IN_PROGRESS: 's-inprog', COMPLETED: 's-done',
-      CANCELLED: 's-cancelled', ESCALATED: 'b-red', ON_HOLD: 's-waiting',
-      DRAFT: 's-pending', IN_REVIEW: 'b-blue', EXTERNAL_HOLD: 's-exthold',
-      RE_OPENED: 'b-amber', APPROVED: 'b-green', REJECTED: 'b-red',
+      PENDING: 's-pending', ASSIGNED: 's-assigned', IN_PROGRESS: 's-inprog',
+      COMPLETED: 's-done', CANCELLED: 's-cancelled', ESCALATED: 'b-red',
+      ON_HOLD: 's-waiting', DRAFT: 's-pending', IN_REVIEW: 's-appr',
+      EXTERNAL_HOLD: 's-exthold', RE_OPENED: 'b-amber',
+      APPROVED: 'b-green', REJECTED: 'b-red', AWAITING_APPROVAL: 's-appr',
     }
     return map[status] || 'b-gray'
   }
@@ -92,37 +104,92 @@ export function TaskList() {
 
   const isCancelledView = activeView === 'cancelled'
 
-  const filtered = tasks.filter(t => {
-    const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase())
-    if (!matchesSearch) return false
+  // Derive unique values for filters
+  const categories = useMemo(() => {
+    const set = new Set<string>()
+    tasks.forEach(t => { if (t.category) set.add(t.category) })
+    return Array.from(set).sort()
+  }, [tasks])
 
-    if (isCancelledView) return t.status === 'CANCELLED'
+  const departments = useMemo(() => {
+    const set = new Set<string>()
+    tasks.forEach(t => { if (t.department) set.add(t.department); else if (t.owner?.department) set.add(t.owner.department) })
+    return Array.from(set).sort()
+  }, [tasks])
 
-    switch (activeTab) {
-      case 'all': return true
-      case 'in_progress': return t.status === 'IN_PROGRESS'
-      case 'pending': return t.status === 'PENDING'
-      case 'completed': return t.status === 'COMPLETED'
-      case 'overdue': return t.dueDate ? new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) : false
-      default: return true
-    }
-  })
+  const getSLAStatus = (dueDate: string | null, status: string) => {
+    if (!dueDate || ['COMPLETED', 'CANCELLED'].includes(status)) return null
+    const now = new Date()
+    const due = new Date(dueDate)
+    const hoursLeft = (due.getTime() - now.getTime()) / (1000 * 60 * 60)
+    if (hoursLeft < 0) return { label: 'BREACHED', color: 'var(--red)', bg: 'var(--red-l)' }
+    if (hoursLeft < 4) return { label: 'CRITICAL', color: '#C2410C', bg: '#FFF7ED' }
+    if (hoursLeft < 24) return { label: 'AT RISK', color: 'var(--amber)', bg: 'var(--amber-l)' }
+    return { label: 'ON TRACK', color: 'var(--green)', bg: 'var(--green-l)' }
+  }
 
-  const counts: Record<string, number> = {
+  const filtered = useMemo(() => {
+    return tasks.filter(t => {
+      const matchesSearch = t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+      if (!matchesSearch) return false
+      if (priorityFilter && t.priority !== priorityFilter) return false
+      if (employeeFilter && t.ownerId !== employeeFilter) return false
+      if (categoryFilter && t.category !== categoryFilter) return false
+      if (deptFilter) {
+        const taskDept = t.department || t.owner?.department || ''
+        if (taskDept !== deptFilter) return false
+      }
+
+      if (isCancelledView) return t.status === 'CANCELLED'
+
+      switch (activeTab) {
+        case 'all': return true
+        case 'assigned': return t.status === 'PENDING' || t.status === 'ASSIGNED'
+        case 'pending': return t.status === 'PENDING'
+        case 'in_progress': return t.status === 'IN_PROGRESS'
+        case 'awaiting_approval': return t.status === 'IN_REVIEW' || t.status === 'AWAITING_APPROVAL'
+        case 'completed': return t.status === 'COMPLETED'
+        case 'overdue': return t.dueDate ? new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) : false
+        default: return true
+      }
+    })
+  }, [tasks, searchQuery, priorityFilter, employeeFilter, categoryFilter, deptFilter, activeTab, isCancelledView])
+
+  const counts = useMemo(() => ({
     all: tasks.length,
-    in_progress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
+    assigned: tasks.filter(t => t.status === 'PENDING' || t.status === 'ASSIGNED').length,
     pending: tasks.filter(t => t.status === 'PENDING').length,
+    in_progress: tasks.filter(t => t.status === 'IN_PROGRESS').length,
+    awaiting_approval: tasks.filter(t => t.status === 'IN_REVIEW' || t.status === 'AWAITING_APPROVAL').length,
     completed: tasks.filter(t => t.status === 'COMPLETED').length,
     overdue: tasks.filter(t => t.dueDate ? new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) : false).length,
-  }
+  }), [tasks])
 
   const tabs = isCancelledView ? [] : [
     { id: 'all', label: 'All' },
-    { id: 'in_progress', label: 'In Progress' },
+    { id: 'assigned', label: 'Assigned' },
     { id: 'pending', label: 'Pending' },
+    { id: 'in_progress', label: 'In Progress' },
+    { id: 'awaiting_approval', label: 'Awaiting Approval' },
     { id: 'completed', label: 'Completed' },
     { id: 'overdue', label: 'Overdue' },
   ]
+
+  const clearFilters = () => {
+    setSearchQuery('')
+    setPriorityFilter('')
+    setEmployeeFilter('')
+    setCategoryFilter('')
+    setDeptFilter('')
+  }
+
+  const hasFilters = searchQuery || priorityFilter || employeeFilter || categoryFilter || deptFilter
+
+  const getInitials = (name: string) =>
+    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+
+  const getShortId = (id: string) => id.slice(-6).toUpperCase()
 
   if (isLoading) {
     return (
@@ -149,19 +216,48 @@ export function TaskList() {
       </div>
       <div className="page-accent" />
 
-      {/* Filters */}
+      {/* Filters Bar */}
       {!isCancelledView && (
         <div className="lcard" style={{ padding: '12px 14px', marginBottom: 12 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <div className="search" style={{ flex: 1, minWidth: 200, maxWidth: 300 }}>
+            <div className="search" style={{ flex: 1, minWidth: 180, maxWidth: 260 }}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
               <input type="text" placeholder="Search tasks…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
             </div>
+
+            <select className="sel" value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} style={{ minWidth: 110 }}>
+              <option value="">Priority</option>
+              <option value="CRITICAL">Critical</option>
+              <option value="HIGH">High</option>
+              <option value="MEDIUM">Medium</option>
+              <option value="LOW">Low</option>
+            </select>
+
+            <select className="sel" value={employeeFilter} onChange={e => setEmployeeFilter(e.target.value)} style={{ minWidth: 130 }}>
+              <option value="">Employee</option>
+              {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+
+            <select className="sel" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} style={{ minWidth: 120 }}>
+              <option value="">Category</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <select className="sel" value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ minWidth: 120 }}>
+              <option value="">Department</option>
+              {departments.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+
+            {hasFilters && (
+              <button className="btn btn-ghost btn-xs" onClick={clearFilters}>✕ Clear</button>
+            )}
           </div>
+
+          {/* Tab Bar */}
           {tabs.length > 0 && (
-            <div className="tabs mt0" style={{ marginTop: 10, marginBottom: 0 }}>
+            <div className="tabs" style={{ marginTop: 10, marginBottom: 0 }}>
               {tabs.map(tab => (
                 <div
                   key={tab.id}
@@ -169,8 +265,12 @@ export function TaskList() {
                   onClick={() => setActiveTab(tab.id)}
                 >
                   {tab.label}
-                  <span className="tab-cnt" style={tab.id === 'overdue' ? { background: 'var(--red-l)', color: 'var(--red)' } : undefined}>
-                    {counts[tab.id] || 0}
+                  <span className="tab-cnt" style={
+                    tab.id === 'overdue' && counts[tab.id as keyof typeof counts] > 0
+                      ? { background: 'var(--red-l)', color: 'var(--red)' }
+                      : undefined
+                  }>
+                    {counts[tab.id as keyof typeof counts] || 0}
                   </span>
                 </div>
               ))}
@@ -189,62 +289,98 @@ export function TaskList() {
           <table className="ltable">
             <thead>
               <tr>
-                <th>#</th><th>Title</th><th>Priority</th><th>Status</th>
-                <th>Due Date</th><th>Assigned To</th><th>Dept</th><th>Actions</th>
+                <th>#</th>
+                <th>Task ID</th>
+                <th>Title</th>
+                <th>Priority</th>
+                <th>Due Date</th>
+                <th>SLA</th>
+                <th>Assigned To</th>
+                <th>Dept</th>
+                <th>Category</th>
+                <th>Steps</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.length > 0 ? filtered.map((t, i) => (
-                <tr key={t.id}>
-                  <td style={{ color: 'var(--t3)', fontSize: 11 }}>{i + 1}</td>
-                  <td>
-                    <div style={{ fontWeight: 600 }}>{t.title}</div>
-                    {t.description && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1 }}>{t.description.slice(0, 60)}{t.description.length > 60 ? '…' : ''}</div>}
-                  </td>
-                  <td><span className={`badge ${getPriorityBadge(t.priority)}`}>{t.priority}</span></td>
-                  <td><span className={`badge ${getBadgeClass(t.status)}`}>{t.status.replace(/_/g, ' ')}</span></td>
-                  <td style={{ fontSize: 11 }}>
-                    {t.dueDate ? (
-                      <span style={{
-                        color: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 'var(--red)' : 'var(--t2)',
-                        fontWeight: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 700 : 400,
-                      }}>
-                        {new Date(t.dueDate).toLocaleDateString()}
-                      </span>
-                    ) : '—'}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div className="ua" style={{ width: 22, height: 22, fontSize: 8 }}>
-                        {t.owner?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '??'}
+              {filtered.length > 0 ? filtered.map((t, i) => {
+                const sla = getSLAStatus(t.dueDate, t.status)
+                const stepsDone = t.taskSteps ? t.taskSteps.filter(s => s.status === 'COMPLETED').length : (t.stepsDone || 0)
+                const stepsTotal = t.taskSteps ? t.taskSteps.length : (t.stepsCount || 0)
+
+                return (
+                  <tr key={t.id}>
+                    <td style={{ color: 'var(--t3)', fontSize: 11 }}>{i + 1}</td>
+                    <td><span className="td-code">{getShortId(t.id)}</span></td>
+                    <td>
+                      <div style={{ fontWeight: 600, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                      {t.description && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description.slice(0, 50)}{t.description.length > 50 ? '…' : ''}</div>}
+                    </td>
+                    <td><span className={`badge ${getPriorityBadge(t.priority)}`}>{t.priority}</span></td>
+                    <td style={{ fontSize: 11 }}>
+                      {t.dueDate ? (
+                        <span style={{
+                          color: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 'var(--red)' : 'var(--t2)',
+                          fontWeight: new Date(t.dueDate) < new Date() && !['COMPLETED', 'CANCELLED'].includes(t.status) ? 700 : 400,
+                        }}>
+                          {new Date(t.dueDate).toLocaleDateString()}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td>
+                      {sla ? (
+                        <span className="badge" style={{ background: sla.bg, color: sla.color, fontSize: 9 }}>
+                          {sla.label}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'var(--t4)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="av" style={{ width: 22, height: 22, fontSize: 8, background: 'linear-gradient(135deg,var(--g1),var(--g3))' }}>
+                          {t.owner?.name ? getInitials(t.owner.name) : '??'}
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 600 }}>{t.owner?.name || '—'}</span>
                       </div>
-                      {t.owner?.name || '—'}
-                    </div>
-                  </td>
-                  <td style={{ fontSize: 11 }}>{t.owner?.department || '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {t.status === 'PENDING' && (
-                        <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'IN_PROGRESS' })}>
-                          Start
-                        </button>
-                      )}
-                      {t.status === 'IN_PROGRESS' && (
-                        <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
-                          Done
-                        </button>
-                      )}
-                      {!['COMPLETED', 'CANCELLED'].includes(t.status) && (
-                        <button className="btn btn-red btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'CANCELLED' })}>
-                          Cancel
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )) : (
+                    </td>
+                    <td style={{ fontSize: 11 }}>{t.department || t.owner?.department || '—'}</td>
+                    <td style={{ fontSize: 11 }}>{t.category || '—'}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div className="prog-bg" style={{ width: 40, height: 4 }}>
+                          <div className="prog-fill" style={{
+                            width: `${stepsTotal > 0 ? (stepsDone / stepsTotal) * 100 : 0}%`,
+                            background: stepsDone === stepsTotal && stepsTotal > 0 ? 'var(--green)' : 'var(--g2)',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700 }}>{stepsDone}/{stepsTotal}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        {t.status === 'PENDING' && (
+                          <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'IN_PROGRESS' })}>
+                            Start
+                          </button>
+                        )}
+                        {t.status === 'IN_PROGRESS' && (
+                          <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
+                            Done
+                          </button>
+                        )}
+                        {!['COMPLETED', 'CANCELLED'].includes(t.status) && (
+                          <button className="btn btn-red btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'CANCELLED' })}>
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              }) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+                  <td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
                     No tasks found
                   </td>
                 </tr>

@@ -2,10 +2,13 @@ import { create } from 'zustand'
 
 type ActiveView = 'dashboard' | 'workflows' | 'approvals' | 'tasks' | 'notifications' | 'executive' | 'analytics' | 'performance' | 'departments' | 'team' | 'escalations' | 'cancelled' | 'categories' | 'holidays' | 'director-dependency'
 
+type UserRole = 'ADMIN' | 'DIRECTOR' | 'EA' | 'MANAGER' | 'EMPLOYEE'
+
 interface WorkflowStore {
   activeView: ActiveView
   currentUserId: string
   currentUserName: string
+  currentRole: UserRole
   sidebarOpen: boolean
   selectedWorkflowId: string | null
   darkMode: boolean
@@ -14,6 +17,7 @@ interface WorkflowStore {
   setActiveView: (view: ActiveView) => void
   setCurrentUserId: (id: string) => void
   setCurrentUserName: (name: string) => void
+  setCurrentRole: (role: UserRole) => void
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   setSelectedWorkflowId: (id: string | null) => void
@@ -28,6 +32,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   activeView: 'dashboard',
   currentUserId: 'user-admin',
   currentUserName: 'Admin',
+  currentRole: 'ADMIN',
   sidebarOpen: false,
   selectedWorkflowId: null,
   darkMode: false,
@@ -36,6 +41,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   setActiveView: (view) => set({ activeView: view, selectedWorkflowId: null }),
   setCurrentUserId: (id) => set({ currentUserId: id }),
   setCurrentUserName: (name) => set({ currentUserName: name }),
+  setCurrentRole: (role) => set({ currentRole: role }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedWorkflowId: (id) => set({ selectedWorkflowId: id }),

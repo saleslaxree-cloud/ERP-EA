@@ -22,7 +22,7 @@ interface NotificationItem {
 }
 
 export function AppHeader() {
-  const { currentUserId, setCurrentUserId, setCurrentUserName, toggleSidebar, darkMode, toggleDarkMode, notifPanelOpen, toggleNotifPanel, setActiveView } = useWorkflowStore()
+  const { currentUserId, setCurrentUserId, setCurrentUserName, setCurrentRole, toggleSidebar, darkMode, toggleDarkMode, notifPanelOpen, toggleNotifPanel, setActiveView } = useWorkflowStore()
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -45,8 +45,11 @@ export function AppHeader() {
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   useEffect(() => {
-    if (currentUser) setCurrentUserName(currentUser.name)
-  }, [currentUser, setCurrentUserName])
+    if (currentUser) {
+      setCurrentUserName(currentUser.name)
+      setCurrentRole((currentUser.role as any) || 'EMPLOYEE')
+    }
+  }, [currentUser, setCurrentUserName, setCurrentRole])
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -61,7 +64,16 @@ export function AppHeader() {
   const handleUserSelect = (user: User) => {
     setCurrentUserId(user.id)
     setCurrentUserName(user.name)
+    setCurrentRole((user.role as any) || 'EMPLOYEE')
     setUserDropdownOpen(false)
+  }
+
+  const roleColors: Record<string, string> = {
+    ADMIN: 'var(--g2)',
+    DIRECTOR: 'var(--purple)',
+    EA: 'var(--blue)',
+    MANAGER: 'var(--green)',
+    EMPLOYEE: 'var(--t3)',
   }
 
   return (
@@ -70,7 +82,7 @@ export function AppHeader() {
       <div className="tb-brand">
         <button
           onClick={toggleSidebar}
-          style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--t2)', marginRight: 6 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--t2)', marginRight: 6, display: 'none' }}
           className="sidebar-toggle-btn"
           title="Menu"
         >
@@ -112,21 +124,22 @@ export function AppHeader() {
         {/* User label */}
         <div
           style={{
-            fontSize: '11.5px', fontWeight: 700, color: 'var(--g2)',
+            fontSize: '11.5px', fontWeight: 700, color: roleColors[currentUser?.role || 'EMPLOYEE'] || 'var(--g2)',
             padding: '6px 12px', background: 'var(--g5)',
             border: '1px solid var(--gbr)', borderRadius: 20,
-            cursor: 'pointer',
+            cursor: 'pointer', position: 'relative',
           }}
           onClick={() => setUserDropdownOpen(!userDropdownOpen)}
           ref={dropdownRef}
         >
           {currentUser?.name || 'Select User'}
+          <span style={{ marginLeft: 6, fontSize: 9, opacity: 0.7 }}>({currentUser?.role || '—'})</span>
           {userDropdownOpen && users.length > 0 && (
             <div style={{
               position: 'absolute', top: '100%', right: 0, marginTop: 8,
               background: 'var(--card)', border: '1px solid var(--b2)',
               borderRadius: 'var(--r)', boxShadow: 'var(--s3)',
-              minWidth: 240, maxHeight: 320, overflowY: 'auto', zIndex: 700,
+              minWidth: 260, maxHeight: 360, overflowY: 'auto', zIndex: 700,
             }}>
               {users.map(user => (
                 <div
@@ -186,7 +199,7 @@ export function AppHeader() {
             </span>
             <span
               style={{ fontSize: 11, color: 'var(--t3)', cursor: 'pointer' }}
-              onClick={() => setActiveView('notifications')}
+              onClick={() => { setActiveView('notifications'); toggleNotifPanel() }}
             >
               View all
             </span>
