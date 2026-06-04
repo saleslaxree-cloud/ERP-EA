@@ -120,13 +120,15 @@ export function WorkflowDashboard() {
 
   const d = data!
 
+  if (!d) return <div className="lcard"><div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Loading dashboard data…</div></div>
+
   const today = new Date()
   const todayStr = today.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 
-  const performanceScore = d.performanceScore || d.completionRate || 0
+  const performanceScore = d?.performanceScore || d?.completionRate || 0
 
   // Chart data for Task Completion Timeline
-  const deptChartData = Object.entries(d.deptMap).map(([name, v]) => ({
+  const deptChartData = Object.entries(d?.deptMap || {}).map(([name, v]) => ({
     name,
     Total: v.total,
     Completed: v.done,

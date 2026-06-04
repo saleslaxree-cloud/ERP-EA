@@ -10,53 +10,113 @@ import { ApprovalList } from '@/components/approval-list'
 import { TaskList } from '@/components/task-list'
 import { NotificationList } from '@/components/notification-list'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { useEffect, useState } from 'react'
+import { Component, useEffect, useState, type ReactNode } from 'react'
+
+/* ═══════════════════════════════════════════════════════════
+   Error Boundary
+   ═══════════════════════════════════════════════════════════ */
+interface ErrorBoundaryProps {
+  children: ReactNode
+  fallback?: ReactNode
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('View rendering error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) return this.props.fallback
+      return (
+        <div className="lcard">
+          <div className="cb" style={{ textAlign: 'center', padding: 40 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--t1)', marginBottom: 8 }}>Something went wrong</div>
+            <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 16 }}>
+              {this.state.error?.message || 'An unexpected error occurred'}
+            </div>
+            <button
+              className="btn btn-gold btn-sm"
+              onClick={() => this.setState({ hasError: false, error: null })}
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 function ActiveView() {
   const { activeView } = useWorkflowStore()
 
-  switch (activeView) {
-    case 'dashboard':
-      return <WorkflowDashboard />
-    case 'workflows':
-      return <WorkflowList />
-    case 'approvals':
-      return <ApprovalList />
-    case 'tasks':
-    case 'cancelled':
-      return <TaskList />
-    case 'notifications':
-      return <NotificationList />
-    case 'executive':
-      return <ExecutiveView />
-    case 'analytics':
-      return <AnalyticsView />
-    case 'performance':
-      return <PerformanceView />
-    case 'departments':
-      return <DepartmentsView />
-    case 'team':
-      return <TeamView />
-    case 'categories':
-      return <CategoriesView />
-    case 'holidays':
-      return <HolidaysView />
-    case 'director-dependency':
-    case 'escalations':
-      return <DirectorDependencyView />
-    case 'employees':
-      return <EmployeesView />
-    case 'projects':
-      return <ProjectsView />
-    case 'reports':
-      return <ReportsView />
-    case 'scorecards':
-      return <ScorecardsView />
-    case 'settings':
-      return <SettingsView />
-    default:
-      return <WorkflowDashboard />
+  const renderView = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return <WorkflowDashboard />
+      case 'workflows':
+        return <WorkflowList />
+      case 'approvals':
+        return <ApprovalList />
+      case 'tasks':
+      case 'cancelled':
+        return <TaskList />
+      case 'notifications':
+        return <NotificationList />
+      case 'executive':
+        return <ExecutiveView />
+      case 'analytics':
+        return <AnalyticsView />
+      case 'performance':
+        return <PerformanceView />
+      case 'departments':
+        return <DepartmentsView />
+      case 'team':
+        return <TeamView />
+      case 'categories':
+        return <CategoriesView />
+      case 'holidays':
+        return <HolidaysView />
+      case 'director-dependency':
+      case 'escalations':
+        return <DirectorDependencyView />
+      case 'employees':
+        return <EmployeesView />
+      case 'projects':
+        return <ProjectsView />
+      case 'reports':
+        return <ReportsView />
+      case 'scorecards':
+        return <ScorecardsView />
+      case 'settings':
+        return <SettingsView />
+      default:
+        return <WorkflowDashboard />
+    }
   }
+
+  return (
+    <ErrorBoundary>
+      {renderView()}
+    </ErrorBoundary>
+  )
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1719,13 +1779,15 @@ export default function HomePage() {
   }, [darkMode])
 
   return (
-    <div style={{ background: 'var(--bg)', minHeight: '100vh', transition: 'background .3s' }}>
-      <AppHeader />
-      <AppSidebar />
-      <main className="main-area">
-        <ActiveView />
-      </main>
-      <div id="toastArea" />
-    </div>
+    <ErrorBoundary>
+      <div style={{ background: '#f8fafc', minHeight: '100vh', transition: 'background .3s' }}>
+        <AppHeader />
+        <AppSidebar />
+        <main className="main-area">
+          <ActiveView />
+        </main>
+        <div id="toastArea" />
+      </div>
+    </ErrorBoundary>
   )
 }

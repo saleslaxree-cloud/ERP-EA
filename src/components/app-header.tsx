@@ -82,7 +82,7 @@ export function AppHeader() {
       <div className="tb-brand">
         <button
           onClick={toggleSidebar}
-          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--t2)', marginRight: 6, display: 'none' }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'rgba(255,255,255,.7)', marginRight: 6, display: 'none' }}
           className="sidebar-toggle-btn"
           title="Menu"
         >
@@ -96,7 +96,7 @@ export function AppHeader() {
       {/* Search */}
       <div className="tb-center">
         <div className="tb-search">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--t4)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#94a3b8' }}>
             <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input type="text" placeholder="Search tasks, people, modules…" readOnly style={{ cursor: 'pointer' }} />

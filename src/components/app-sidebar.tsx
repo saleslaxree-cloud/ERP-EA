@@ -211,12 +211,12 @@ export function AppSidebar() {
       )}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         {/* LAXREE Brand */}
-        <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid var(--b1)', marginBottom: 4 }}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 800, letterSpacing: 3, textTransform: 'uppercase', color: 'var(--g2)', textAlign: 'center' }}>
+        <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid rgba(255,255,255,.08)', marginBottom: 4 }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 800, letterSpacing: 4, textTransform: 'uppercase', color: '#fff', textAlign: 'center' }}>
             LAXREE
           </div>
-          <div style={{ fontSize: 9, color: 'var(--t4)', textAlign: 'center', letterSpacing: 1, textTransform: 'uppercase', marginTop: 2 }}>
-            Enterprise Suite
+          <div style={{ fontSize: 9, color: 'rgba(255,255,255,.4)', textAlign: 'center', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 2 }}>
+            Organization
           </div>
         </div>
 
