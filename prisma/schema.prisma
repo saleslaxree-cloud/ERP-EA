@@ -64,8 +64,12 @@ model User {
   name          String
   role          UserRole     @default(EMPLOYEE)
   department    String?
+  designation   String?
+  phone         String?
+  location      String?
   avatar        String?
   isActive      Boolean      @default(true)
+  joinDate      DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -79,14 +83,20 @@ model User {
   comments           Comment[]           @relation("CommentAuthor")
   tasks              Task[]              @relation("TaskOwner")
   assignedTaskSteps  TaskStep[]          @relation("StepAssigneeTask")
+  managedProjects    Project[]           @relation("ProjectManager")
+  deptHead           Department[]        @relation("DeptHead")
 }
 
 model Department {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
+  headId      String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  head        User?    @relation("DeptHead", fields: [headId], references: [id])
+  projects    Project[]
 }
 
 model WorkflowTemplate {
@@ -207,6 +217,8 @@ model Task {
   dependencies    TaskDependency[]  @relation("TaskDependsOn")
   dependents      TaskDependency[]  @relation("TaskRequiredBy")
   taskSteps       TaskStep[]
+  projectId       String?
+  project         Project?          @relation(fields: [projectId], references: [id])
 }
 
 model TaskStep {
@@ -319,4 +331,22 @@ model Comment {
 
   workflow    WorkflowInstance @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   author      User             @relation("CommentAuthor", fields: [authorId], references: [id])
+}
+
+model Project {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  department  String?
+  managerId   String?
+  status      WorkflowStatus @default(PENDING)
+  priority    TaskPriority   @default(MEDIUM)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  manager     User?          @relation("ProjectManager", fields: [managerId], references: [id])
+  dept        Department?    @relation(fields: [department], references: [name])
+  tasks       Task[]
 }

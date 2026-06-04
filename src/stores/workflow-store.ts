@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type ActiveView = 'dashboard' | 'workflows' | 'approvals' | 'tasks' | 'notifications' | 'executive' | 'analytics' | 'performance' | 'departments' | 'team' | 'escalations' | 'cancelled' | 'categories' | 'holidays' | 'director-dependency'
+type ActiveView = 'dashboard' | 'workflows' | 'approvals' | 'tasks' | 'notifications' | 'executive' | 'analytics' | 'performance' | 'departments' | 'team' | 'escalations' | 'cancelled' | 'categories' | 'holidays' | 'director-dependency' | 'employees' | 'projects' | 'reports' | 'scorecards' | 'settings'
 
 type UserRole = 'ADMIN' | 'DIRECTOR' | 'EA' | 'MANAGER' | 'EMPLOYEE'
 

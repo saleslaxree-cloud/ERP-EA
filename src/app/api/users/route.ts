@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 export async function GET() {
@@ -11,8 +11,12 @@ export async function GET() {
         name: true,
         role: true,
         department: true,
+        designation: true,
+        phone: true,
+        location: true,
         avatar: true,
         isActive: true,
+        joinDate: true,
         createdAt: true,
       },
       orderBy: { name: 'asc' },

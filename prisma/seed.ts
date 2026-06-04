@@ -16,6 +16,7 @@ async function main() {
   await prisma.workflowInstance.deleteMany()
   await prisma.stepTemplate.deleteMany()
   await prisma.workflowTemplate.deleteMany()
+  await prisma.project.deleteMany()
   await prisma.department.deleteMany()
   await prisma.category.deleteMany()
   await prisma.holiday.deleteMany()
@@ -26,11 +27,11 @@ async function main() {
   const daysAgo = (d: number) => new Date(now.getTime() - d * 24 * 60 * 60 * 1000)
   const daysFromNow = (d: number) => new Date(now.getTime() + d * 24 * 60 * 60 * 1000)
 
-  // ══ DEPARTMENTS ══
+  // ══ DEPARTMENTS (created without headId first, updated after users) ══
   await prisma.department.createMany({
     data: [
       { id: 'dept-sales', name: 'Sales', description: 'Sales and client acquisition' },
-      { id: 'dept-backoffice', name: 'Back Office', description: 'Operations and support' },
+      { id: 'dept-backoffice', name: 'Back Office', description: 'Operations, design, coordination and support' },
       { id: 'dept-accounts', name: 'Accounts', description: 'Finance and accounting' },
     ]
   })
@@ -44,6 +45,8 @@ async function main() {
       { id: 'cat-hr', name: 'HR', color: '#B45309', icon: '👥' },
       { id: 'cat-marketing', name: 'Marketing', color: '#BE123C', icon: '📣' },
       { id: 'cat-it', name: 'IT & Tech', color: '#0F766E', icon: '💻' },
+      { id: 'cat-design', name: 'Design', color: '#6D28D9', icon: '🎨' },
+      { id: 'cat-roofing', name: 'Roofing', color: '#B45309', icon: '🏠' },
     ]
   })
 
@@ -63,48 +66,80 @@ async function main() {
     ]
   })
 
-  // ══ USERS (LAXREE Organization) ══
+  // ══ USERS — AJMER STAFF (LAXREE Organization) ══
+  // Admin & Leadership
   const admin = await prisma.user.create({
-    data: { id: 'user-admin', email: 'admin@laxree.com', name: 'Priya Sharma', role: UserRole.ADMIN, department: 'Accounts', isActive: true }
+    data: { id: 'user-admin', email: 'accounts@laxree.com', name: 'Hitesh Tak', role: UserRole.ADMIN, department: 'Accounts', designation: 'Accountant', phone: '9982214555', location: 'Ajmer', isActive: true, joinDate: daysAgo(365) }
   })
   const director1 = await prisma.user.create({
-    data: { id: 'user-dir1', email: 'rohit.kapoor@laxree.com', name: 'Rohit Kapoor', role: UserRole.DIRECTOR, department: 'Sales', isActive: true }
+    data: { id: 'user-dir1', email: 'sandeep@laxree.com', name: 'Sandeep', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683662', location: 'Ajmer', isActive: true, joinDate: daysAgo(730) }
   })
   const director2 = await prisma.user.create({
-    data: { id: 'user-dir2', email: 'meera.iyer@laxree.com', name: 'Meera Iyer', role: UserRole.DIRECTOR, department: 'Back Office', isActive: true }
+    data: { id: 'user-dir2', email: 'ronak@laxree.com', name: 'Ronak Jain', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683659', location: 'Ajmer', isActive: true, joinDate: daysAgo(500) }
   })
+
+  // EA
   const ea1 = await prisma.user.create({
-    data: { id: 'user-ea1', email: 'arti.sharma@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Accounts', isActive: true }
+    data: { id: 'user-ea1', email: 'ea@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Back Office', designation: 'EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400) }
   })
-  const ea2 = await prisma.user.create({
-    data: { id: 'user-ea2', email: 'nisha.patil@laxree.com', name: 'Nisha Patil', role: UserRole.EA, department: 'Sales', isActive: true }
-  })
+
+  // Managers
   const manager1 = await prisma.user.create({
-    data: { id: 'user-mgr1', email: 'vikram.singh@laxree.com', name: 'Vikram Singh', role: UserRole.MANAGER, department: 'Sales', isActive: true }
+    data: { id: 'user-mgr1', email: 'khushboo@laxree.com', name: 'Khushboo Manglani', role: UserRole.MANAGER, department: 'Sales', designation: 'Team Lead Roofing', phone: '9251683656', location: 'Ajmer', isActive: true, joinDate: daysAgo(300) }
   })
   const manager2 = await prisma.user.create({
-    data: { id: 'user-mgr2', email: 'sunita.rao@laxree.com', name: 'Sunita Rao', role: UserRole.MANAGER, department: 'Back Office', isActive: true }
+    data: { id: 'user-mgr2', email: 'hr@laxree.com', name: 'Radhika', role: UserRole.MANAGER, department: 'Back Office', designation: 'HR', phone: '9251683663', location: 'Ajmer', isActive: true, joinDate: daysAgo(250) }
   })
   const manager3 = await prisma.user.create({
-    data: { id: 'user-mgr3', email: 'deepak.jain@laxree.com', name: 'Deepak Jain', role: UserRole.MANAGER, department: 'Accounts', isActive: true }
+    data: { id: 'user-mgr3', email: 'tanuja@laxree.com', name: 'Tanuja Tigaya', role: UserRole.MANAGER, department: 'Back Office', designation: 'Customer Relationship Manager', phone: '9982286667', location: 'Ajmer', isActive: true, joinDate: daysAgo(200) }
   })
+
+  // Employees — Ajmer Staff
   const emp1 = await prisma.user.create({
-    data: { id: 'user-emp1', email: 'rahul.verma@laxree.com', name: 'Rahul Verma', role: UserRole.EMPLOYEE, department: 'Sales', isActive: true }
+    data: { id: 'user-emp1', email: 'aditya@laxree.com', name: 'Aditya Sharma', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982281768', location: 'Ajmer', isActive: true, joinDate: daysAgo(180) }
   })
   const emp2 = await prisma.user.create({
-    data: { id: 'user-emp2', email: 'pooja.nair@laxree.com', name: 'Pooja Nair', role: UserRole.EMPLOYEE, department: 'Back Office', isActive: true }
+    data: { id: 'user-emp2', email: 'aakash@laxree.com', name: 'Aakash', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982220833', location: 'Ajmer', isActive: true, joinDate: daysAgo(150) }
   })
   const emp3 = await prisma.user.create({
-    data: { id: 'user-emp3', email: 'amit.gupta@laxree.com', name: 'Amit Gupta', role: UserRole.EMPLOYEE, department: 'Accounts', isActive: true }
+    data: { id: 'user-emp3', email: 'anamika@laxree.com', name: 'Anamika', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982261222', location: 'Ajmer', isActive: true, joinDate: daysAgo(120) }
   })
   const emp4 = await prisma.user.create({
-    data: { id: 'user-emp4', email: 'kavita.desai@laxree.com', name: 'Kavita Desai', role: UserRole.EMPLOYEE, department: 'Sales', isActive: true }
+    data: { id: 'user-emp4', email: 'saurabh@laxree.com', name: 'Saurabh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Designer', phone: '9351000183', location: 'Ajmer', isActive: true, joinDate: daysAgo(100) }
   })
   const emp5 = await prisma.user.create({
-    data: { id: 'user-emp5', email: 'suresh.kumar@laxree.com', name: 'Suresh Kumar', role: UserRole.EMPLOYEE, department: 'Back Office', isActive: true }
+    data: { id: 'user-emp5', email: 'ruchi@laxree.com', name: 'Ruchi', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9251683664', location: 'Ajmer', isActive: true, joinDate: daysAgo(90) }
   })
   const emp6 = await prisma.user.create({
-    data: { id: 'user-emp6', email: 'neha.chopra@laxree.com', name: 'Neha Chopra', role: UserRole.EMPLOYEE, department: 'Accounts', isActive: true }
+    data: { id: 'user-emp6', email: 'aayush@laxree.com', name: 'Aayush', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982286668', location: 'Ajmer', isActive: true, joinDate: daysAgo(60) }
+  })
+  const emp7 = await prisma.user.create({
+    data: { id: 'user-emp7', email: 'kamlesh@laxree.com', name: 'Kamlesh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'MIS', phone: '9251683660', location: 'Ajmer', isActive: true, joinDate: daysAgo(200) }
+  })
+
+  // ══ UPDATE DEPARTMENT HEADS ══
+  await prisma.department.update({ where: { id: 'dept-sales' }, data: { headId: director1.id } })
+  await prisma.department.update({ where: { id: 'dept-backoffice' }, data: { headId: director2.id } })
+  await prisma.department.update({ where: { id: 'dept-accounts' }, data: { headId: admin.id } })
+
+  // ══ PROJECTS ══
+  const proj1 = await prisma.project.create({
+    data: { id: 'proj-1', name: 'Website Revamp', description: 'Redesign company website with modern UI', department: 'Sales', managerId: manager1.id, status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, startDate: daysAgo(30), endDate: daysFromNow(30) }
+  })
+  const proj2 = await prisma.project.create({
+    data: { id: 'proj-2', name: 'Mobile Application', description: 'Build mobile app for field team', department: 'Sales', managerId: manager1.id, status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, startDate: daysAgo(10), endDate: daysFromNow(60) }
+  })
+  const proj3 = await prisma.project.create({
+    data: { id: 'proj-3', name: 'CRM Development', description: 'Internal CRM system development', department: 'Sales', managerId: director1.id, status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, startDate: daysAgo(45), endDate: daysFromNow(45) }
+  })
+  const proj4 = await prisma.project.create({
+    data: { id: 'proj-4', name: 'E-Commerce Platform', description: 'Online sales platform for roofing products', department: 'Sales', managerId: director2.id, status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, startDate: daysFromNow(5), endDate: daysFromNow(90) }
+  })
+  const proj5 = await prisma.project.create({
+    data: { id: 'proj-5', name: 'Internal Operations', description: 'Streamline internal operations and processes', department: 'Back Office', managerId: manager2.id, status: WorkflowStatus.COMPLETED, priority: TaskPriority.LOW, startDate: daysAgo(60), endDate: daysAgo(5) }
+  })
+  const proj6 = await prisma.project.create({
+    data: { id: 'proj-6', name: 'Brand Design System', description: 'Create unified design system for LAXREE brand', department: 'Back Office', managerId: manager3.id, status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, startDate: daysAgo(20), endDate: daysFromNow(40) }
   })
 
   // ══ WORKFLOW TEMPLATES ══
@@ -118,7 +153,6 @@ async function main() {
     data: { id: 'tpl-leave', name: 'Leave Request', description: 'Employee leave request process', category: 'HR', isActive: true }
   })
 
-  // Step templates for Task Approval
   await prisma.stepTemplate.createMany({
     data: [
       { id: 'step-task-1', templateId: taskTemplate.id, name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, assigneeRole: UserRole.EMPLOYEE, approvalLevel: 1, slaHours: 72 },
@@ -126,8 +160,6 @@ async function main() {
       { id: 'step-task-3', templateId: taskTemplate.id, name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, assigneeRole: UserRole.DIRECTOR, approvalLevel: 3, slaHours: 72 },
     ]
   })
-
-  // Step templates for PO
   await prisma.stepTemplate.createMany({
     data: [
       { id: 'step-po-1', templateId: poTemplate.id, name: 'Manager Review', stepType: StepType.APPROVAL, order: 1, assigneeRole: UserRole.MANAGER, approvalLevel: 1, slaHours: 24 },
@@ -135,8 +167,6 @@ async function main() {
       { id: 'step-po-3', templateId: poTemplate.id, name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, assigneeRole: UserRole.DIRECTOR, approvalLevel: 3, slaHours: 72 },
     ]
   })
-
-  // Step templates for Leave
   await prisma.stepTemplate.createMany({
     data: [
       { id: 'step-leave-1', templateId: leaveTemplate.id, name: 'Manager Approval', stepType: StepType.APPROVAL, order: 1, assigneeRole: UserRole.MANAGER, approvalLevel: 1, slaHours: 24 },
@@ -164,7 +194,7 @@ async function main() {
     data: [
       { id: 'si-2-1', workflowId: wf2.id, stepTemplateId: 'step-leave-1', name: 'Manager Approval', stepType: StepType.APPROVAL, order: 1, status: WorkflowStatus.APPROVED, assigneeId: manager2.id, startedAt: daysAgo(3), completedAt: daysAgo(2) },
       { id: 'si-2-2', workflowId: wf2.id, stepTemplateId: 'step-leave-2', name: 'HR Review', stepType: StepType.REVIEW, order: 2, status: WorkflowStatus.IN_REVIEW, assigneeId: ea1.id, startedAt: daysAgo(2), slaDeadline: daysFromNow(1) },
-      { id: 'si-2-3', workflowId: wf2.id, stepTemplateId: 'step-leave-3', name: 'Director Confirmation', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.PENDING, assigneeId: director2.id },
+      { id: 'si-2-3', workflowId: wf2.id, stepTemplateId: 'step-leave-3', name: 'Director Confirmation', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.PENDING, assigneeId: director1.id },
     ]
   })
   await prisma.approval.create({ data: { id: 'appr-2-1', stepInstanceId: 'si-2-1', workflowId: wf2.id, approverId: manager2.id, action: WorkflowStatus.APPROVED, comments: 'Approved', level: 1 } })
@@ -204,14 +234,14 @@ async function main() {
   })
   await prisma.stepInstance.createMany({
     data: [
-      { id: 'si-5-1', workflowId: wf5.id, stepTemplateId: 'step-task-1', name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, status: WorkflowStatus.APPROVED, assigneeId: emp4.id, startedAt: daysAgo(5), completedAt: daysAgo(4) },
+      { id: 'si-5-1', workflowId: wf5.id, stepTemplateId: 'step-task-1', name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, status: WorkflowStatus.APPROVED, assigneeId: emp1.id, startedAt: daysAgo(5), completedAt: daysAgo(4) },
       { id: 'si-5-2', workflowId: wf5.id, stepTemplateId: 'step-task-2', name: 'EA Review & Verification', stepType: StepType.APPROVAL, order: 2, status: WorkflowStatus.APPROVED, assigneeId: ea1.id, startedAt: daysAgo(4), completedAt: daysAgo(2) },
       { id: 'si-5-3', workflowId: wf5.id, stepTemplateId: 'step-task-3', name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.ESCALATED, assigneeId: director2.id, startedAt: daysAgo(2), isEscalated: true, slaDeadline: daysAgo(1) },
     ]
   })
   await prisma.approval.createMany({
     data: [
-      { id: 'appr-5-1', stepInstanceId: 'si-5-1', workflowId: wf5.id, approverId: emp4.id, action: WorkflowStatus.APPROVED, comments: 'Task completed', level: 1 },
+      { id: 'appr-5-1', stepInstanceId: 'si-5-1', workflowId: wf5.id, approverId: emp1.id, action: WorkflowStatus.APPROVED, comments: 'Task completed', level: 1 },
       { id: 'appr-5-2', stepInstanceId: 'si-5-2', workflowId: wf5.id, approverId: ea1.id, action: WorkflowStatus.APPROVED, comments: 'Budget within range', level: 2 },
     ]
   })
@@ -221,16 +251,16 @@ async function main() {
   })
   await prisma.stepInstance.createMany({
     data: [
-      { id: 'si-6-1', workflowId: wf6.id, stepTemplateId: 'step-task-1', name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, status: WorkflowStatus.APPROVED, assigneeId: emp2.id, startedAt: daysAgo(15), completedAt: daysAgo(13) },
-      { id: 'si-6-2', workflowId: wf6.id, stepTemplateId: 'step-task-2', name: 'EA Review & Verification', stepType: StepType.APPROVAL, order: 2, status: WorkflowStatus.APPROVED, assigneeId: ea2.id, startedAt: daysAgo(13), completedAt: daysAgo(10) },
-      { id: 'si-6-3', workflowId: wf6.id, stepTemplateId: 'step-task-3', name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.APPROVED, assigneeId: director2.id, startedAt: daysAgo(10), completedAt: daysAgo(7) },
+      { id: 'si-6-1', workflowId: wf6.id, stepTemplateId: 'step-task-1', name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, status: WorkflowStatus.APPROVED, assigneeId: emp3.id, startedAt: daysAgo(15), completedAt: daysAgo(13) },
+      { id: 'si-6-2', workflowId: wf6.id, stepTemplateId: 'step-task-2', name: 'EA Review & Verification', stepType: StepType.APPROVAL, order: 2, status: WorkflowStatus.APPROVED, assigneeId: ea1.id, startedAt: daysAgo(13), completedAt: daysAgo(10) },
+      { id: 'si-6-3', workflowId: wf6.id, stepTemplateId: 'step-task-3', name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.APPROVED, assigneeId: director1.id, startedAt: daysAgo(10), completedAt: daysAgo(7) },
     ]
   })
   await prisma.approval.createMany({
     data: [
-      { id: 'appr-6-1', stepInstanceId: 'si-6-1', workflowId: wf6.id, approverId: emp2.id, action: WorkflowStatus.APPROVED, comments: 'Design done', level: 1 },
-      { id: 'appr-6-2', stepInstanceId: 'si-6-2', workflowId: wf6.id, approverId: ea2.id, action: WorkflowStatus.APPROVED, comments: 'Budget allocated', level: 2 },
-      { id: 'appr-6-3', stepInstanceId: 'si-6-3', workflowId: wf6.id, approverId: director2.id, action: WorkflowStatus.APPROVED, comments: 'Strategic alignment confirmed', level: 3 },
+      { id: 'appr-6-1', stepInstanceId: 'si-6-1', workflowId: wf6.id, approverId: emp3.id, action: WorkflowStatus.APPROVED, comments: 'Design done', level: 1 },
+      { id: 'appr-6-2', stepInstanceId: 'si-6-2', workflowId: wf6.id, approverId: ea1.id, action: WorkflowStatus.APPROVED, comments: 'Budget allocated', level: 2 },
+      { id: 'appr-6-3', stepInstanceId: 'si-6-3', workflowId: wf6.id, approverId: director1.id, action: WorkflowStatus.APPROVED, comments: 'Strategic alignment confirmed', level: 3 },
     ]
   })
 
@@ -252,14 +282,14 @@ async function main() {
   await prisma.stepInstance.createMany({
     data: [
       { id: 'si-8-1', workflowId: wf8.id, stepTemplateId: 'step-leave-1', name: 'Manager Approval', stepType: StepType.APPROVAL, order: 1, status: WorkflowStatus.APPROVED, assigneeId: manager1.id, startedAt: daysAgo(12), completedAt: daysAgo(11) },
-      { id: 'si-8-2', workflowId: wf8.id, stepTemplateId: 'step-leave-2', name: 'HR Review', stepType: StepType.REVIEW, order: 2, status: WorkflowStatus.APPROVED, assigneeId: ea2.id, startedAt: daysAgo(11), completedAt: daysAgo(9) },
+      { id: 'si-8-2', workflowId: wf8.id, stepTemplateId: 'step-leave-2', name: 'HR Review', stepType: StepType.REVIEW, order: 2, status: WorkflowStatus.APPROVED, assigneeId: ea1.id, startedAt: daysAgo(11), completedAt: daysAgo(9) },
       { id: 'si-8-3', workflowId: wf8.id, stepTemplateId: 'step-leave-3', name: 'Director Confirmation', stepType: StepType.APPROVAL, order: 3, status: WorkflowStatus.APPROVED, assigneeId: director1.id, startedAt: daysAgo(9), completedAt: daysAgo(7) },
     ]
   })
   await prisma.approval.createMany({
     data: [
       { id: 'appr-8-1', stepInstanceId: 'si-8-1', workflowId: wf8.id, approverId: manager1.id, action: WorkflowStatus.APPROVED, comments: 'Enjoy!', level: 1 },
-      { id: 'appr-8-2', stepInstanceId: 'si-8-2', workflowId: wf8.id, approverId: ea2.id, action: WorkflowStatus.APPROVED, comments: 'HR records updated', level: 1 },
+      { id: 'appr-8-2', stepInstanceId: 'si-8-2', workflowId: wf8.id, approverId: ea1.id, action: WorkflowStatus.APPROVED, comments: 'HR records updated', level: 1 },
       { id: 'appr-8-3', stepInstanceId: 'si-8-3', workflowId: wf8.id, approverId: director1.id, action: WorkflowStatus.APPROVED, comments: 'Confirmed', level: 1 },
     ]
   })
@@ -287,33 +317,38 @@ async function main() {
     ]
   })
 
-  // ══ TASKS with department/category matching LAXREE template ══
+  // ══ TASKS with project assignments ══
   const tasks = [
     // Sales department tasks
-    { id: 'task-1', title: 'Client Pitch Deck Preparation', description: 'Prepare Q1 pitch deck for enterprise clients', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp1.id, department: 'Sales', category: 'Marketing', dueDate: daysFromNow(0) },
-    { id: 'task-2', title: 'Monthly Sales Report', description: 'Compile monthly sales figures and KPIs', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp4.id, department: 'Sales', category: 'Finance', dueDate: daysFromNow(2) },
-    { id: 'task-3', title: 'CRM Data Cleanup', description: 'Clean and update CRM records for Q1', status: WorkflowStatus.COMPLETED, priority: TaskPriority.LOW, ownerId: emp1.id, department: 'Sales', category: 'Admin', dueDate: daysAgo(3), completedAt: daysAgo(3) },
-    { id: 'task-4', title: 'New Client Onboarding - Acme Corp', description: 'Complete onboarding process for new client', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp4.id, department: 'Sales', category: 'Operations', dueDate: daysFromNow(1) },
-    { id: 'task-5', title: 'Quarterly Target Review', description: 'Review and adjust quarterly sales targets', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: manager1.id, department: 'Sales', category: 'Finance', dueDate: daysAgo(5), completedAt: daysAgo(5) },
+    { id: 'task-1', title: 'Client Pitch Deck Preparation', description: 'Prepare Q1 pitch deck for enterprise clients', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp1.id, department: 'Sales', category: 'Marketing', dueDate: daysFromNow(0), projectId: proj1.id },
+    { id: 'task-2', title: 'Monthly Sales Report', description: 'Compile monthly sales figures and KPIs', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp2.id, department: 'Sales', category: 'Finance', dueDate: daysFromNow(2), projectId: proj3.id },
+    { id: 'task-3', title: 'CRM Data Cleanup', description: 'Clean and update CRM records for Q1', status: WorkflowStatus.COMPLETED, priority: TaskPriority.LOW, ownerId: emp1.id, department: 'Sales', category: 'Admin', dueDate: daysAgo(3), completedAt: daysAgo(3), projectId: proj3.id },
+    { id: 'task-4', title: 'New Client Onboarding - Acme Corp', description: 'Complete onboarding process for new client', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp2.id, department: 'Sales', category: 'Operations', dueDate: daysFromNow(1), projectId: proj1.id },
+    { id: 'task-5', title: 'Quarterly Target Review', description: 'Review and adjust quarterly sales targets', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: manager1.id, department: 'Sales', category: 'Finance', dueDate: daysAgo(5), completedAt: daysAgo(5), projectId: proj3.id },
 
     // Back Office tasks
-    { id: 'task-6', title: 'Office Supply Inventory Check', description: 'Monthly inventory verification', status: WorkflowStatus.PENDING, priority: TaskPriority.LOW, ownerId: emp2.id, department: 'Back Office', category: 'Admin', dueDate: daysFromNow(5) },
-    { id: 'task-7', title: 'Vendor Contract Renewal', description: 'Renew annual vendor contracts', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp5.id, department: 'Back Office', category: 'Operations', dueDate: daysFromNow(0) },
-    { id: 'task-8', title: 'Facility Maintenance Schedule', description: 'Schedule Q2 facility maintenance', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: emp2.id, department: 'Back Office', category: 'Operations', dueDate: daysAgo(2), completedAt: daysAgo(2) },
+    { id: 'task-6', title: 'Office Supply Inventory Check', description: 'Monthly inventory verification', status: WorkflowStatus.PENDING, priority: TaskPriority.LOW, ownerId: emp3.id, department: 'Back Office', category: 'Admin', dueDate: daysFromNow(5) },
+    { id: 'task-7', title: 'Vendor Contract Renewal', description: 'Renew annual vendor contracts', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp5.id, department: 'Back Office', category: 'Operations', dueDate: daysFromNow(0), projectId: proj5.id },
+    { id: 'task-8', title: 'Facility Maintenance Schedule', description: 'Schedule Q2 facility maintenance', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: emp3.id, department: 'Back Office', category: 'Operations', dueDate: daysAgo(2), completedAt: daysAgo(2), projectId: proj5.id },
     { id: 'task-9', title: 'Security Audit Planning', description: 'Plan and schedule annual security audit', status: WorkflowStatus.PENDING, priority: TaskPriority.CRITICAL, ownerId: emp5.id, department: 'Back Office', category: 'IT & Tech', dueDate: daysFromNow(3) },
-    { id: 'task-10', title: 'Employee ID Card Printing', description: 'Print new employee ID cards', status: WorkflowStatus.COMPLETED, priority: TaskPriority.LOW, ownerId: emp2.id, department: 'Back Office', category: 'HR', dueDate: daysAgo(7), completedAt: daysAgo(7) },
+    { id: 'task-10', title: 'Employee ID Card Printing', description: 'Print new employee ID cards', status: WorkflowStatus.COMPLETED, priority: TaskPriority.LOW, ownerId: emp3.id, department: 'Back Office', category: 'HR', dueDate: daysAgo(7), completedAt: daysAgo(7) },
+    { id: 'task-21', title: 'Brand Guidelines Document', description: 'Create comprehensive brand guidelines PDF', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp4.id, department: 'Back Office', category: 'Design', dueDate: daysFromNow(4), projectId: proj6.id },
+    { id: 'task-22', title: 'Social Media Templates', description: 'Design social media post templates', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp4.id, department: 'Back Office', category: 'Design', dueDate: daysFromNow(8), projectId: proj6.id },
 
     // Accounts tasks
-    { id: 'task-11', title: 'Quarterly Tax Filing', description: 'Prepare and file Q4 tax returns', status: WorkflowStatus.PENDING, priority: TaskPriority.CRITICAL, ownerId: emp3.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(1) },
-    { id: 'task-12', title: 'Payroll Processing - December', description: 'Process December payroll for all employees', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp6.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
-    { id: 'task-13', title: 'Budget Allocation Q2', description: 'Prepare Q2 budget allocation plan', status: WorkflowStatus.COMPLETED, priority: TaskPriority.HIGH, ownerId: manager3.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(4), completedAt: daysAgo(4) },
-    { id: 'task-14', title: 'Invoice Reconciliation', description: 'Reconcile November invoices', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp3.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(4) },
-    { id: 'task-15', title: 'Annual Financial Report', description: 'Compile annual financial statements', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: emp6.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(7) },
-    { id: 'task-16', title: 'Expense Report Review', description: 'Review and approve team expense reports', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: manager3.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(2) },
-    { id: 'task-17', title: 'Vendor Payment Processing', description: 'Process outstanding vendor payments', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: emp3.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
-    { id: 'task-18', title: 'Audit Preparation Documents', description: 'Prepare documents for external audit', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: emp6.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(6), completedAt: daysAgo(6) },
-    { id: 'task-19', title: 'Client Proposal - TechCorp', description: 'Draft proposal for TechCorp partnership', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: manager1.id, department: 'Sales', category: 'Marketing', dueDate: daysFromNow(6) },
+    { id: 'task-11', title: 'Quarterly Tax Filing', description: 'Prepare and file Q4 tax returns', status: WorkflowStatus.PENDING, priority: TaskPriority.CRITICAL, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(1) },
+    { id: 'task-12', title: 'Payroll Processing - December', description: 'Process December payroll for all employees', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
+    { id: 'task-13', title: 'Budget Allocation Q2', description: 'Prepare Q2 budget allocation plan', status: WorkflowStatus.COMPLETED, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(4), completedAt: daysAgo(4) },
+    { id: 'task-14', title: 'Invoice Reconciliation', description: 'Reconcile November invoices', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(4) },
+    { id: 'task-15', title: 'Annual Financial Report', description: 'Compile annual financial statements', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(7) },
+    { id: 'task-16', title: 'Expense Report Review', description: 'Review and approve team expense reports', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(2) },
+    { id: 'task-17', title: 'Vendor Payment Processing', description: 'Process outstanding vendor payments', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
+    { id: 'task-18', title: 'Audit Preparation Documents', description: 'Prepare documents for external audit', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(6), completedAt: daysAgo(6) },
+    { id: 'task-19', title: 'Client Proposal - TechCorp', description: 'Draft proposal for TechCorp partnership', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: manager1.id, department: 'Sales', category: 'Marketing', dueDate: daysFromNow(6), projectId: proj4.id },
     { id: 'task-20', title: 'IT System Migration Plan', description: 'Plan migration to new cloud infrastructure', status: WorkflowStatus.EXTERNAL_HOLD, priority: TaskPriority.HIGH, ownerId: emp5.id, department: 'Back Office', category: 'IT & Tech', dueDate: daysFromNow(10) },
+    { id: 'task-23', title: 'Roofing Catalog Update', description: 'Update product catalog with new roofing items', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: manager1.id, department: 'Sales', category: 'Roofing', dueDate: daysFromNow(3), projectId: proj2.id },
+    { id: 'task-24', title: 'MIS Report Generation', description: 'Generate monthly MIS reports', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp7.id, department: 'Back Office', category: 'Operations', dueDate: daysFromNow(1) },
+    { id: 'task-25', title: 'Customer Feedback Analysis', description: 'Analyze customer feedback data from Q4', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: manager3.id, department: 'Back Office', category: 'Operations', dueDate: daysFromNow(5) },
   ]
 
   for (const t of tasks) {
@@ -329,6 +364,7 @@ async function main() {
     { taskId: 'task-12', steps: ['Collect timesheets', 'Verify deductions', 'Calculate payouts', 'Process payments', 'Distribute payslips'] },
     { taskId: 'task-15', steps: ['Gather department data', 'Compile income statement', 'Prepare balance sheet', 'Management review', 'Board presentation'] },
     { taskId: 'task-20', steps: ['Assess current systems', 'Vendor evaluation', 'Migration planning', 'Testing phase', 'Go-live'] },
+    { taskId: 'task-21', steps: ['Audit existing brand', 'Draft guidelines', 'Design templates', 'Internal review', 'Final document'] },
   ]
 
   for (const ts of taskStepsData) {
@@ -374,11 +410,11 @@ async function main() {
       { id: 'notif-5', type: NotificationType.REJECTED, title: 'Leave Request Rejected', message: 'Sick leave extension rejected. Please provide documentation.', senderId: manager3.id, receiverId: emp3.id, workflowId: wf4.id, isRead: true, readAt: daysAgo(5), createdAt: daysAgo(6) },
       { id: 'notif-6', type: NotificationType.APPROVAL_REQUIRED, title: 'HR Review Required', message: 'A leave request is awaiting your HR review.', senderId: manager2.id, receiverId: ea1.id, workflowId: wf2.id, isRead: false, createdAt: daysAgo(2) },
       { id: 'notif-7', type: NotificationType.REMINDER, title: 'SLA Reminder: Server Equipment Purchase', message: 'This approval is approaching its SLA deadline.', senderId: admin.id, receiverId: manager1.id, workflowId: wf1.id, isRead: false, createdAt: daysAgo(0.5) },
-      { id: 'notif-8', type: NotificationType.COMMENT, title: 'New Comment on AI Platform Proposal', message: 'Meera Iyer commented: "Need more detailed cost analysis."', senderId: director2.id, receiverId: manager1.id, workflowId: wf5.id, isRead: false, createdAt: daysAgo(0.5) },
+      { id: 'notif-8', type: NotificationType.COMMENT, title: 'New Comment on AI Platform Proposal', message: 'Ronak Jain commented: "Need more detailed cost analysis."', senderId: director2.id, receiverId: manager1.id, workflowId: wf5.id, isRead: false, createdAt: daysAgo(0.5) },
       { id: 'notif-9', type: NotificationType.STATUS_CHANGE, title: 'Project Approved', message: 'Customer Portal Redesign is now in progress.', senderId: admin.id, receiverId: manager2.id, workflowId: wf6.id, isRead: true, readAt: daysAgo(3), createdAt: daysAgo(3) },
-      { id: 'notif-10', type: NotificationType.DELEGATION, title: 'Approval Delegated', message: 'Arti Sharma has delegated approval authority to you.', senderId: ea1.id, receiverId: ea2.id, isRead: false, createdAt: daysAgo(1) },
-      { id: 'notif-11', type: NotificationType.APPROVAL_REQUIRED, title: 'Task Awaiting Approval', message: 'Client Pitch Deck Preparation is ready for EA review.', senderId: emp1.id, receiverId: ea2.id, isRead: false, createdAt: daysAgo(0.2) },
-      { id: 'notif-12', type: NotificationType.REMINDER, title: 'Overdue Task Alert', message: 'Quarterly Tax Filing is overdue. Please take action.', senderId: admin.id, receiverId: emp3.id, isRead: false, createdAt: daysAgo(0.1) },
+      { id: 'notif-10', type: NotificationType.DELEGATION, title: 'Approval Delegated', message: 'Arti Sharma has delegated approval authority to you.', senderId: ea1.id, receiverId: manager2.id, isRead: false, createdAt: daysAgo(1) },
+      { id: 'notif-11', type: NotificationType.APPROVAL_REQUIRED, title: 'Task Awaiting Approval', message: 'Client Pitch Deck Preparation is ready for EA review.', senderId: emp1.id, receiverId: ea1.id, isRead: false, createdAt: daysAgo(0.2) },
+      { id: 'notif-12', type: NotificationType.REMINDER, title: 'Overdue Task Alert', message: 'Quarterly Tax Filing is overdue. Please take action.', senderId: admin.id, receiverId: admin.id, isRead: false, createdAt: daysAgo(0.1) },
     ]
   })
 
@@ -394,10 +430,10 @@ async function main() {
 
   // ══ DELEGATIONS ══
   await prisma.delegation.create({
-    data: { id: 'deleg-1', fromUserId: ea1.id, toUserId: ea2.id, startDate: daysAgo(2), endDate: daysFromNow(5), isActive: true, reason: 'Traveling for conference' }
+    data: { id: 'deleg-1', fromUserId: ea1.id, toUserId: manager2.id, startDate: daysAgo(2), endDate: daysFromNow(5), isActive: true, reason: 'Traveling for conference' }
   })
 
-  console.log('LAXREE Organization seed data created successfully!')
+  console.log('LAXREE Organization seed data created successfully with Ajmer Staff!')
 }
 
 main()
