@@ -32,7 +32,7 @@ export function LaxreeCommandPalette() {
 
   // Add Create Task as first item if search matches
   const allItems = [
-    ...(!search || 'create task'.includes(search.toLowerCase()) ? [{ id: 'tasks', label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true }] : []),
+    ...(!search || 'create task'.includes(search.toLowerCase()) ? [{ id: 'tasks', label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true, shortcut: undefined as string | undefined }] : []),
     ...filtered,
   ]
 

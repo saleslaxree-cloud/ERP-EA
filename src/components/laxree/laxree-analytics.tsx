@@ -77,7 +77,7 @@ export function LaxreeAnalytics() {
       <div className="card" style={{ marginBottom: 14 }}>
         <div className="ch"><div className="ct">📊 Status Distribution</div><span className="badge b-gold" style={{ fontSize: 10 }}>Live</span></div>
         <div className="cb">
-          {Object.entries(dash?.statusCounts || {}).filter(([, v]) => v > 0).map(([status, count]) => {
+          {Object.entries((dash?.statusCounts || {}) as Record<string, number>).filter(([, v]) => v > 0).map(([status, count]) => {
             const pct = total ? Math.round(count / total * 100) : 0
             return (
               <div key={status} style={{ marginBottom: 10 }}>

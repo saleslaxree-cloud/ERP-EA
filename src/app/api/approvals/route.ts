@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         approverId,
         action: action as WorkflowStatus,
         comments: comments || null,
-        level: stepInstance.stepTemplate?.approvalLevel ?? 1,
+        level: (stepInstance as any).stepTemplate?.approvalLevel ?? 1,
         isDelegated: isDelegated || false,
         originalApproverId: originalApproverId || null,
       },

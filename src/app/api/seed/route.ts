@@ -25,7 +25,7 @@ export async function POST() {
       { email: 'rajesh@laxree.com', name: 'Rajesh Kumar', role: UserRole.EMPLOYEE, department: 'Coordinator' },
     ]
 
-    const createdUsers = []
+    const createdUsers: any[] = []
     for (const m of members) {
       const existing = await db.user.findFirst({ where: { email: m.email } })
       if (!existing) {

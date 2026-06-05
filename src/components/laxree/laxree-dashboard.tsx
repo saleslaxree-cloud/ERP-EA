@@ -279,7 +279,7 @@ export function LaxreeDashboard() {
             {upcomingTasks.length === 0 ? (
               <div className="empty" style={{ padding: 20 }}><p>No upcoming tasks</p></div>
             ) : upcomingTasks.slice(0, 5).map((t: any) => {
-              const daysLeft = t.dueDate ? Math.ceil((new Date(t.dueDate) - new Date()) / (1000 * 60 * 60 * 24)) : 0
+              const daysLeft = t.dueDate ? Math.ceil((new Date(t.dueDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0
               return (
                 <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px', borderBottom: '1px solid var(--b1)', cursor: 'pointer' }}>
                   <div className="av" style={{ width: 28, height: 28, fontSize: 10, background: 'var(--blue)' }}>{getInitials(t.owner?.name || 'T')}</div>

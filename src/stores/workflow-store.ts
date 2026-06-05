@@ -33,6 +33,8 @@ interface WorkflowStore {
   selectedWorkflowId: string | null
   // Task tab
   taskTab: string
+  // Monday meeting panel
+  mmPanelOpen: boolean
   // Toast notifications
   toasts: Toast[]
   // Setters
@@ -52,10 +54,12 @@ interface WorkflowStore {
   toggleNotifPanel: () => void
   setCmdPaletteOpen: (open: boolean) => void
   setCreateTaskOpen: (open: boolean) => void
+  toggleMmPanel: () => void
   setSelectedTaskId: (id: string | null) => void
   setTaskTab: (tab: string) => void
   addToast: (type: 'ok' | 'err' | 'info', message: string) => void
   removeToast: (id: string) => void
+  login: (username: string, password: string) => boolean
   logout: () => void
 }
 
@@ -73,6 +77,7 @@ const initialState = {
   notifPanelOpen: false,
   cmdPaletteOpen: false,
   createTaskOpen: false,
+  mmPanelOpen: false,
   selectedTaskId: null as string | null,
   selectedWorkflowId: null as string | null,
   taskTab: 'all',
@@ -115,6 +120,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   toggleNotifPanel: () => set((state) => ({ notifPanelOpen: !state.notifPanelOpen })),
   setCmdPaletteOpen: (open) => set({ cmdPaletteOpen: open }),
   setCreateTaskOpen: (open) => set({ createTaskOpen: open }),
+  toggleMmPanel: () => set((state) => ({ mmPanelOpen: !state.mmPanelOpen })),
   setSelectedTaskId: (id) => set({ selectedTaskId: id }),
   setTaskTab: (tab) => set({ taskTab: tab }),
   addToast: (type, message) => {
@@ -125,6 +131,24 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     }, 4000)
   },
   removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+  login: (username: string, password: string) => {
+    const users: Record<string, { password: string; role: UserRole; name: string }> = {
+      admin: { password: 'admin123', role: 'ADMIN', name: 'Arti Sharma' },
+      ea: { password: 'ea123', role: 'EA', name: 'Executive Assistant' },
+      ashish: { password: 'ashish123', role: 'DIRECTOR', name: 'Ashish Kumar' },
+    }
+    const user = users[username]
+    if (user && user.password === password) {
+      set({
+        currentUserId: `user-${username}`,
+        currentUserName: user.name,
+        currentRole: user.role,
+        currentUser: { username, role: user.role, name: user.name },
+      })
+      return true
+    }
+    return false
+  },
   logout: () => set({
     ...initialState,
   }),

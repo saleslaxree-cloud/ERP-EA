@@ -47,7 +47,6 @@
   --radius: 0.75rem;
   --background: var(--bg);
   --foreground: var(--t1);
-  --card: var(--card);
   --card-foreground: var(--t1);
   --popover: var(--card);
   --popover-foreground: var(--t1);
@@ -112,9 +111,12 @@
   --t1:#F4F5FA; --t2:#B8BCCE; --t3:#767A96; --t4:#4E5270;
   --g5:rgba(184,134,11,.08);
   --gb:rgba(184,134,11,.15); --gbr:rgba(184,134,11,.35);
+  --green-l:rgba(21,128,61,.15); --red-l:rgba(200,21,26,.15);
+  --amber-l:rgba(180,83,9,.15); --blue-l:rgba(29,78,216,.15);
+  --purple-l:rgba(109,40,217,.15); --teal-l:rgba(15,118,110,.15);
+  --rose-l:rgba(190,18,60,.15);
   --background: var(--bg);
   --foreground: var(--t1);
-  --card: var(--card);
   --card-foreground: var(--t1);
   --popover: var(--card);
   --popover-foreground: var(--t1);
@@ -127,7 +129,16 @@
   --muted-foreground: var(--t3);
   --secondary: var(--bg2);
   --secondary-foreground: var(--t2);
+  /* Dark mode topbar/sidebar */
 }
+.dark .topbar { background: var(--card); border-color: var(--b1); }
+.dark .tb-brand { background: #0D0E12; border-color: var(--b1); }
+.dark .tb-search { background: var(--bg2); border-color: var(--b2); }
+.dark .tb-search input { color: var(--t1); }
+.dark .tb-icon-btn { background: var(--bg2); border-color: var(--b2); color: var(--t3); }
+.dark .sidebar { background: #0D0E12; }
+.dark .sb-footer { background: #0D0E12; }
+.dark .main-area { background: var(--bg); }
 
 @layer base {
   * {
