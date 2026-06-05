@@ -18,6 +18,7 @@ interface Task {
   ownerId: string
   owner: { id: string; name: string; email: string; role: string; department: string | null; avatar: string | null }
   workflow: { id: string; title: string; status: string } | null
+  dependencies?: { id: string; dependsOnTaskId: string; dependencyType: string; dependsOnTask: { id: string; title: string; status: string } }[]
   subTasks: { id: string; title: string; status: string; ownerId: string; owner: { id: string; name: string } }[]
   taskSteps?: { id: string; title: string; status: string; order: number }[]
   stepsCount?: number
@@ -30,6 +31,16 @@ interface User {
   role: string
   department: string | null
 }
+
+interface WorkflowTemplate {
+  id: string
+  name: string
+  description: string | null
+  category: string | null
+}
+
+const DEPT_DEPS = ['Sales', 'Accounts', 'HR', 'Coordinator', 'Admin', 'Back Office', 'Management']
+const DIRECTOR_DEPS = ['Ashish Sir', 'Samarth Sir']
 
 export function TaskList() {
   const { activeView, currentUserId } = useWorkflowStore()
@@ -45,6 +56,11 @@ export function TaskList() {
   const [newPriority, setNewPriority] = useState('MEDIUM')
   const [newOwnerId, setNewOwnerId] = useState('')
   const [newDueDate, setNewDueDate] = useState('')
+  const [newDepartment, setNewDepartment] = useState('')
+  const [newCategory, setNewCategory] = useState('')
+  const [newDeptDeps, setNewDeptDeps] = useState<string[]>([])
+  const [newDirectorDeps, setNewDirectorDeps] = useState<string[]>([])
+  const [newWorkflowId, setNewWorkflowId] = useState('')
   const queryClient = useQueryClient()
 
   const { data: tasks = [], isLoading } = useQuery<Task[]>({
@@ -57,8 +73,13 @@ export function TaskList() {
     queryFn: () => fetch('/api/users').then(r => r.json()),
   })
 
+  const { data: workflowTemplates = [] } = useQuery<WorkflowTemplate[]>({
+    queryKey: ['workflow-templates'],
+    queryFn: () => fetch('/api/workflow-templates').then(r => r.json()),
+  })
+
   const createMutation = useMutation({
-    mutationFn: (data: { title: string; description: string; priority: string; ownerId: string; dueDate: string }) =>
+    mutationFn: (data: Record<string, unknown>) =>
       fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,9 +88,18 @@ export function TaskList() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      queryClient.invalidateQueries({ queryKey: ['workflows'] })
       setShowCreate(false)
       setNewTitle('')
       setNewDesc('')
+      setNewPriority('MEDIUM')
+      setNewOwnerId('')
+      setNewDueDate('')
+      setNewDepartment('')
+      setNewCategory('')
+      setNewDeptDeps([])
+      setNewDirectorDeps([])
+      setNewWorkflowId('')
     },
   })
 
@@ -104,7 +134,6 @@ export function TaskList() {
 
   const isCancelledView = activeView === 'cancelled'
 
-  // Derive unique values for filters
   const categories = useMemo(() => {
     const set = new Set<string>()
     tasks.forEach(t => { if (t.category) set.add(t.category) })
@@ -190,6 +219,16 @@ export function TaskList() {
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
   const getShortId = (id: string) => id.slice(-6).toUpperCase()
+
+  const toggleDeptDep = (dept: string) => {
+    setNewDeptDeps(prev => prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept])
+  }
+
+  const toggleDirectorDep = (dir: string) => {
+    setNewDirectorDeps(prev => prev.includes(dir) ? prev.filter(d => d !== dir) : [...prev, dir])
+  }
+
+  const hasDeps = newDeptDeps.length > 0 || newDirectorDeps.length > 0
 
   if (isLoading) {
     return (
@@ -298,6 +337,7 @@ export function TaskList() {
                 <th>Assigned To</th>
                 <th>Dept</th>
                 <th>Category</th>
+                <th>Workflow</th>
                 <th>Steps</th>
                 <th>Actions</th>
               </tr>
@@ -307,14 +347,16 @@ export function TaskList() {
                 const sla = getSLAStatus(t.dueDate, t.status)
                 const stepsDone = t.taskSteps ? t.taskSteps.filter(s => s.status === 'COMPLETED').length : (t.stepsDone || 0)
                 const stepsTotal = t.taskSteps ? t.taskSteps.length : (t.stepsCount || 0)
+                const hasDeps = t.dependencies && t.dependencies.length > 0
 
                 return (
                   <tr key={t.id}>
                     <td style={{ color: 'var(--t3)', fontSize: 11 }}>{i + 1}</td>
                     <td><span className="td-code">{getShortId(t.id)}</span></td>
                     <td>
-                      <div style={{ fontWeight: 600, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
-                      {t.description && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description.slice(0, 50)}{t.description.length > 50 ? '…' : ''}</div>}
+                      <div style={{ fontWeight: 600, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                      {t.description && <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.description.slice(0, 50)}{t.description.length > 50 ? '…' : ''}</div>}
+                      {hasDeps && <div style={{ fontSize: 9, color: 'var(--purple)', marginTop: 2, fontWeight: 700 }}>🔗 Dependency</div>}
                     </td>
                     <td><span className={`badge ${getPriorityBadge(t.priority)}`}>{t.priority}</span></td>
                     <td style={{ fontSize: 11 }}>
@@ -347,6 +389,13 @@ export function TaskList() {
                     <td style={{ fontSize: 11 }}>{t.department || t.owner?.department || '—'}</td>
                     <td style={{ fontSize: 11 }}>{t.category || '—'}</td>
                     <td>
+                      {t.workflow ? (
+                        <span className="badge" style={{ background: 'var(--purple-l)', color: 'var(--purple)', fontSize: 9 }}>{t.workflow.status}</span>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'var(--t4)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         <div className="prog-bg" style={{ width: 40, height: 4 }}>
                           <div className="prog-fill" style={{
@@ -364,7 +413,7 @@ export function TaskList() {
                             Start
                           </button>
                         )}
-                        {t.status === 'IN_PROGRESS' && (
+                        {t.status === 'IN_PROGRESS' && !t.workflowId && (
                           <button className="btn btn-green btn-xs" onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
                             Done
                           </button>
@@ -380,7 +429,7 @@ export function TaskList() {
                 )
               }) : (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+                  <td colSpan={12} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
                     No tasks found
                   </td>
                 </tr>
@@ -393,10 +442,28 @@ export function TaskList() {
       {/* Create Task Modal */}
       {showCreate && (
         <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }}>
-          <div className="modal modal-md">
+          <div className="modal" style={{ maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
             <button className="mx" onClick={() => setShowCreate(false)}>✕</button>
             <div className="mt">Create New Task</div>
-            <div className="ms">Add a new task to the system</div>
+            <div className="ms">Add a new task with optional department/director dependencies and workflow</div>
+
+            {/* Approval Flow Preview */}
+            {hasDeps && (
+              <div style={{ background: 'linear-gradient(135deg,rgba(109,40,217,.06),var(--card))', border: '1px solid rgba(109,40,217,.15)', borderRadius: 8, padding: '10px 14px', marginBottom: 14 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--purple)', marginBottom: 8 }}>Approval Flow Preview</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  <div style={{ background: 'var(--blue-l)', color: 'var(--blue)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>Employee</div>
+                  <span style={{ color: 'var(--purple)', fontSize: 12, fontWeight: 900 }}>→</span>
+                  <div style={{ background: 'var(--amber-l)', color: 'var(--amber)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>EA Review</div>
+                  <span style={{ color: 'var(--purple)', fontSize: 12, fontWeight: 900 }}>→</span>
+                  <div style={{ background: 'var(--purple-l)', color: 'var(--purple)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, border: '1.5px solid var(--purple)' }}>Director Approval</div>
+                  <span style={{ color: 'var(--purple)', fontSize: 12, fontWeight: 900 }}>→</span>
+                  <div style={{ background: 'var(--amber-l)', color: 'var(--amber)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>EA Final Review</div>
+                  <span style={{ color: 'var(--purple)', fontSize: 12, fontWeight: 900 }}>→</span>
+                  <div style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '4px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800 }}>Complete</div>
+                </div>
+              </div>
+            )}
 
             <div className="fg">
               <label>Title <span>*</span></label>
@@ -419,10 +486,10 @@ export function TaskList() {
                 </select>
               </div>
               <div className="fg">
-                <label>Assign To</label>
+                <label>Assign To <span>*</span></label>
                 <select className="sel" value={newOwnerId} onChange={e => setNewOwnerId(e.target.value)}>
                   <option value="">Select user…</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
                 </select>
               </div>
               <div className="fg">
@@ -431,7 +498,95 @@ export function TaskList() {
               </div>
             </div>
 
-            <div className="form-actions">
+            <div className="form-row fr-2">
+              <div className="fg">
+                <label>Department</label>
+                <select className="sel" value={newDepartment} onChange={e => setNewDepartment(e.target.value)}>
+                  <option value="">Select department…</option>
+                  {DEPT_DEPS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div className="fg">
+                <label>Category</label>
+                <input className="fi" value={newCategory} onChange={e => setNewCategory(e.target.value)} placeholder="e.g. Operations, Finance, HR" />
+              </div>
+            </div>
+
+            {/* Department Dependencies */}
+            <div style={{ marginTop: 12, marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t1)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--blue)' }}>🏢</span> Department Dependencies
+                <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 400 }}>(triggers EA → Director approval flow)</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {DEPT_DEPS.map(dept => (
+                  <button
+                    key={dept}
+                    type="button"
+                    onClick={() => toggleDeptDep(dept)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      border: newDeptDeps.includes(dept) ? '1.5px solid var(--blue)' : '1.5px solid var(--b2)',
+                      background: newDeptDeps.includes(dept) ? 'var(--blue-l)' : 'var(--card)',
+                      color: newDeptDeps.includes(dept) ? 'var(--blue)' : 'var(--t2)',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {newDeptDeps.includes(dept) ? '✓ ' : ''}{dept}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Director Dependencies */}
+            <div style={{ marginTop: 12, marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t1)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--purple)' }}>👔</span> Director Dependencies
+                <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 400 }}>(requires director approval before completion)</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {DIRECTOR_DEPS.map(dir => (
+                  <button
+                    key={dir}
+                    type="button"
+                    onClick={() => toggleDirectorDep(dir)}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      border: newDirectorDeps.includes(dir) ? '1.5px solid var(--purple)' : '1.5px solid var(--b2)',
+                      background: newDirectorDeps.includes(dir) ? 'var(--purple-l)' : 'var(--card)',
+                      color: newDirectorDeps.includes(dir) ? 'var(--purple)' : 'var(--t2)',
+                      cursor: 'pointer',
+                      transition: 'all .15s',
+                    }}
+                  >
+                    {newDirectorDeps.includes(dir) ? '✓ ' : ''}{dir}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Workflow Selection (Optional) */}
+            <div style={{ marginTop: 12, marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--t1)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--amber)' }}>📋</span> Workflow Template
+                <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 400 }}>(optional - auto-created if dependencies selected)</span>
+              </div>
+              <select className="sel" value={newWorkflowId} onChange={e => setNewWorkflowId(e.target.value)} style={{ width: '100%' }}>
+                <option value="">No workflow (standalone task)</option>
+                {workflowTemplates.map(wt => (
+                  <option key={wt.id} value={wt.id}>{wt.name} {wt.category ? `(${wt.category})` : ''}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-actions" style={{ marginTop: 16 }}>
               <button className="btn btn-out" onClick={() => setShowCreate(false)}>Cancel</button>
               <button
                 className="btn btn-gold"
@@ -442,9 +597,14 @@ export function TaskList() {
                   priority: newPriority,
                   ownerId: newOwnerId,
                   dueDate: newDueDate,
+                  department: newDepartment,
+                  category: newCategory,
+                  departmentDependencies: newDeptDeps,
+                  directorDependencies: newDirectorDeps,
+                  workflowTemplateId: newWorkflowId || undefined,
                 })}
               >
-                {createMutation.isPending ? 'Creating…' : 'Create Task'}
+                {createMutation.isPending ? 'Creating…' : `Create Task${hasDeps ? ' with Approval Flow' : ''}`}
               </button>
             </div>
           </div>

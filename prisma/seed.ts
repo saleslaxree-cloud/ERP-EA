@@ -33,6 +33,7 @@ async function main() {
       { id: 'dept-sales', name: 'Sales', description: 'Sales and client acquisition' },
       { id: 'dept-backoffice', name: 'Back Office', description: 'Operations, design, coordination and support' },
       { id: 'dept-accounts', name: 'Accounts', description: 'Finance and accounting' },
+      { id: 'dept-management', name: 'Management', description: 'Director-level management and strategic oversight' },
     ]
   })
 
@@ -76,6 +77,12 @@ async function main() {
   })
   const director2 = await prisma.user.create({
     data: { id: 'user-dir2', email: 'ronak@laxree.com', name: 'Ronak Jain', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683659', location: 'Ajmer', isActive: true, joinDate: daysAgo(500) }
+  })
+  const director3 = await prisma.user.create({
+    data: { id: 'user-dir3', email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683601', location: 'Ajmer', isActive: true, joinDate: daysAgo(800) }
+  })
+  const director4 = await prisma.user.create({
+    data: { id: 'user-dir4', email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683602', location: 'Ajmer', isActive: true, joinDate: daysAgo(750) }
   })
 
   // EA
@@ -158,6 +165,7 @@ async function main() {
       { id: 'step-task-1', templateId: taskTemplate.id, name: 'Employee Task Completion', stepType: StepType.NOTIFICATION, order: 1, assigneeRole: UserRole.EMPLOYEE, approvalLevel: 1, slaHours: 72 },
       { id: 'step-task-2', templateId: taskTemplate.id, name: 'EA Review & Verification', stepType: StepType.APPROVAL, order: 2, assigneeRole: UserRole.EA, approvalLevel: 2, slaHours: 48 },
       { id: 'step-task-3', templateId: taskTemplate.id, name: 'Director Approval', stepType: StepType.APPROVAL, order: 3, assigneeRole: UserRole.DIRECTOR, approvalLevel: 3, slaHours: 72 },
+      { id: 'step-task-4', templateId: taskTemplate.id, name: 'EA Final Review & Submit', stepType: StepType.APPROVAL, order: 4, assigneeRole: UserRole.EA, approvalLevel: 2, slaHours: 24 },
     ]
   })
   await prisma.stepTemplate.createMany({

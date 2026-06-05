@@ -11,25 +11,22 @@ export async function GET(
     const task = await db.task.findUnique({
       where: { id },
       include: {
-        owner: { select: { id: true, name: true, email: true, role: true, avatar: true } },
-        workflow: { select: { id: true, title: true, status: true } },
-        parentTask: {
-          select: { id: true, title: true, status: true },
-        },
-        subTasks: {
+        owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+        workflow: {
+          select: { id: true, title: true, status: true, currentStepOrder: true },
           include: {
-            owner: { select: { id: true, name: true, email: true, role: true } },
+            steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
           },
+        },
+        parentTask: { select: { id: true, title: true, status: true } },
+        subTasks: {
+          include: { owner: { select: { id: true, name: true, email: true, role: true } } },
         },
         dependencies: {
-          include: {
-            dependsOnTask: { select: { id: true, title: true, status: true } },
-          },
+          include: { dependsOnTask: { select: { id: true, title: true, status: true } } },
         },
         dependents: {
-          include: {
-            task: { select: { id: true, title: true, status: true } },
-          },
+          include: { task: { select: { id: true, title: true, status: true } } },
         },
       },
     })
@@ -56,7 +53,7 @@ export async function PATCH(
 
     const task = await db.task.findUnique({
       where: { id },
-      include: { dependencies: true },
+      include: { dependencies: true, workflow: { include: { steps: true } } },
     })
 
     if (!task) {
@@ -65,27 +62,17 @@ export async function PATCH(
 
     // Check dependency resolution before allowing IN_PROGRESS
     if (status === WorkflowStatus.IN_PROGRESS) {
-      const unmetDeps = task.dependencies.filter(
-        (dep) => dep.dependsOnTaskId
-      )
-
+      const unmetDeps = task.dependencies.filter(dep => dep.dependsOnTaskId)
       if (unmetDeps.length > 0) {
         const depTasks = await db.task.findMany({
-          where: { id: { in: unmetDeps.map((d) => d.dependsOnTaskId) } },
+          where: { id: { in: unmetDeps.map(d => d.dependsOnTaskId) } },
         })
-        const incompleteDeps = depTasks.filter(
-          (t) => t.status !== WorkflowStatus.COMPLETED
-        )
-
+        const incompleteDeps = depTasks.filter(t => t.status !== WorkflowStatus.COMPLETED)
         if (incompleteDeps.length > 0) {
           return NextResponse.json(
             {
               error: 'Cannot start task: dependencies not completed',
-              dependencies: incompleteDeps.map((t) => ({
-                id: t.id,
-                title: t.title,
-                status: t.status,
-              })),
+              dependencies: incompleteDeps.map(t => ({ id: t.id, title: t.title, status: t.status })),
             },
             { status: 400 }
           )

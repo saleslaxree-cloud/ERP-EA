@@ -1,0 +1,69 @@
+'use client'
+
+import { useState } from 'react'
+import { useWorkflowStore } from '@/stores/workflow-store'
+
+export function LaxreeLogin() {
+  const { login } = useWorkflowStore()
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [attempts, setAttempts] = useState(0)
+
+  const handleLogin = () => {
+    if (attempts >= 5) {
+      setError('Too many failed attempts. Please refresh the page.')
+      return
+    }
+    const success = login(username, password)
+    if (!success) {
+      const remaining = 5 - attempts - 1
+      setAttempts(a => a + 1)
+      setError(remaining > 0 ? `Invalid credentials. ${remaining} attempt(s) remaining.` : 'Account locked — please refresh.')
+    }
+  }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'linear-gradient(160deg, #fffcf2 0%, #fdf6d8 60%, #fff9ee 100%)',
+      zIndex: 8000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div className="lc">
+        <div className="lc-brand">
+          <div style={{
+            width: 72, height: 72, margin: '0 auto 10px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #8B6914, #D4AA50)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Cormorant Garamond', serif", fontSize: 28, fontWeight: 700,
+            color: '#fff', letterSpacing: 2,
+          }}>L</div>
+          <span className="lc-brand-name">LAXREE</span>
+          <span className="lc-brand-sub">Enterprise Operating System</span>
+        </div>
+        <div className="lf-g">
+          <label className="lf-l">Username</label>
+          <input className="lf-i" type="text" placeholder="admin"
+            value={username} onChange={e => setUsername(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+        </div>
+        <div className="lf-g">
+          <label className="lf-l">Password</label>
+          <input className="lf-i" type="password" placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleLogin()} />
+        </div>
+        <button className="lf-btn" onClick={handleLogin}>Sign In to LOS</button>
+        {error && (
+          <div style={{
+            background: 'var(--red-l)', border: '1px solid rgba(200,21,26,.3)',
+            color: 'var(--red)', padding: '10px 14px', borderRadius: 'var(--r-sm)',
+            fontSize: 12, marginTop: 10,
+          }}>{error}</div>
+        )}
+        <div className="lf-hint">Demo: admin / admin123 · ea / ea123 · ashish / ashish123</div>
+      </div>
+    </div>
+  )
+}
