@@ -270,9 +270,6 @@ export async function POST(request: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         workflowId: createdWorkflowId,
         parentTaskId: parentTaskId || null,
-        frequency: frequency || null,
-        weekDays: weekDays || null,
-        monthDates: monthDates || null,
         taskSteps: {
           create: taskStepsData.map((step: { title: string; order: number; directorName?: string | null; directorNote?: string | null }) => ({
             title: step.title,
@@ -280,9 +277,6 @@ export async function POST(request: NextRequest) {
             order: step.order || 0,
           })),
         },
-        frequency: frequency || null,
-        weekDays: weekDays || null,
-        monthDates: monthDates || null,
       },
       include: {
         owner: { select: { id: true, name: true, email: true, role: true, department: true } },

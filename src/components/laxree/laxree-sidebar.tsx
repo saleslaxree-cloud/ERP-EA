@@ -16,17 +16,15 @@ interface NavItem {
 export function LaxreeSidebar() {
   const { activePage, setActivePage, currentUser, sidebarOpen, setSidebarOpen, logout } = useWorkflowStore()
 
-  const { data: workflows = [] } = useQuery({
-    queryKey: ['workflows-sidebar'],
-    queryFn: () => fetch('/api/workflows').then(r => r.json()),
+  const { data: dashData } = useQuery({
+    queryKey: ['sidebar-stats'],
+    queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()),
   })
 
-  const pendingApprovals = workflows.filter((w: any) => w.status === 'PENDING' || w.status === 'IN_REVIEW').length
-  const activeTasks = workflows.filter((w: any) => w.status !== 'COMPLETED' && w.status !== 'CANCELLED').length
-  const overdueTasks = workflows.filter((w: any) => {
-    if (!w.dueDate || w.status === 'COMPLETED' || w.status === 'CANCELLED') return false
-    return new Date(w.dueDate) < new Date()
-  }).length
+  const d = dashData as any
+  const pendingApprovals = d?.pendingApprovals || 0
+  const activeTasks = (d?.totalTasks || 0) - (d?.completedTasks || 0) - ((d?.statusCounts?.CANCELLED || 0))
+  const overdueTasks = d?.overdueTasks || 0
 
   const commandCenter: NavItem[] = [
     {
