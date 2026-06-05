@@ -70,7 +70,7 @@ async function main() {
   // ══ USERS — AJMER STAFF (LAXREE Organization) ══
   // Admin & Leadership
   const admin = await prisma.user.create({
-    data: { id: 'user-admin', email: 'accounts@laxree.com', name: 'Hitesh Tak', role: UserRole.ADMIN, department: 'Accounts', designation: 'Accountant', phone: '9982214555', location: 'Ajmer', isActive: true, joinDate: daysAgo(365) }
+    data: { id: 'user-admin', email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.ADMIN, department: 'Back Office', designation: 'Admin & EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400) }
   })
   const director1 = await prisma.user.create({
     data: { id: 'user-dir1', email: 'sandeep@laxree.com', name: 'Sandeep', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683662', location: 'Ajmer', isActive: true, joinDate: daysAgo(730) }
@@ -123,11 +123,14 @@ async function main() {
   const emp7 = await prisma.user.create({
     data: { id: 'user-emp7', email: 'kamlesh@laxree.com', name: 'Kamlesh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'MIS', phone: '9251683660', location: 'Ajmer', isActive: true, joinDate: daysAgo(200) }
   })
+  const emp8 = await prisma.user.create({
+    data: { id: 'user-emp8', email: 'accounts@laxree.com', name: 'Hitesh Tak', role: UserRole.EMPLOYEE, department: 'Accounts', designation: 'Accountant', phone: '9982214555', location: 'Ajmer', isActive: true, joinDate: daysAgo(365) }
+  })
 
   // ══ UPDATE DEPARTMENT HEADS ══
   await prisma.department.update({ where: { id: 'dept-sales' }, data: { headId: director1.id } })
   await prisma.department.update({ where: { id: 'dept-backoffice' }, data: { headId: director2.id } })
-  await prisma.department.update({ where: { id: 'dept-accounts' }, data: { headId: admin.id } })
+  await prisma.department.update({ where: { id: 'dept-accounts' }, data: { headId: emp8.id } })
 
   // ══ PROJECTS ══
   const proj1 = await prisma.project.create({
@@ -344,14 +347,14 @@ async function main() {
     { id: 'task-22', title: 'Social Media Templates', description: 'Design social media post templates', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp4.id, department: 'Back Office', category: 'Design', dueDate: daysFromNow(8), projectId: proj6.id },
 
     // Accounts tasks
-    { id: 'task-11', title: 'Quarterly Tax Filing', description: 'Prepare and file Q4 tax returns', status: WorkflowStatus.PENDING, priority: TaskPriority.CRITICAL, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(1) },
-    { id: 'task-12', title: 'Payroll Processing - December', description: 'Process December payroll for all employees', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
-    { id: 'task-13', title: 'Budget Allocation Q2', description: 'Prepare Q2 budget allocation plan', status: WorkflowStatus.COMPLETED, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(4), completedAt: daysAgo(4) },
-    { id: 'task-14', title: 'Invoice Reconciliation', description: 'Reconcile November invoices', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(4) },
-    { id: 'task-15', title: 'Annual Financial Report', description: 'Compile annual financial statements', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(7) },
-    { id: 'task-16', title: 'Expense Report Review', description: 'Review and approve team expense reports', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(2) },
-    { id: 'task-17', title: 'Vendor Payment Processing', description: 'Process outstanding vendor payments', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
-    { id: 'task-18', title: 'Audit Preparation Documents', description: 'Prepare documents for external audit', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: admin.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(6), completedAt: daysAgo(6) },
+    { id: 'task-11', title: 'Quarterly Tax Filing', description: 'Prepare and file Q4 tax returns', status: WorkflowStatus.PENDING, priority: TaskPriority.CRITICAL, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(1) },
+    { id: 'task-12', title: 'Payroll Processing - December', description: 'Process December payroll for all employees', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.HIGH, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
+    { id: 'task-13', title: 'Budget Allocation Q2', description: 'Prepare Q2 budget allocation plan', status: WorkflowStatus.COMPLETED, priority: TaskPriority.HIGH, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(4), completedAt: daysAgo(4) },
+    { id: 'task-14', title: 'Invoice Reconciliation', description: 'Reconcile November invoices', status: WorkflowStatus.PENDING, priority: TaskPriority.MEDIUM, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(4) },
+    { id: 'task-15', title: 'Annual Financial Report', description: 'Compile annual financial statements', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(7) },
+    { id: 'task-16', title: 'Expense Report Review', description: 'Review and approve team expense reports', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(2) },
+    { id: 'task-17', title: 'Vendor Payment Processing', description: 'Process outstanding vendor payments', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysFromNow(0) },
+    { id: 'task-18', title: 'Audit Preparation Documents', description: 'Prepare documents for external audit', status: WorkflowStatus.COMPLETED, priority: TaskPriority.MEDIUM, ownerId: emp8.id, department: 'Accounts', category: 'Finance', dueDate: daysAgo(6), completedAt: daysAgo(6) },
     { id: 'task-19', title: 'Client Proposal - TechCorp', description: 'Draft proposal for TechCorp partnership', status: WorkflowStatus.PENDING, priority: TaskPriority.HIGH, ownerId: manager1.id, department: 'Sales', category: 'Marketing', dueDate: daysFromNow(6), projectId: proj4.id },
     { id: 'task-20', title: 'IT System Migration Plan', description: 'Plan migration to new cloud infrastructure', status: WorkflowStatus.EXTERNAL_HOLD, priority: TaskPriority.HIGH, ownerId: emp5.id, department: 'Back Office', category: 'IT & Tech', dueDate: daysFromNow(10) },
     { id: 'task-23', title: 'Roofing Catalog Update', description: 'Update product catalog with new roofing items', status: WorkflowStatus.IN_PROGRESS, priority: TaskPriority.MEDIUM, ownerId: manager1.id, department: 'Sales', category: 'Roofing', dueDate: daysFromNow(3), projectId: proj2.id },

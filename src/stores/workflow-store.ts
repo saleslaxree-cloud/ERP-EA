@@ -4,6 +4,12 @@ type ActiveView = 'dashboard' | 'workflows' | 'approvals' | 'tasks' | 'notificat
 
 type UserRole = 'ADMIN' | 'DIRECTOR' | 'EA' | 'MANAGER' | 'EMPLOYEE'
 
+interface Toast {
+  id: string
+  type: 'ok' | 'err' | 'info'
+  message: string
+}
+
 interface WorkflowStore {
   activeView: ActiveView
   currentUserId: string
@@ -14,6 +20,22 @@ interface WorkflowStore {
   darkMode: boolean
   searchQuery: string
   notifPanelOpen: boolean
+  // Task creation modal
+  createTaskOpen: boolean
+  setCreateTaskOpen: (open: boolean) => void
+  // Task detail/selection
+  selectedTaskId: string | null
+  setSelectedTaskId: (id: string | null) => void
+  // Task tab
+  taskTab: string
+  setTaskTab: (tab: string) => void
+  // Current user object (for components that need it)
+  currentUser: { username: string; role: string; name: string } | null
+  // Toast notifications
+  toasts: Toast[]
+  addToast: (type: 'ok' | 'err' | 'info', message: string) => void
+  removeToast: (id: string) => void
+  // Standard setters
   setActiveView: (view: ActiveView) => void
   setCurrentUserId: (id: string) => void
   setCurrentUserName: (name: string) => void
@@ -31,13 +53,29 @@ interface WorkflowStore {
 export const useWorkflowStore = create<WorkflowStore>((set) => ({
   activeView: 'dashboard',
   currentUserId: 'user-admin',
-  currentUserName: 'Admin',
+  currentUserName: 'Arti Sharma',
   currentRole: 'ADMIN',
   sidebarOpen: false,
   selectedWorkflowId: null,
   darkMode: false,
   searchQuery: '',
   notifPanelOpen: false,
+  createTaskOpen: false,
+  selectedTaskId: null,
+  taskTab: 'all',
+  currentUser: { username: 'admin', role: 'admin', name: 'Arti Sharma' },
+  toasts: [],
+  setCreateTaskOpen: (open) => set({ createTaskOpen: open }),
+  setSelectedTaskId: (id) => set({ selectedTaskId: id }),
+  setTaskTab: (tab) => set({ taskTab: tab }),
+  addToast: (type, message) => {
+    const id = Date.now().toString() + Math.random().toString(36).slice(2)
+    set((state) => ({ toasts: [...state.toasts, { id, type, message }] }))
+    setTimeout(() => {
+      set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) }))
+    }, 4000)
+  },
+  removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
   setActiveView: (view) => set({ activeView: view, selectedWorkflowId: null }),
   setCurrentUserId: (id) => set({ currentUserId: id }),
   setCurrentUserName: (name) => set({ currentUserName: name }),
