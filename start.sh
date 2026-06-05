@@ -9,5 +9,5 @@ if [ ! -d ".next/standalone" ]; then
   npx next build 2>/dev/null
 fi
 
-# Start the production server (more stable than dev)
-exec npx next start -p 3000 -H 0.0.0.0
+# Start the server using custom server.js
+exec node server.js
