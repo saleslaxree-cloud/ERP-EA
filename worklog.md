@@ -1,27 +1,27 @@
 ---
 Task ID: 1
 Agent: Main Agent
-Task: Fix CSS self-referential variables, TypeScript errors, and build issues
+Task: Fix blank page, clean database, and rebuild LAXREE Enterprise Management System
 
 Work Log:
-- Fixed self-referential `--card: var(--card)` in globals.css :root block (line 50)
-- Fixed self-referential `--card: var(--card)` in .dark block that was overriding concrete `--card:#16181F`
-- Added dark mode overrides for topbar, sidebar, and main-area backgrounds
-- Added dark mode color variables for light-tint variants (green-l, red-l, amber-l, blue-l, purple-l, teal-l, rose-l)
-- Removed `ignoreBuildErrors: true` from next.config.ts
-- Enabled `reactStrictMode: true`
-- Added `skills` and `examples` to tsconfig.json exclude list
-- Removed broken `examples/websocket/` directory
-- Fixed TypeScript error: `stepInstance.stepTemplate` -> `(stepInstance as any).stepTemplate`
-- Fixed TypeScript error: `t.ownerId` -> `t.owner?.id` in dashboard route
-- Fixed TypeScript error: array `.includes()` type narrowing with `as WorkflowStatus[]`
-- Fixed TypeScript error: `createdUsers` empty array type as `any[]`
-- Sub-agent fixed: laxree-analytics.tsx unknown type, laxree-command-palette missing property, laxree-dashboard Date arithmetic, workflow-store missing login/mmPanelOpen
-- Database seeded with 18 users and 17 tasks
-- Build passes with 0 TypeScript errors
+- Audited entire project structure (40+ files read)
+- Verified tsconfig.json - no nested compilerOptions (was fixed in previous session)
+- Verified globals.css - no "statbackground" typo
+- Verified lib/db.ts - complete PrismaClient singleton
+- Checked database: had 21 users, 44 tasks, 13 workflows
+- Verified all API endpoints work correctly (dashboard, tasks, users)
+- App builds successfully with `next build`
+- Page renders correctly on server-side (HTML contains full LAXREE layout)
+- Fixed tailwind.config.ts - added `./src/**/*.{js,ts,jsx,tsx,mdx}` to content paths
+- Cleaned database: removed all tasks (44), workflows (13), task steps (49), approvals (27), notifications (27), projects (6), dependencies (2), escalation logs (1), comments (4), delegations (1), status history (15)
+- Removed 4 extra non-seed users (Radhika duplicate, Hitesh Tak duplicate, Meera Patel, Rajesh Kumar)
+- Kept only 17 LAXREE organization users with proper roles
+- Clean build succeeds, dev server starts, APIs return correct data
+- Dashboard shows 0 tasks (clean start), 17 users
+- All views functional: Dashboard, Executive, Approvals, Tasks, Analytics, Performance, Departments, Team, Categories, Holidays, Director Dependency, External Hold, Escalations, Monday Meeting, Employees, Projects, Reports, Scorecards, Settings
 
 Stage Summary:
-- All core bugs fixed
-- CSS dark mode properly styled
-- Build passes cleanly
-- App renders correctly with sidebar, topbar, dashboard data
+- Database cleaned: only 17 LAXREE employees remain (Arti Sharma, Sandeep, Ronak Jain, Ashish Sir, Samarth Sir, Khushboo Manglani, Radhika, Tanuja Tigaya, Aditya Sharma, Aakash, Anamika, Saurabh, Ruchi, Aayush, Kamlesh, Hitesh Tak, and Arti Sharma EA)
+- App builds and runs successfully on port 3000
+- All API endpoints functional
+- tailwind.config.ts fixed to include src/** paths
