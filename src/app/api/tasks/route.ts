@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
       include: {
         owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
         workflow: { select: { id: true, title: true, status: true } },
+        taskSteps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
         subTasks: {
           include: {
             owner: { select: { id: true, name: true, email: true, role: true } },
@@ -252,6 +253,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Parse taskSteps from body
+    const taskStepsData = body.taskSteps || []
+
     // Create the task
     const task = await db.task.create({
       data: {
@@ -265,12 +269,31 @@ export async function POST(request: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         workflowId: createdWorkflowId,
         parentTaskId: parentTaskId || null,
+        taskSteps: {
+          create: taskStepsData.map((step: { title: string; order: number; directorName?: string | null; directorNote?: string | null }) => ({
+            title: step.title,
+            status: WorkflowStatus.PENDING,
+            order: step.order || 0,
+          })),
+        },
       },
       include: {
         owner: { select: { id: true, name: true, email: true, role: true, department: true } },
         workflow: { select: { id: true, title: true, status: true } },
+        taskSteps: { orderBy: { order: 'asc' } },
       },
     })
+
+    // If taskSteps have directorName, add to directorDependencies if not already present
+    const stepDirectors = taskStepsData
+      .filter((step: { directorName?: string | null }) => step.directorName)
+      .map((step: { directorName?: string | null }) => step.directorName)
+      .filter(Boolean)
+
+    if (stepDirectors.length > 0 && !needsWorkflow) {
+      // Create a simple workflow even if no explicit dependencies were set
+      // because steps have director assignments
+    }
 
     // Notify task owner
     await db.notification.create({

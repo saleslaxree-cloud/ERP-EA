@@ -93,11 +93,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
     }
 
+    // Only Arti Sharma can be ADMIN - prevent others from getting ADMIN role
+    const requestedRole = (role as UserRole) || UserRole.EMPLOYEE
+    if (requestedRole === UserRole.ADMIN) {
+      const existingAdmins = await db.user.findMany({ where: { role: UserRole.ADMIN } })
+      if (existingAdmins.length > 0) {
+        return NextResponse.json({ error: 'Admin role is reserved. Only Arti Sharma can be admin.' }, { status: 403 })
+      }
+    }
+
     const employee = await db.user.create({
       data: {
         name,
         email,
-        role: (role as UserRole) || UserRole.EMPLOYEE,
+        role: requestedRole,
         department: department || null,
         designation: designation || null,
         phone: phone || null,

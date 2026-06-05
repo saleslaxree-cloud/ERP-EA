@@ -4,11 +4,18 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AppSidebar } from '@/components/app-sidebar'
 import { AppHeader } from '@/components/app-header'
-import { WorkflowDashboard } from '@/components/workflow-dashboard'
 import { WorkflowList } from '@/components/workflow-list'
 import { ApprovalList } from '@/components/approval-list'
 import { TaskList } from '@/components/task-list'
 import { NotificationList } from '@/components/notification-list'
+import { LaxreeDashboard } from '@/components/laxree/laxree-dashboard'
+import { LaxreeCreateTask } from '@/components/laxree/laxree-create-task'
+import { LaxreeTasks } from '@/components/laxree/laxree-tasks'
+import { LaxreeApprovals } from '@/components/laxree/laxree-approvals'
+import { LaxreeDirDependency } from '@/components/laxree/laxree-dir-dependency'
+import { LaxreeExtHold } from '@/components/laxree/laxree-exthold'
+import { LaxreeEscalations } from '@/components/laxree/laxree-escalations'
+import { LaxreeMonday } from '@/components/laxree/laxree-monday'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, type ReactNode } from 'react'
 
@@ -65,23 +72,20 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 function ActiveView() {
-  const { activeView } = useWorkflowStore()
+  const { activePage } = useWorkflowStore()
 
   const renderView = () => {
-    switch (activeView) {
+    switch (activePage) {
       case 'dashboard':
-        return <WorkflowDashboard />
-      case 'workflows':
-        return <WorkflowList />
-      case 'approvals':
-        return <ApprovalList />
-      case 'tasks':
-      case 'cancelled':
-        return <TaskList />
-      case 'notifications':
-        return <NotificationList />
+        return <LaxreeDashboard />
       case 'executive':
         return <ExecutiveView />
+      case 'approvals':
+        return <LaxreeApprovals />
+      case 'tasks':
+        return <LaxreeTasks />
+      case 'cancelled':
+        return <LaxreeTasks showCancelled />
       case 'analytics':
         return <AnalyticsView />
       case 'performance':
@@ -94,9 +98,18 @@ function ActiveView() {
         return <CategoriesView />
       case 'holidays':
         return <HolidaysView />
+      case 'dirDep':
       case 'director-dependency':
+        return <LaxreeDirDependency />
+      case 'exthold':
+        return <LaxreeExtHold />
       case 'escalations':
-        return <DirectorDependencyView />
+        return <LaxreeEscalations />
+      case 'monday':
+      case 'workflows':
+        return <LaxreeMonday />
+      case 'notifications':
+        return <NotificationList />
       case 'employees':
         return <EmployeesView />
       case 'projects':
@@ -108,7 +121,7 @@ function ActiveView() {
       case 'settings':
         return <SettingsView />
       default:
-        return <WorkflowDashboard />
+        return <LaxreeDashboard />
     }
   }
 
@@ -1125,7 +1138,6 @@ function EmployeesView() {
                   <option value="MANAGER">Manager</option>
                   <option value="EA">EA</option>
                   <option value="DIRECTOR">Director</option>
-                  <option value="ADMIN">Admin</option>
                 </select>
               </div>
               <div className="fg">
@@ -1937,6 +1949,7 @@ export default function HomePage() {
         <main className="main-area">
           <ActiveView />
         </main>
+        <LaxreeCreateTask />
         <div id="toastArea" />
       </div>
     </ErrorBoundary>

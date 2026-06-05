@@ -1,9 +1,9 @@
 'use client'
 
-import { useWorkflowStore, type ActivePage } from '@/stores/workflow-store'
+import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState, useEffect, useRef } from 'react'
 
-const COMMANDS: Array<{ id: ActivePage; label: string; section: string; icon: string; shortcut?: string }> = [
+const COMMANDS: Array<{ id: string; label: string; section: string; icon: string; shortcut?: string }> = [
   { id: 'dashboard', label: 'Go to Dashboard', section: 'Navigation', icon: '🏠' },
   { id: 'executive', label: 'Executive View', section: 'Navigation', icon: '👔', shortcut: 'E' },
   { id: 'approvals', label: 'Approvals', section: 'Navigation', icon: '✅', shortcut: 'A' },
@@ -20,7 +20,7 @@ const COMMANDS: Array<{ id: ActivePage; label: string; section: string; icon: st
 ]
 
 export function LaxreeCommandPalette() {
-  const { commandPaletteOpen, setCommandPaletteOpen, setActivePage, setCreateTaskOpen } = useWorkflowStore()
+  const { cmdPaletteOpen, setCmdPaletteOpen, setActivePage, setCreateTaskOpen } = useWorkflowStore()
   const [search, setSearch] = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -32,33 +32,33 @@ export function LaxreeCommandPalette() {
 
   // Add Create Task as first item if search matches
   const allItems = [
-    ...(!search || 'create task'.includes(search.toLowerCase()) ? [{ id: 'tasks' as ActivePage, label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true }] : []),
+    ...(!search || 'create task'.includes(search.toLowerCase()) ? [{ id: 'tasks', label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true }] : []),
     ...filtered,
   ]
 
   useEffect(() => {
-    if (commandPaletteOpen) {
+    if (cmdPaletteOpen) {
       requestAnimationFrame(() => {
         setSearch('')
         setActiveIdx(0)
         setTimeout(() => inputRef.current?.focus(), 50)
       })
     }
-  }, [commandPaletteOpen])
+  }, [cmdPaletteOpen])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
-        setCommandPaletteOpen(!commandPaletteOpen)
+        setCmdPaletteOpen(!cmdPaletteOpen)
       }
-      if (e.key === 'Escape' && commandPaletteOpen) {
-        setCommandPaletteOpen(false)
+      if (e.key === 'Escape' && cmdPaletteOpen) {
+        setCmdPaletteOpen(false)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [commandPaletteOpen, setCommandPaletteOpen])
+  }, [cmdPaletteOpen, setCmdPaletteOpen])
 
   const handleSelect = (item: typeof allItems[0]) => {
     if ((item as { isCreateTask?: boolean }).isCreateTask) {
@@ -66,7 +66,7 @@ export function LaxreeCommandPalette() {
     } else {
       setActivePage(item.id)
     }
-    setCommandPaletteOpen(false)
+    setCmdPaletteOpen(false)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -81,10 +81,10 @@ export function LaxreeCommandPalette() {
     }
   }
 
-  if (!commandPaletteOpen) return null
+  if (!cmdPaletteOpen) return null
 
   return (
-    <div className="overlay show" onClick={() => setCommandPaletteOpen(false)}>
+    <div className="overlay show" onClick={() => setCmdPaletteOpen(false)}>
       <div className="modal modal-md" style={{ maxHeight: 480, overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--b1)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--t3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

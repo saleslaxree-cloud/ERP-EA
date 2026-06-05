@@ -63,7 +63,7 @@ export function LaxreeDashboard() {
     const done = uTasks.filter((t: any) => t.status === 'COMPLETED').length
     const rate = uTasks.length ? Math.round(done / uTasks.length * 100) : 0
     const score = Math.max(0, rate)
-    return { user, total: uTasks.length, done, score }
+    return { user: u, total: uTasks.length, done, score }
   }).sort((a, b) => b.score - a.score).slice(0, 8)
 
   const statusLabels: Record<string, string> = {

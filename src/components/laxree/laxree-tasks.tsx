@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 interface LaxreeTasksProps {
   showCancelled?: boolean
@@ -11,15 +11,12 @@ interface LaxreeTasksProps {
 }
 
 export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: LaxreeTasksProps) {
-  const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId } = useWorkflowStore()
+  const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId, addToast, setCreateTaskOpen, currentRole } = useWorkflowStore()
   const queryClient = useQueryClient()
-  const [showCreate, setShowCreate] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'MEDIUM', dueDate: '' })
-
-  const { data: workflows = [] } = useQuery({
-    queryKey: ['workflows-tasks'],
-    queryFn: () => fetch('/api/workflows').then(r => r.json()),
-  })
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
+  const [editTask, setEditTask] = useState<any>(null)
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: string } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks-list'],
@@ -31,75 +28,126 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     queryFn: () => fetch('/api/users').then(r => r.json()),
   })
 
-  const createMutation = useMutation({
-    mutationFn: (data: any) => fetch('/api/workflows', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
-    }).then(r => r.json()),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workflows-tasks'] }); setShowCreate(false); setNewTask({ title: '', description: '', priority: 'MEDIUM', dueDate: '' }) },
+  // Close menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpenId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => fetch(`/api/tasks/${id}`, { method: 'DELETE' }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      addToast('ok', 'Task deleted')
+      setConfirmAction(null)
+      setMenuOpenId(null)
+    },
   })
 
-  const statusLabels: Record<string, string> = {
-    DRAFT: 'Draft', PENDING: 'Pending', IN_REVIEW: 'In Review', APPROVED: 'Approved',
-    REJECTED: 'Rejected', IN_PROGRESS: 'In Progress', ON_HOLD: 'On Hold',
-    ESCALATED: 'Escalated', COMPLETED: 'Completed', CANCELLED: 'Cancelled', EXTERNAL_HOLD: 'External Hold',
-    RE_OPENED: 'Re-Opened',
-  }
+  const cancelMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'CANCELLED' }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      addToast('ok', 'Task cancelled')
+      setConfirmAction(null)
+      setMenuOpenId(null)
+    },
+  })
 
-  const statusBadgeClass: Record<string, string> = {
-    COMPLETED: 's-done', IN_PROGRESS: 's-inprog', PENDING: 's-pending',
-    CANCELLED: 's-cancelled', ON_HOLD: 's-waiting', ESCALATED: 's-overdue',
-    EXTERNAL_HOLD: 's-exthold', APPROVED: 's-done', REJECTED: 's-returned',
-    IN_REVIEW: 's-approval', DRAFT: 's-pending', RE_OPENED: 's-approval',
-  }
+  const startMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      addToast('ok', 'Task started')
+      setMenuOpenId(null)
+    },
+  })
 
-  const priorityClass: Record<string, string> = {
-    CRITICAL: 'p-critical', HIGH: 'p-high', MEDIUM: 'p-med', LOW: 'p-low',
-  }
+  const editMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      addToast('ok', 'Task updated')
+      setEditTask(null)
+    },
+  })
 
-  const priorityLabels: Record<string, string> = {
-    CRITICAL: 'Critical', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low',
-  }
+  // Filtering
+  let filtered = Array.isArray(tasks) ? [...tasks] : []
 
-  // Combine workflows and tasks
-  let allItems = [...workflows.map((w: any) => ({ ...w, type: 'workflow' })), ...tasks.map((t: any) => ({ ...t, type: 'task' }))]
-
-  // Filter based on props
-  if (showCancelled) allItems = allItems.filter((i: any) => i.status === 'CANCELLED')
-  if (showExtHold) allItems = allItems.filter((i: any) => i.status === 'EXTERNAL_HOLD')
-  if (showEscalations) allItems = allItems.filter((i: any) => i.status === 'ESCALATED' || (i.dueDate && new Date(i.dueDate) < new Date() && i.status !== 'COMPLETED' && i.status !== 'CANCELLED'))
+  if (showCancelled) filtered = filtered.filter((t: any) => t.status === 'CANCELLED')
+  if (showExtHold) filtered = filtered.filter((t: any) => t.status === 'EXTERNAL_HOLD')
+  if (showEscalations) filtered = filtered.filter((t: any) =>
+    t.status === 'ESCALATED' || (t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  )
 
   // Tab filtering
-  const filtered = taskTab === 'all' ? allItems
-    : taskTab === 'inprogress' ? allItems.filter((i: any) => i.status === 'IN_PROGRESS')
-    : taskTab === 'pending' ? allItems.filter((i: any) => i.status === 'PENDING' || i.status === 'DRAFT')
-    : taskTab === 'completed' ? allItems.filter((i: any) => i.status === 'COMPLETED')
-    : taskTab === 'overdue' ? allItems.filter((i: any) => i.dueDate && new Date(i.dueDate) < new Date() && i.status !== 'COMPLETED' && i.status !== 'CANCELLED')
-    : allItems
+  if (!showCancelled && !showExtHold && !showEscalations) {
+    if (taskTab === 'inprogress') filtered = filtered.filter((t: any) => t.status === 'IN_PROGRESS')
+    else if (taskTab === 'pending') filtered = filtered.filter((t: any) => t.status === 'PENDING' || t.status === 'DRAFT')
+    else if (taskTab === 'completed') filtered = filtered.filter((t: any) => t.status === 'COMPLETED')
+    else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
+      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+    )
+  }
 
   const tabs = [
-    { id: 'all', label: 'All', count: allItems.length },
-    { id: 'inprogress', label: 'In Progress', count: allItems.filter((i: any) => i.status === 'IN_PROGRESS').length },
-    { id: 'pending', label: 'Pending', count: allItems.filter((i: any) => i.status === 'PENDING' || i.status === 'DRAFT').length },
-    { id: 'completed', label: 'Completed', count: allItems.filter((i: any) => i.status === 'COMPLETED').length },
-    { id: 'overdue', label: 'Overdue', count: allItems.filter((i: any) => i.dueDate && new Date(i.dueDate) < new Date() && i.status !== 'COMPLETED' && i.status !== 'CANCELLED').length },
+    { id: 'all', label: 'All', count: Array.isArray(tasks) ? tasks.length : 0 },
+    { id: 'inprogress', label: 'In Progress', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'IN_PROGRESS').length },
+    { id: 'pending', label: 'Pending', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'PENDING' || t.status === 'DRAFT').length },
+    { id: 'completed', label: 'Completed', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'COMPLETED').length },
+    { id: 'overdue', label: 'Overdue', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length },
   ]
 
   const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?'
 
+  const priorityBadge: Record<string, { bg: string; color: string }> = {
+    CRITICAL: { bg: '#FFF1F2', color: '#E11D48' },
+    HIGH: { bg: '#FEF2F2', color: '#DC2626' },
+    MEDIUM: { bg: '#FFFBEB', color: '#D97706' },
+    LOW: { bg: '#EFF6FF', color: '#2563EB' },
+  }
+
+  const getSlaStatus = (task: any) => {
+    if (task.status === 'COMPLETED' || task.status === 'CANCELLED') return null
+    if (!task.dueDate) return { label: 'On Track', bg: '#ECFDF5', color: '#059669' }
+    const now = new Date()
+    const due = new Date(task.dueDate)
+    const diffDays = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    if (diffDays < 0) return { label: 'Overdue', bg: '#FEF2F2', color: '#DC2626' }
+    if (diffDays <= 2) return { label: 'Due Soon', bg: '#FFFBEB', color: '#D97706' }
+    return { label: 'On Track', bg: '#ECFDF5', color: '#059669' }
+  }
+
+  const generateTaskId = (task: any, index: number) => {
+    return `TSK${String(index + 1).padStart(3, '0')}`
+  }
+
   const pageTitle = showCancelled ? 'Cancelled Tasks' : showExtHold ? 'External Hold' : showEscalations ? 'Escalations' : 'All Tasks'
   const pageDesc = showCancelled ? 'Cancelled workflow items' : showExtHold ? 'Tasks waiting on external action' : showEscalations ? 'Overdue and escalated items' : 'Manage and track all tasks'
-
-  const handleCreate = () => {
-    if (!newTask.title.trim()) return
-    createMutation.mutate({
-      templateId: 'template-1',
-      title: newTask.title,
-      description: newTask.description,
-      priority: newTask.priority,
-      dueDate: newTask.dueDate || undefined,
-      creatorId: currentUser?.username === 'admin' ? 'user-admin' : 'user-ea',
-    })
-  }
 
   return (
     <>
@@ -110,7 +158,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
         </div>
         <div className="ph-right">
           {(currentUser?.role === 'admin' || currentUser?.role === 'ea') && !showCancelled && !showExtHold && !showEscalations && (
-            <button className="btn btn-gold" onClick={() => setShowCreate(true)}>+ Create Task</button>
+            <button className="btn btn-gold" onClick={() => setCreateTaskOpen(true)}>+ Create Task</button>
           )}
         </div>
       </div>
@@ -130,83 +178,313 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
         </div>
       )}
 
-      {/* Task List */}
-      <div className="card">
+      {/* Tasks Table */}
+      <div className="lcard">
         <div className="ch">
-          <div className="ct">📋 {filtered.length} Item(s)</div>
+          <div className="ct">📋 {filtered.length} Task(s)</div>
           <span className="badge b-gold" style={{ fontSize: 10 }}>Live</span>
         </div>
-        <div className="tw">
-          <table>
+        <div className="tw" style={{ overflowX: 'auto' }}>
+          <table className="ltable">
             <thead>
-              <tr><th>Title</th><th>Status</th><th>Priority</th><th>Due Date</th><th>Created</th></tr>
+              <tr>
+                <th style={{ width: 40 }}>#</th>
+                <th style={{ width: 80 }}>TASK ID</th>
+                <th>TITLE</th>
+                <th style={{ width: 90 }}>PRIORITY</th>
+                <th style={{ width: 90 }}>DUE DATE</th>
+                <th style={{ width: 80 }}>SLA</th>
+                <th style={{ width: 140 }}>ASSIGNED TO</th>
+                <th style={{ width: 90 }}>DEPT</th>
+                <th style={{ width: 100 }}>CATEGORY</th>
+                <th style={{ width: 70 }}>STEPS</th>
+                <th style={{ width: 120 }}>ACTIONS</th>
+              </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={5} className="tac" style={{ padding: 30, color: 'var(--t3)' }}>No items found</td></tr>
-              ) : filtered.map((item: any) => (
-                <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedTaskId(item.id)}>
-                  <td>
-                    <div className="flex">
-                      <div className="av" style={{
-                        background: item.status === 'COMPLETED' ? 'var(--green)' :
-                          item.status === 'ESCALATED' ? 'var(--red)' :
-                          item.status === 'EXTERNAL_HOLD' ? '#C2410C' : 'var(--g2)',
-                      }}>{getInitials(item.title)}</div>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 12.5 }}>{item.title}</div>
-                        <div style={{ fontSize: 10, color: 'var(--t3)' }}>{item.type === 'workflow' ? 'Workflow' : 'Task'}</div>
+                <tr><td colSpan={11} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>No tasks found</td></tr>
+              ) : filtered.map((task: any, index: number) => {
+                const sla = getSlaStatus(task)
+                const pBadge = priorityBadge[task.priority] || priorityBadge.MEDIUM
+                const stepsTotal = task.taskSteps?.length || 0
+                const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+                const owner = task.owner
+
+                return (
+                  <tr key={task.id} style={{ position: 'relative' }}>
+                    <td style={{ color: 'var(--t3)', fontSize: 11 }}>{index + 1}</td>
+                    <td style={{ fontSize: 11, fontWeight: 700, color: 'var(--g2)' }}>{generateTaskId(task, index)}</td>
+                    <td>
+                      <div style={{ fontWeight: 700, fontSize: 12.5 }}>{task.title}</div>
+                      <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--blue-l)', color: 'var(--blue)', marginTop: 2, display: 'inline-block' }}>
+                        Assigned
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge" style={{ fontSize: 10, padding: '2px 8px', background: pBadge.bg, color: pBadge.color, fontWeight: 700 }}>
+                        {task.priority || 'MEDIUM'}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: 11.5 }}>
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
+                    </td>
+                    <td>
+                      {sla ? (
+                        <span className="badge" style={{ fontSize: 9, padding: '2px 6px', background: sla.bg, color: sla.color, fontWeight: 700 }}>
+                          {sla.label}
+                        </span>
+                      ) : (
+                        <span style={{ color: 'var(--t3)', fontSize: 10 }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div className="av" style={{ width: 24, height: 24, fontSize: 9, background: 'var(--g2)', flexShrink: 0 }}>
+                          {getInitials(owner?.name || 'U')}
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {owner?.name || 'Unassigned'}
+                        </span>
                       </div>
-                    </div>
-                  </td>
-                  <td><span className={`badge ${statusBadgeClass[item.status] || 's-pending'}`} style={{ fontSize: 10 }}>
-                    {statusLabels[item.status] || item.status}
-                  </span></td>
-                  <td><span className={`badge ${priorityClass[item.priority] || 'p-med'}`} style={{ fontSize: 10 }}>
-                    {priorityLabels[item.priority] || item.priority || 'Medium'}
-                  </span></td>
-                  <td style={{ fontSize: 11.5 }}>
-                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
-                    {item.dueDate && new Date(item.dueDate) < new Date() && item.status !== 'COMPLETED' && (
-                      <span style={{ color: 'var(--red)', fontWeight: 700, marginLeft: 4 }}>OVERDUE</span>
-                    )}
-                  </td>
-                  <td style={{ fontSize: 11, color: 'var(--t3)' }}>
-                    {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      <span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>
+                        {task.department || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--amber-l)', color: 'var(--amber)' }}>
+                        {task.category || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      {stepsTotal > 0 ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <div className="prog" style={{ flex: 1, minWidth: 40 }}>
+                            <div className="prog-bg" style={{ height: 6 }}>
+                              <div className="prog-fill" style={{
+                                width: `${stepsTotal > 0 ? (stepsDone / stepsTotal * 100) : 0}%`,
+                                background: stepsDone === stepsTotal ? 'var(--green)' : 'var(--g2)',
+                                height: '100%',
+                              }} />
+                            </div>
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--t2)' }}>{stepsDone}/{stepsTotal}</span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: 10, color: 'var(--t3)' }}>—</span>
+                      )}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--bg2)', border: '1px solid var(--b1)', padding: '2px 6px', fontSize: 10 }}
+                          onClick={() => setSelectedTaskId(task.id)}
+                          title="View"
+                        >
+                          👁
+                        </button>
+                        {task.status === 'PENDING' && (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1px solid var(--blue)', padding: '2px 6px', fontSize: 10 }}
+                            onClick={() => startMutation.mutate({ id: task.id })}
+                            disabled={startMutation.isPending}
+                            title="Start"
+                          >
+                            ▶ Start
+                          </button>
+                        )}
+                        {/* 3-dot menu */}
+                        <div style={{ position: 'relative' }} ref={menuOpenId === task.id ? menuRef : null}>
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', fontSize: 14, color: 'var(--t3)' }}
+                            onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === task.id ? null : task.id) }}
+                          >
+                            ⋮
+                          </button>
+                          {menuOpenId === task.id && (
+                            <div style={{
+                              position: 'absolute', right: 0, top: '100%', zIndex: 500,
+                              background: 'var(--card)', border: '1px solid var(--b2)',
+                              borderRadius: 8, boxShadow: 'var(--s3)', minWidth: 140, overflow: 'hidden',
+                            }}>
+                              <div
+                                style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600, borderBottom: '1px solid var(--b1)' }}
+                                onClick={() => { setEditTask(task); setMenuOpenId(null) }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                              >
+                                ✏️ Edit
+                              </div>
+                              <div
+                                style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600, color: 'var(--red)', borderBottom: '1px solid var(--b1)' }}
+                                onClick={() => { setConfirmAction({ id: task.id, action: 'delete' }); setMenuOpenId(null) }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                              >
+                                🗑 Delete
+                              </div>
+                              {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
+                                <div
+                                  style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', fontWeight: 600, color: 'var(--amber)' }}
+                                  onClick={() => { setConfirmAction({ id: task.id, action: 'cancel' }); setMenuOpenId(null) }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--bg2)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                  🚫 Cancel Task
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Create Task Modal */}
-      {showCreate && (
-        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setShowCreate(false) }}>
-          <div className="modal modal-lg">
-            <button className="mx" onClick={() => setShowCreate(false)}>✕</button>
-            <div className="mt">Create New Task</div>
-            <div className="ms">Add a new workflow task to the system</div>
+      {/* Task Detail Modal */}
+      {selectedTaskId && (() => {
+        const task = tasks.find((t: any) => t.id === selectedTaskId)
+        if (!task) return null
+        const owner = task.owner
+        const stepsTotal = task.taskSteps?.length || 0
+        const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+        const sla = getSlaStatus(task)
+        const pBadge = priorityBadge[task.priority] || priorityBadge.MEDIUM
+
+        return (
+          <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setSelectedTaskId(null) }}>
+            <div className="modal modal-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+              <button className="mx" onClick={() => setSelectedTaskId(null)}>✕</button>
+              <div className="mt">{task.title}</div>
+              <div className="ms">{task.description || 'No description'}</div>
+              <div className="gold-divider" />
+
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                <span className="badge" style={{ background: pBadge.bg, color: pBadge.color }}>
+                  {task.priority || 'MEDIUM'}
+                </span>
+                {task.department && <span className="badge b-gray">{task.department}</span>}
+                {task.category && <span className="badge" style={{ background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
+                {sla && <span className="badge" style={{ background: sla.bg, color: sla.color }}>{sla.label}</span>}
+                {task.dueDate && (
+                  <span className="badge b-gray">
+                    Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+
+              {/* Assigned to */}
+              {owner && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, padding: '10px 12px', background: 'var(--bg2)', borderRadius: 8 }}>
+                  <div className="av" style={{ width: 32, height: 32, fontSize: 12, background: 'var(--g2)' }}>
+                    {getInitials(owner.name)}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{owner.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--t3)' }}>{owner.role} · {owner.department || '—'}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step Progress */}
+              {stepsTotal > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>
+                    Step Progress ({stepsDone}/{stepsTotal})
+                  </div>
+                  {task.taskSteps.map((step: any, i: number) => (
+                    <div key={step.id} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                      background: step.status === 'COMPLETED' ? 'var(--green-l)' : 'var(--bg2)',
+                      borderRadius: 6, marginBottom: 4, borderLeft: `3px solid ${step.status === 'COMPLETED' ? 'var(--green)' : 'var(--b2)'}`,
+                    }}>
+                      <div style={{
+                        width: 22, height: 22, borderRadius: '50%', fontSize: 10, fontWeight: 800,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                        background: step.status === 'COMPLETED' ? 'var(--green)' : 'var(--g2)',
+                        color: '#fff',
+                      }}>
+                        {step.status === 'COMPLETED' ? '✓' : i + 1}
+                      </div>
+                      <span style={{ flex: 1, fontSize: 12, fontWeight: step.status === 'COMPLETED' ? 600 : 700, color: step.status === 'COMPLETED' ? 'var(--green)' : 'var(--t1)' }}>
+                        {step.title}
+                      </span>
+                      <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: step.status === 'COMPLETED' ? 'var(--green-l)' : 'var(--amber-l)', color: step.status === 'COMPLETED' ? 'var(--green)' : 'var(--amber)' }}>
+                        {step.status === 'COMPLETED' ? 'Done' : step.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Workflow Flow */}
+              {task.workflow && (
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>Workflow</div>
+                  <div className="wf-flow">
+                    <span className="wf-stage wf-stage-ea">EA Review</span>
+                    <span className="wf-arrow">→</span>
+                    <span className="wf-stage wf-stage-dir">Director</span>
+                    <span className="wf-arrow">→</span>
+                    <span className="wf-stage wf-stage-done">Done</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Audit Trail */}
+              <div className="audit-trail">
+                <div className="audit-trail-title">Audit Trail</div>
+                <div className="audit-entry">
+                  <div className="audit-dot" style={{ background: 'var(--g2)' }} />
+                  <div className="audit-text">Created — {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'N/A'}</div>
+                </div>
+                {task.updatedAt && task.updatedAt !== task.createdAt && (
+                  <div className="audit-entry">
+                    <div className="audit-dot" style={{ background: 'var(--amber)' }} />
+                    <div className="audit-text">Last updated — {new Date(task.updatedAt).toLocaleString()}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Edit Task Modal */}
+      {editTask && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setEditTask(null) }}>
+          <div className="modal modal-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <button className="mx" onClick={() => setEditTask(null)}>✕</button>
+            <div className="mt">Edit Task</div>
+            <div className="ms">{editTask.title}</div>
             <div className="gold-divider" />
+
             <div className="form-row fr-1">
               <div className="fg">
-                <label>Task Title <span style={{ color: 'var(--red)' }}>*</span></label>
-                <input className="fi" placeholder="Enter task title..." value={newTask.title}
-                  onChange={e => setNewTask({ ...newTask, title: e.target.value })} />
+                <label>Title</label>
+                <input className="fi" value={editTask.title} onChange={e => setEditTask({ ...editTask, title: e.target.value })} />
               </div>
             </div>
             <div className="form-row fr-1">
               <div className="fg">
                 <label>Description</label>
-                <textarea className="fi" placeholder="Describe the task..." value={newTask.description}
-                  onChange={e => setNewTask({ ...newTask, description: e.target.value })} />
+                <textarea className="fi" value={editTask.description || ''} onChange={e => setEditTask({ ...editTask, description: e.target.value })} rows={3} />
               </div>
             </div>
-            <div className="form-row fr-2">
+            <div className="form-row fr-3">
               <div className="fg">
                 <label>Priority</label>
-                <select className="sel" value={newTask.priority} onChange={e => setNewTask({ ...newTask, priority: e.target.value })}>
+                <select className="fi" value={editTask.priority || 'MEDIUM'} onChange={e => setEditTask({ ...editTask, priority: e.target.value })}>
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
@@ -214,111 +492,72 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                 </select>
               </div>
               <div className="fg">
-                <label>Due Date</label>
-                <input className="fi" type="date" value={newTask.dueDate}
-                  onChange={e => setNewTask({ ...newTask, dueDate: e.target.value })} />
+                <label>Department</label>
+                <select className="fi" value={editTask.department || ''} onChange={e => setEditTask({ ...editTask, department: e.target.value })}>
+                  <option value="">None</option>
+                  {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
-            </div>
-
-            {/* Dependency Section */}
-            <div className="dep-section">
-              <div className="dep-section-title">🔗 Dependency Type</div>
-              <div className="dep-type-btns">
-                <div className="dep-type-btn active">None</div>
-                <div className="dep-type-btn">Internal</div>
-                <div className="dep-type-btn">External Hold</div>
+              <div className="fg">
+                <label>Due Date</label>
+                <input className="fi" type="date" value={editTask.dueDate ? new Date(editTask.dueDate).toISOString().split('T')[0] : ''} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
               </div>
             </div>
 
             <div className="form-actions">
-              <button className="btn btn-ghost" onClick={() => setShowCreate(false)}>Cancel</button>
-              <button className="btn btn-gold" onClick={handleCreate}
-                disabled={!newTask.title.trim() || createMutation.isPending}>
-                {createMutation.isPending ? 'Creating...' : '+ Create Task'}
+              <button className="btn btn-ghost" onClick={() => setEditTask(null)}>Cancel</button>
+              <button className="btn btn-gold" onClick={() => editMutation.mutate({
+                id: editTask.id,
+                data: {
+                  title: editTask.title,
+                  description: editTask.description,
+                  priority: editTask.priority,
+                  department: editTask.department,
+                  category: editTask.category,
+                  dueDate: editTask.dueDate || null,
+                }
+              })} disabled={editMutation.isPending}>
+                {editMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Task Detail Modal */}
-      {selectedTaskId && (
-        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setSelectedTaskId(null) }}>
-          <div className="modal modal-lg">
-            <button className="mx" onClick={() => setSelectedTaskId(null)}>✕</button>
-            {(() => {
-              const item = [...workflows, ...tasks].find((i: any) => i.id === selectedTaskId)
-              if (!item) return <div className="empty"><p>Item not found</p></div>
-              return (
-                <>
-                  <div className="mt">{item.title}</div>
-                  <div className="ms">{item.description || 'No description'}</div>
-                  <div className="gold-divider" />
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                    <span className={`badge ${statusBadgeClass[item.status] || 's-pending'}`}>
-                      {statusLabels[item.status] || item.status}
-                    </span>
-                    <span className={`badge ${priorityClass[item.priority] || 'p-med'}`}>
-                      {priorityLabels[item.priority] || item.priority || 'Medium'}
-                    </span>
-                    {item.dueDate && (
-                      <span className="badge b-gray">
-                        Due: {new Date(item.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Workflow Flow */}
-                  <div className="wf-flow" style={{ marginBottom: 14 }}>
-                    <span className="wf-stage wf-stage-ea">EA Review</span>
-                    <span className="wf-arrow">→</span>
-                    <span className="wf-stage wf-stage-dir">Director</span>
-                    <span className="wf-arrow">→</span>
-                    <span className="wf-stage wf-stage-done">Done</span>
-                  </div>
-
-                  {/* Step Progress */}
-                  <div style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>Step Progress</div>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {Array.from({ length: Math.max(item.currentStepOrder || 1, 3) }, (_, i) => (
-                        <div key={i} style={{
-                          flex: 1, height: 6, borderRadius: 3,
-                          background: i < (item.currentStepOrder || 0) ? 'var(--green)' : 'var(--b1)',
-                        }} />
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Audit Trail */}
-                  <div className="audit-trail">
-                    <div className="audit-trail-title">Audit Trail</div>
-                    <div className="audit-entry">
-                      <div className="audit-dot" style={{ background: 'var(--g2)' }} />
-                      <div className="audit-text">Created — {item.createdAt ? new Date(item.createdAt).toLocaleString() : 'N/A'}</div>
-                    </div>
-                    {item.status !== 'DRAFT' && (
-                      <div className="audit-entry">
-                        <div className="audit-dot" style={{ background: 'var(--amber)' }} />
-                        <div className="audit-text">Status: {statusLabels[item.status] || item.status}</div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Action buttons based on role */}
-                  {(currentUser?.role === 'admin' || currentUser?.role === 'ea') && item.status !== 'COMPLETED' && item.status !== 'CANCELLED' && (
-                    <div className="dd-action-bar" style={{ marginTop: 14 }}>
-                      <button className="dd-btn-verify">✓ Verify & Approve</button>
-                      <button className="dd-btn-send-dir">📤 Send to Director</button>
-                      <button className="dd-btn-return-emp">↩ Return to Employee</button>
-                    </div>
-                  )}
-                </>
-              )
-            })()}
+      {/* Confirm Action Modal */}
+      {confirmAction && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setConfirmAction(null) }}>
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <button className="mx" onClick={() => setConfirmAction(null)}>✕</button>
+            <div className="mt" style={{ fontSize: 16 }}>
+              {confirmAction.action === 'delete' ? 'Delete Task?' : 'Cancel Task?'}
+            </div>
+            <div className="ms">
+              {confirmAction.action === 'delete'
+                ? 'This action cannot be undone. The task will be permanently deleted.'
+                : 'This will mark the task as CANCELLED. This action can be reversed by an admin.'}
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmAction(null)}>No, Keep It</button>
+              <button
+                className={confirmAction.action === 'delete' ? 'btn btn-red' : 'btn btn-gold'}
+                onClick={() => {
+                  if (confirmAction.action === 'delete') {
+                    deleteMutation.mutate(confirmAction.id)
+                  } else {
+                    cancelMutation.mutate({ id: confirmAction.id })
+                  }
+                }}
+                disabled={deleteMutation.isPending || cancelMutation.isPending}
+              >
+                {confirmAction.action === 'delete' ? 'Yes, Delete' : 'Yes, Cancel Task'}
+              </button>
+            </div>
           </div>
         </div>
       )}
     </>
   )
 }
+
+const DEPTS = ['Sales', 'Back Office', 'Accounts', 'HR', 'Coordinator', 'Admin']

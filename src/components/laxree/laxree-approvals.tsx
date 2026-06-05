@@ -5,10 +5,11 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 
 export function LaxreeApprovals() {
-  const { currentUser, approvalTab, setApprovalTab } = useWorkflowStore()
+  const { currentUser, addToast } = useWorkflowStore()
   const queryClient = useQueryClient()
   const [comment, setComment] = useState('')
   const [actionWorkflow, setActionWorkflow] = useState<string | null>(null)
+  const [approvalTab, setApprovalTab] = useState('pending')
 
   const { data: workflows = [] } = useQuery({
     queryKey: ['workflows-approvals'],
