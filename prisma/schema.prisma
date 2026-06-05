@@ -85,6 +85,7 @@ model User {
   assignedTaskSteps  TaskStep[]          @relation("StepAssigneeTask")
   managedProjects    Project[]           @relation("ProjectManager")
   deptHead           Department[]        @relation("DeptHead")
+  mondayMeetings     MondayMeeting[]     @relation("MondayMeetingUser")
 }
 
 model Department {
@@ -352,4 +353,37 @@ model Project {
   manager     User?          @relation("ProjectManager", fields: [managerId], references: [id])
   dept        Department?    @relation(fields: [department], references: [name])
   tasks       Task[]
+}
+
+model MondayMeeting {
+  id              String   @id @default(cuid())
+  userId          String
+  weekStartDate   DateTime
+  weekEndDate     DateTime
+  weekNumber      Int
+  year            Int
+  // This Week Plan scores (0-100 percentage)
+  planRedScore    Float    @default(0)
+  planYellowScore Float    @default(0)
+  planGreenScore  Float    @default(0)
+  // Actual scores (0-100 percentage)
+  actualRedScore  Float    @default(0)
+  actualYellowScore Float  @default(0)
+  actualGreenScore Float   @default(0)
+  // Next Week Plan scores (0-100 percentage)
+  nextRedScore    Float    @default(0)
+  nextYellowScore Float    @default(0)
+  nextGreenScore  Float    @default(0)
+  // Performance Rating
+  prScore         Float    @default(0)
+  // Commitments for next week
+  commitments     String?
+  // Notes/remarks
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation("MondayMeetingUser", fields: [userId], references: [id])
+
+  @@unique([userId, weekNumber, year])
 }
