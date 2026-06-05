@@ -8,8 +8,9 @@ export function LaxreeNotifPanel() {
 
   const { data: notifData, refetch } = useQuery({
     queryKey: ['notifications-panel'],
-    queryFn: () => fetch(`/api/notifications?userId=user-admin`).then(r => r.json()),
+    queryFn: () => fetch(`/api/notifications?userId=user-admin`).then(r => r.json()).catch(() => ({ notifications: [] })),
     refetchInterval: 30000,
+    enabled: notifPanelOpen,
   })
 
   const notifications = notifData?.notifications || []

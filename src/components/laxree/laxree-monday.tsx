@@ -41,6 +41,7 @@ function loadScorecards(): ScorecardData[] {
 }
 
 function saveScorecards(data: ScorecardData[]) {
+  if (typeof window === 'undefined') return
   localStorage.setItem('laxree-scorecards', JSON.stringify(data))
 }
 
@@ -50,11 +51,7 @@ export function LaxreeMonday() {
   const [week, setWeek] = useState('Week 1')
   const [actuals, setActuals] = useState<Record<string, number>>({})
   const [commitment, setCommitment] = useState('')
-  const [history, setHistory] = useState<ScorecardData[]>([])
-
-  useState(() => {
-    setHistory(loadScorecards())
-  })
+  const [history, setHistory] = useState<ScorecardData[]>(() => loadScorecards())
 
   const handleSave = () => {
     const scores: Record<string, { target: number; actual: number; score: number }> = {}
