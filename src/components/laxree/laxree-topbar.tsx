@@ -22,7 +22,8 @@ export function LaxreeTopbar() {
     <header className="topbar">
       <div className="tb-brand">
         <button id="sidebarToggle" onClick={() => setSidebarOpen(!sidebarOpen)}
-          style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--t2)', marginRight: 6 }}
+          className="sidebar-toggle-btn"
+          style={{ display: 'none', background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#fff', marginRight: 6 }}
           title="Menu">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />

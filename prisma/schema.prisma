@@ -219,6 +219,9 @@ model Task {
   taskSteps       TaskStep[]
   projectId       String?
   project         Project?          @relation(fields: [projectId], references: [id])
+  frequency       String?        // 'One Time', 'Daily', 'Weekly', 'Monthly'
+  weekDays        String?        // JSON array of selected weekdays e.g. '["Monday","Wednesday"]'
+  monthDates      String?        // JSON array of selected dates e.g. '[1,15,28]'
 }
 
 model TaskStep {

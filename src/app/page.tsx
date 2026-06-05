@@ -2,12 +2,6 @@
 
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { AppSidebar } from '@/components/app-sidebar'
-import { AppHeader } from '@/components/app-header'
-import { WorkflowList } from '@/components/workflow-list'
-import { ApprovalList } from '@/components/approval-list'
-import { TaskList } from '@/components/task-list'
-import { NotificationList } from '@/components/notification-list'
 import { LaxreeDashboard } from '@/components/laxree/laxree-dashboard'
 import { LaxreeCreateTask } from '@/components/laxree/laxree-create-task'
 import { LaxreeTasks } from '@/components/laxree/laxree-tasks'
@@ -16,6 +10,8 @@ import { LaxreeDirDependency } from '@/components/laxree/laxree-dir-dependency'
 import { LaxreeExtHold } from '@/components/laxree/laxree-exthold'
 import { LaxreeEscalations } from '@/components/laxree/laxree-escalations'
 import { LaxreeMonday } from '@/components/laxree/laxree-monday'
+import { LaxreeSidebar } from '@/components/laxree/laxree-sidebar'
+import { LaxreeTopbar } from '@/components/laxree/laxree-topbar'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, type ReactNode } from 'react'
 
@@ -109,7 +105,7 @@ function ActiveView() {
       case 'workflows':
         return <LaxreeMonday />
       case 'notifications':
-        return <NotificationList />
+        return <div className="lcard"><div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>Notifications coming soon</div></div>
       case 'employees':
         return <EmployeesView />
       case 'projects':
@@ -1944,8 +1940,8 @@ export default function HomePage() {
   return (
     <ErrorBoundary>
       <div style={{ background: '#f8fafc', minHeight: '100vh', transition: 'background .3s' }}>
-        <AppHeader />
-        <AppSidebar />
+        <LaxreeTopbar />
+        <LaxreeSidebar />
         <main className="main-area">
           <ActiveView />
         </main>

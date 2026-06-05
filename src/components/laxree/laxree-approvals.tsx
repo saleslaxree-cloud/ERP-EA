@@ -4,8 +4,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 
+const statusLabels: Record<string, string> = {
+  DRAFT: 'Draft', PENDING: 'Pending', IN_REVIEW: 'In Review', APPROVED: 'Approved',
+  REJECTED: 'Rejected', IN_PROGRESS: 'In Progress', ON_HOLD: 'On Hold',
+  ESCALATED: 'Escalated', COMPLETED: 'Completed', CANCELLED: 'Cancelled', EXTERNAL_HOLD: 'External Hold',
+}
+
+const statusBadgeStyle: Record<string, { bg: string; color: string }> = {
+  PENDING: { bg: 'var(--amber-l)', color: 'var(--amber)' },
+  IN_REVIEW: { bg: 'var(--blue-l)', color: 'var(--blue)' },
+  IN_PROGRESS: { bg: 'var(--amber-l)', color: 'var(--amber)' },
+  ON_HOLD: { bg: 'var(--purple-l)', color: 'var(--purple)' },
+  APPROVED: { bg: 'var(--green-l)', color: 'var(--green)' },
+  COMPLETED: { bg: 'var(--green-l)', color: 'var(--green)' },
+  ESCALATED: { bg: 'var(--red-l)', color: 'var(--red)' },
+  REJECTED: { bg: 'var(--red-l)', color: 'var(--red)' },
+  CANCELLED: { bg: 'var(--bg3)', color: 'var(--t3)' },
+  EXTERNAL_HOLD: { bg: '#FFF7ED', color: '#C2410C' },
+}
+
+const avatarColors = ['#B45309','#6D28D9','#0F766E','#1D4ED8','#BE123C','#15803D','#C2410C','#7C3AED']
+function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return avatarColors[Math.abs(h) % avatarColors.length] }
+function getInitials(name: string) { return name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?' }
+
 export function LaxreeApprovals() {
-  const { currentUser, addToast } = useWorkflowStore()
+  const { currentUser, addToast, currentUserId } = useWorkflowStore()
   const queryClient = useQueryClient()
   const [comment, setComment] = useState('')
   const [actionWorkflow, setActionWorkflow] = useState<string | null>(null)
@@ -14,6 +37,11 @@ export function LaxreeApprovals() {
   const { data: workflows = [] } = useQuery({
     queryKey: ['workflows-approvals'],
     queryFn: () => fetch('/api/workflows').then(r => r.json()),
+  })
+
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks-approvals'],
+    queryFn: () => fetch('/api/tasks').then(r => r.json()),
   })
 
   const { data: approvals = [] } = useQuery({
@@ -25,104 +53,184 @@ export function LaxreeApprovals() {
     mutationFn: (data: any) => fetch('/api/approvals', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }).then(r => r.json()),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['workflows-approvals'] }); queryClient.invalidateQueries({ queryKey: ['approvals'] }) },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-approvals'] })
+      addToast('ok', 'Action completed')
+      setComment('')
+      setActionWorkflow(null)
+    },
   })
 
+  const taskStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      addToast('ok', 'Task status updated')
+      setActionWorkflow(null)
+    },
+  })
+
+  // Get tasks needing approval - PENDING and IN_PROGRESS tasks
+  const pendingTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
+    t.status === 'PENDING' || t.status === 'IN_PROGRESS'
+  ) : []
+
+  const awaitingDirector = Array.isArray(tasks) ? tasks.filter((t: any) =>
+    t.status === 'ON_HOLD'
+  ) : []
+
+  const completedTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
+    t.status === 'COMPLETED'
+  ) : []
+
   const pendingEA = workflows.filter((w: any) => w.status === 'PENDING' || w.status === 'IN_REVIEW')
-  const awaitingDirector = workflows.filter((w: any) => w.status === 'APPROVED' && w.currentStepOrder > 0)
   const directorActions = workflows.filter((w: any) => w.status === 'ESCALATED' || w.status === 'ON_HOLD')
-  const history = approvals.pending?.concat(approvals.history || []) || []
 
   const tabs = [
-    { id: 'pending', label: 'Pending EA Review', count: pendingEA.length },
+    { id: 'pending', label: 'Pending Review', count: pendingTasks.length + pendingEA.length },
     { id: 'director', label: 'Awaiting Director', count: awaitingDirector.length },
     { id: 'actions', label: 'Director Actions', count: directorActions.length },
-    { id: 'history', label: 'History', count: 0 },
+    { id: 'completed', label: 'Completed', count: completedTasks.length },
   ]
-
-  const statusLabels: Record<string, string> = {
-    DRAFT: 'Draft', PENDING: 'Pending', IN_REVIEW: 'In Review', APPROVED: 'Approved',
-    REJECTED: 'Rejected', IN_PROGRESS: 'In Progress', ON_HOLD: 'On Hold',
-    ESCALATED: 'Escalated', COMPLETED: 'Completed', CANCELLED: 'Cancelled', EXTERNAL_HOLD: 'External Hold',
-  }
 
   const handleApprove = (workflowId: string, action: string) => {
     approveMutation.mutate({
       workflowId,
       action: action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'ON_HOLD',
       comments: comment,
-      approverId: 'user-admin',
+      approverId: currentUserId,
       stepInstanceId: workflowId,
     })
-    setComment('')
-    setActionWorkflow(null)
   }
 
-  const renderWorkflowCard = (w: any) => (
-    <div key={w.id} className="dd-card dd-approval-pending" style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        <div className="av" style={{ background: 'var(--g2)' }}>{(w.title || 'W')[0]}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 700 }}>{w.title}</div>
-          <div style={{ fontSize: 11, color: 'var(--t3)' }}>Step {w.currentStepOrder} · {statusLabels[w.status] || w.status}</div>
-        </div>
-        <span className={`badge s-${w.status?.toLowerCase()}`}>{statusLabels[w.status] || w.status}</span>
-      </div>
+  const handleTaskAction = (taskId: string, action: string) => {
+    let newStatus = 'IN_PROGRESS'
+    if (action === 'approve') newStatus = 'COMPLETED'
+    else if (action === 'reject') newStatus = 'REJECTED'
+    else if (action === 'return') newStatus = 'PENDING'
+    else if (action === 'director') newStatus = 'ON_HOLD'
+    else if (action === 'done') newStatus = 'COMPLETED'
 
-      {/* Workflow flow indicator */}
-      <div className="wf-flow">
-        <span className="wf-stage wf-stage-ea">EA Review</span>
-        <span className="wf-arrow">→</span>
-        <span className="wf-stage wf-stage-dir">Director</span>
-        <span className="wf-arrow">→</span>
-        <span className="wf-stage wf-stage-done">Done</span>
-      </div>
+    taskStatusMutation.mutate({ id: taskId, status: newStatus })
+  }
 
-      {w.description && (
-        <div style={{ fontSize: 12, color: 'var(--t2)', marginBottom: 8 }}>{w.description}</div>
-      )}
+  const renderTaskCard = (task: any) => {
+    const sBadge = statusBadgeStyle[task.status] || statusBadgeStyle.PENDING
+    const owner = task.owner
+    const stepsTotal = task.taskSteps?.length || 0
+    const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
 
-      {w.dueDate && (
-        <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 8 }}>
-          Due: {new Date(w.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-          {new Date(w.dueDate) < new Date() && <span style={{ color: 'var(--red)', fontWeight: 700, marginLeft: 6 }}>OVERDUE</span>}
-        </div>
-      )}
-
-      {/* Action buttons */}
-      {actionWorkflow === w.id ? (
-        <div style={{ marginTop: 10 }}>
-          <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
-            onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8 }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="dd-btn-dir-approve" onClick={() => handleApprove(w.id, 'approve')}>✓ Approve</button>
-            <button className="dd-btn-dir-reject" onClick={() => handleApprove(w.id, 'reject')}>✕ Reject</button>
-            <button className="dd-btn-dir-hold" onClick={() => handleApprove(w.id, 'hold')}>⏸ Hold</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setActionWorkflow(null)}>Cancel</button>
+    return (
+      <div key={task.id} style={{
+        background: 'var(--card)', border: '1.5px solid var(--gbr)', borderRadius: 'var(--r)',
+        padding: 16, marginBottom: 10, transition: 'all .15s',
+        borderLeft: `3px solid ${sBadge.color}`,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div className="av" style={{ background: avatarColor(owner?.name || 'T'), width: 34, height: 34, fontSize: 12 }}>
+            {getInitials(owner?.name || 'T')}
           </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--t1)' }}>{task.title}</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+              {owner?.name || 'Unassigned'} · {owner?.department || '—'} · {statusLabels[task.status] || task.status}
+            </div>
+          </div>
+          <span className="badge" style={{ background: sBadge.bg, color: sBadge.color, fontWeight: 700, fontSize: 10 }}>
+            {statusLabels[task.status] || task.status}
+          </span>
         </div>
-      ) : (
-        <div className="dd-action-bar">
-          <button className="dd-btn-verify" onClick={() => setActionWorkflow(w.id)}>✓ Verify & Approve</button>
-          <button className="dd-btn-send-dir">📤 Send to Director</button>
-          <button className="dd-btn-return-emp">↩ Return</button>
-          <button className="dd-btn-notes">📝 Notes</button>
-        </div>
-      )}
-    </div>
-  )
 
-  const currentList = approvalTab === 'pending' ? pendingEA
+        {/* Task info */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          {task.department && <span className="badge b-gray" style={{ fontSize: 9 }}>{task.department}</span>}
+          {task.category && <span className="badge" style={{ fontSize: 9, background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
+          {task.frequency && <span className="badge" style={{ fontSize: 9, background: 'var(--blue-l)', color: 'var(--blue)' }}>🔄 {task.frequency}</span>}
+          <span className="badge" style={{ fontSize: 9, background: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? 'var(--red-l)' : 'var(--bg2)', color: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? 'var(--red)' : 'var(--t3)' }}>
+            {task.priority}
+          </span>
+        </div>
+
+        {/* Steps progress */}
+        {stepsTotal > 0 && (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, marginBottom: 4 }}>Steps: {stepsDone}/{stepsTotal}</div>
+            <div className="prog-bg" style={{ height: 5 }}>
+              <div style={{ width: `${(stepsDone / stepsTotal) * 100}%`, background: stepsDone === stepsTotal ? 'var(--green)' : 'var(--g2)', height: '100%', borderRadius: 3, transition: 'width .3s' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Workflow flow */}
+        <div className="wf-flow" style={{ marginBottom: 10, fontSize: 11 }}>
+          <span className="wf-stage wf-stage-ea" style={{ padding: '3px 8px', fontSize: 9 }}>EA Review</span>
+          <span className="wf-arrow">→</span>
+          <span className="wf-stage wf-stage-dir" style={{ padding: '3px 8px', fontSize: 9 }}>Director</span>
+          <span className="wf-arrow">→</span>
+          <span className="wf-stage wf-stage-done" style={{ padding: '3px 8px', fontSize: 9 }}>Done</span>
+        </div>
+
+        {/* Action buttons */}
+        {actionWorkflow === task.id ? (
+          <div style={{ marginTop: 10 }}>
+            <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
+              onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button className="btn btn-green btn-sm" onClick={() => handleTaskAction(task.id, 'approve')}>✓ Approve & Complete</button>
+              <button className="btn btn-red btn-sm" onClick={() => handleTaskAction(task.id, 'reject')}>✕ Reject</button>
+              <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)' }} onClick={() => handleTaskAction(task.id, 'director')}>📤 Send to Director</button>
+              <button className="btn btn-sm" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)' }} onClick={() => handleTaskAction(task.id, 'return')}>↩ Return</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setActionWorkflow(null); setComment('') }}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-sm"
+              style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid var(--green)', fontWeight: 700 }}
+              onClick={() => setActionWorkflow(task.id)}
+            >
+              ✓ Review & Act
+            </button>
+            {task.status === 'IN_PROGRESS' && (
+              <button
+                className="btn btn-sm"
+                style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid rgba(21,128,61,.3)', fontWeight: 700 }}
+                onClick={() => handleTaskAction(task.id, 'done')}
+              >
+                ✓ Mark Done
+              </button>
+            )}
+            {task.status === 'PENDING' && (
+              <button
+                className="btn btn-sm"
+                style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.3)', fontWeight: 700 }}
+                onClick={() => handleTaskAction(task.id, 'director')}
+              >
+                📤 Send to Director
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const currentList = approvalTab === 'pending' ? pendingTasks
     : approvalTab === 'director' ? awaitingDirector
     : approvalTab === 'actions' ? directorActions
-    : []
+    : completedTasks
 
   return (
     <>
       <div className="ph">
         <div className="ph-left">
           <h2>Approval Center</h2>
-          <p>Review and manage workflow approvals · EA → Director routing</p>
+          <p>Review and manage task approvals · EA → Director routing</p>
         </div>
       </div>
 
@@ -140,43 +248,42 @@ export function LaxreeApprovals() {
       </div>
 
       {/* Pending approval pulse */}
-      {pendingEA.length > 0 && approvalTab === 'pending' && (
+      {pendingTasks.length > 0 && approvalTab === 'pending' && (
         <div className="alert alert-gold" style={{ marginBottom: 14 }}>
           <div className="alert-icon">🔔</div>
           <div className="alert-body">
-            <div className="alert-title" style={{ color: 'var(--g2)' }}>{pendingEA.length} Approval(s) Pending EA Review</div>
+            <div className="alert-title" style={{ color: 'var(--g2)' }}>{pendingTasks.length} Item(s) Pending Review</div>
             <div className="alert-sub">Employee work submissions awaiting verification</div>
           </div>
-          <span className="alert-cnt ap-pending-ring">{pendingEA.length}</span>
+          <span className="alert-cnt" style={{ background: 'var(--amber)', animation: 'ap-pulse 2s infinite' }}>{pendingTasks.length}</span>
         </div>
       )}
 
-      {/* Workflow cards */}
+      {/* Task approval cards */}
       {currentList.length === 0 ? (
         <div className="empty">
           <h3>No items in this category</h3>
-          <p>All caught up! No workflows pending review.</p>
+          <p>All caught up! No items pending review.</p>
         </div>
       ) : (
-        currentList.map(renderWorkflowCard)
+        currentList.map(renderTaskCard)
       )}
 
-      {/* Approval History */}
-      {approvalTab === 'history' && (
-        <div className="card">
-          <div className="ch"><div className="ct">📜 Approval History</div></div>
+      {/* Completed history */}
+      {approvalTab === 'completed' && (
+        <div className="lcard" style={{ marginTop: 14 }}>
+          <div className="ch"><div className="ct">📜 Completed Tasks</div></div>
           <div className="cb">
-            {history.length === 0 ? (
-              <div className="empty"><p>No approval history yet</p></div>
-            ) : history.map((a: any) => (
-              <div key={a.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--b1)' }}>
-                <div className="av" style={{ background: a.action === 'APPROVED' ? 'var(--green)' : 'var(--red)' }}>
-                  {a.action === 'APPROVED' ? '✓' : '✕'}
-                </div>
+            {completedTasks.length === 0 ? (
+              <div className="empty"><p>No completed tasks yet</p></div>
+            ) : completedTasks.map((task: any) => (
+              <div key={task.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--b1)', alignItems: 'center' }}>
+                <div className="av" style={{ background: 'var(--green)' }}>✓</div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{a.action}</div>
-                  <div style={{ fontSize: 11, color: 'var(--t3)' }}>{a.comments || 'No comment'} · {a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700 }}>{task.title}</div>
+                  <div style={{ fontSize: 11, color: 'var(--t3)' }}>{task.owner?.name || 'Unassigned'} · {task.completedAt ? new Date(task.completedAt).toLocaleString() : ''}</div>
                 </div>
+                <span className="badge b-green" style={{ fontSize: 9 }}>Completed</span>
               </div>
             ))}
           </div>

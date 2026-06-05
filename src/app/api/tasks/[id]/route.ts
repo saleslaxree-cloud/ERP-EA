@@ -50,7 +50,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { status, title, description, priority, department, category, dueDate, ownerId } = body
+    const { status, title, description, priority, department, category, dueDate, ownerId, frequency, weekDays, monthDates, taskStepId, taskStepStatus } = body
 
     const task = await db.task.findUnique({
       where: { id },
@@ -96,6 +96,17 @@ export async function PATCH(
     if (category !== undefined) updateData.category = category
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null
     if (ownerId !== undefined) updateData.ownerId = ownerId
+    if (frequency !== undefined) updateData.frequency = frequency
+    if (weekDays !== undefined) updateData.weekDays = weekDays
+    if (monthDates !== undefined) updateData.monthDates = monthDates
+
+    // Handle task step status update
+    if (taskStepId && taskStepStatus) {
+      await db.taskStep.update({
+        where: { id: taskStepId },
+        data: { status: taskStepStatus as WorkflowStatus, completedAt: taskStepStatus === 'COMPLETED' ? now : null },
+      })
+    }
 
     const updatedTask = await db.task.update({
       where: { id },

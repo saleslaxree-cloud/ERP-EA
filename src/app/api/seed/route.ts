@@ -5,7 +5,9 @@ import { WorkflowStatus, TaskPriority, UserRole } from '@prisma/client'
 export async function POST() {
   try {
     const members = [
-      { email: 'admin@laxree.com', name: 'Admin', role: UserRole.ADMIN, department: 'Management' },
+      { email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.ADMIN, department: 'Admin' },
+      { email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Admin' },
+      { email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Admin' },
       { email: 'sandeep@laxree.com', name: 'Sandeep', role: UserRole.MANAGER, department: 'Sales' },
       { email: 'khushboo@laxree.com', name: 'Khushboo Manglani', role: UserRole.MANAGER, department: 'Sales' },
       { email: 'aditya@laxree.com', name: 'Aditya Sharma', role: UserRole.EMPLOYEE, department: 'Sales' },
@@ -15,13 +17,12 @@ export async function POST() {
       { email: 'radhika@laxree.com', name: 'Radhika', role: UserRole.EMPLOYEE, department: 'Back Office' },
       { email: 'saurabh@laxree.com', name: 'Saurabh', role: UserRole.EMPLOYEE, department: 'Back Office' },
       { email: 'ruchi@laxree.com', name: 'Ruchi', role: UserRole.EMPLOYEE, department: 'Back Office' },
-      { email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Back Office' },
       { email: 'tanuja@laxree.com', name: 'Tanuja Tigaya', role: UserRole.EMPLOYEE, department: 'Back Office' },
       { email: 'aayush@laxree.com', name: 'Aayush', role: UserRole.EMPLOYEE, department: 'Back Office' },
       { email: 'kamlesh@laxree.com', name: 'Kamlesh', role: UserRole.EMPLOYEE, department: 'Back Office' },
       { email: 'hitesh@laxree.com', name: 'Hitesh Tak', role: UserRole.EMPLOYEE, department: 'Accounts' },
-      { email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Management' },
-      { email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Management' },
+      { email: 'meera@laxree.com', name: 'Meera Patel', role: UserRole.EMPLOYEE, department: 'HR' },
+      { email: 'rajesh@laxree.com', name: 'Rajesh Kumar', role: UserRole.EMPLOYEE, department: 'Coordinator' },
     ]
 
     const createdUsers = []
@@ -35,25 +36,27 @@ export async function POST() {
       }
     }
 
-    const taskData = [
-      { title: 'Monthly Sales Report', description: 'Prepare and submit the monthly sales report for management review', priority: TaskPriority.HIGH, status: WorkflowStatus.IN_PROGRESS },
-      { title: 'Client Follow-up - ABC Corp', description: 'Follow up with ABC Corp regarding pending proposal', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING },
-      { title: 'Reconciliation - March 2025', description: 'Complete bank reconciliation for March 2025', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS },
-      { title: 'Update CRM Records', description: 'Update all client records in the CRM system', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED },
-      { title: 'Design Review - Hotel Brochure', description: 'Review and approve the hotel brochure design', priority: TaskPriority.MEDIUM, status: WorkflowStatus.PENDING },
-      { title: 'Procurement - Office Supplies', description: 'Order office supplies for the quarter', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED },
-      { title: 'Compliance Audit Preparation', description: 'Prepare documentation for upcoming compliance audit', priority: TaskPriority.CRITICAL, status: WorkflowStatus.ON_HOLD },
-      { title: 'Team Performance Review', description: 'Conduct quarterly team performance reviews', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING },
-      { title: 'Invoice Processing - Vendor Payments', description: 'Process pending vendor invoices', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS },
-      { title: 'Roofing Project Status Update', description: 'Update roofing project status and timeline', priority: TaskPriority.HIGH, status: WorkflowStatus.EXTERNAL_HOLD },
-      { title: 'HR Policy Update', description: 'Review and update HR policies', priority: TaskPriority.MEDIUM, status: WorkflowStatus.PENDING },
-      { title: 'Interior Procurement - Material Sourcing', description: 'Source materials for interior procurement project', priority: TaskPriority.MEDIUM, status: WorkflowStatus.ESCALATED },
-      { title: 'Daily Operations Checklist', description: 'Complete daily operations checklist', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED },
-      { title: 'MIS Report Generation', description: 'Generate monthly MIS reports', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS },
-      { title: 'Client Presentation - Q1 Results', description: 'Prepare Q1 results presentation for client', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING },
-    ]
-
     const assignees = createdUsers.filter(u => u.role !== UserRole.ADMIN && u.role !== UserRole.DIRECTOR)
+
+    const taskData = [
+      { title: 'Daily Operations Checklist', description: 'Complete daily operations checklist', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED, frequency: 'Daily', category: 'Routine Work' },
+      { title: 'Monthly Sales Report', description: 'Prepare and submit the monthly sales report for management review', priority: TaskPriority.HIGH, status: WorkflowStatus.IN_PROGRESS, frequency: 'Monthly', monthDates: '[1]', category: 'Routine Work' },
+      { title: 'Client Follow-up - ABC Corp', description: 'Follow up with ABC Corp regarding pending proposal', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING, frequency: 'One Time', category: 'One Time Work' },
+      { title: 'Weekly Reconciliation', description: 'Complete weekly bank reconciliation', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS, frequency: 'Weekly', weekDays: '["Monday"]', category: 'Reconciliation' },
+      { title: 'Update CRM Records', description: 'Update all client records in the CRM system', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED, frequency: 'One Time', category: 'Operations' },
+      { title: 'Design Review - Hotel Brochure', description: 'Review and approve the hotel brochure design', priority: TaskPriority.MEDIUM, status: WorkflowStatus.PENDING, frequency: 'One Time', category: 'One Time Work' },
+      { title: 'Procurement - Office Supplies', description: 'Order office supplies for the quarter', priority: TaskPriority.LOW, status: WorkflowStatus.COMPLETED, frequency: 'One Time', category: 'Procurement' },
+      { title: 'Compliance Audit Preparation', description: 'Prepare documentation for upcoming compliance audit', priority: TaskPriority.CRITICAL, status: WorkflowStatus.ON_HOLD, frequency: 'One Time', category: 'Compliance' },
+      { title: 'Team Performance Review', description: 'Conduct quarterly team performance reviews', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING, frequency: 'Monthly', monthDates: '[28]', category: 'Routine Work' },
+      { title: 'Invoice Processing - Vendor Payments', description: 'Process pending vendor invoices', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS, frequency: 'Weekly', weekDays: '["Friday"]', category: 'Routine Work' },
+      { title: 'Roofing Project Status Update', description: 'Update roofing project status and timeline', priority: TaskPriority.HIGH, status: WorkflowStatus.EXTERNAL_HOLD, frequency: 'One Time', category: 'Operations' },
+      { title: 'HR Policy Update', description: 'Review and update HR policies', priority: TaskPriority.MEDIUM, status: WorkflowStatus.PENDING, frequency: 'One Time', category: 'Compliance' },
+      { title: 'Interior Procurement - Material Sourcing', description: 'Source materials for interior procurement project', priority: TaskPriority.MEDIUM, status: WorkflowStatus.ESCALATED, frequency: 'One Time', category: 'Procurement' },
+      { title: 'MIS Report Generation', description: 'Generate monthly MIS reports', priority: TaskPriority.MEDIUM, status: WorkflowStatus.IN_PROGRESS, frequency: 'Monthly', monthDates: '[5]', category: 'Routine Work' },
+      { title: 'Client Presentation - Q1 Results', description: 'Prepare Q1 results presentation for client', priority: TaskPriority.HIGH, status: WorkflowStatus.PENDING, frequency: 'One Time', category: 'One Time Work' },
+      { title: 'Daily Standup Notes', description: 'Prepare and distribute daily standup meeting notes', priority: TaskPriority.LOW, status: WorkflowStatus.PENDING, frequency: 'Daily', category: 'Routine Work' },
+      { title: 'Monthly Account Reconciliation', description: 'Complete full monthly account reconciliation', priority: TaskPriority.HIGH, status: WorkflowStatus.IN_PROGRESS, frequency: 'Monthly', monthDates: '[28]', category: 'Reconciliation' },
+    ]
 
     for (let i = 0; i < taskData.length; i++) {
       const existing = await db.task.findFirst({ where: { title: taskData[i].title } })
@@ -62,17 +65,30 @@ export async function POST() {
         const dueDate = new Date()
         dueDate.setDate(dueDate.getDate() + (i % 7) - 2)
 
+        const dept = (taskData[i] as any).category === 'Reconciliation' ? 'Accounts' :
+          (taskData[i] as any).category === 'Procurement' ? 'Back Office' :
+          (taskData[i] as any).category === 'Compliance' ? 'HR' :
+          assignee.department || 'Sales'
+
         await db.task.create({
           data: {
-            ...taskData[i],
+            title: taskData[i].title,
+            description: taskData[i].description,
+            priority: taskData[i].priority,
+            status: taskData[i].status,
             ownerId: assignee.id,
             dueDate,
+            department: dept,
+            category: (taskData[i] as any).category || null,
+            frequency: (taskData[i] as any).frequency || null,
+            weekDays: (taskData[i] as any).weekDays || null,
+            monthDates: (taskData[i] as any).monthDates || null,
           },
         })
       }
     }
 
-    const departments = ['Sales', 'Back Office', 'Accounts', 'Management']
+    const departments = ['Sales', 'Back Office', 'Accounts', 'HR', 'Coordinator', 'Admin']
     for (const dept of departments) {
       const existing = await db.department.findFirst({ where: { name: dept } })
       if (!existing) {
