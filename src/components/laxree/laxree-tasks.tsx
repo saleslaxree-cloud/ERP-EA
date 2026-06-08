@@ -297,6 +297,16 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       {task.frequency && task.frequency !== 'One Time' && (
                         <span className="badge b-blue" style={{ fontSize: 9, padding: '1px 6px' }}>🔄 {task.frequency}</span>
                       )}
+                      {task.directorDependency && (() => {
+                        try {
+                          const dirs = JSON.parse(task.directorDependency)
+                          return dirs.length > 0 ? (
+                            <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.2)' }}>
+                              👔 {dirs.join(', ')}
+                            </span>
+                          ) : null
+                        } catch { return null }
+                      })()}
                     </div>
 
                     {/* Step Progress */}
@@ -434,6 +444,16 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     <span className="badge" style={{ background: pBadge.bg, color: pBadge.color, fontWeight: 700 }}>{task.priority}</span>
                     {task.department && <span className="badge b-gray">{task.department}</span>}
                     {task.category && <span className="badge" style={{ background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
+                    {task.directorDependency && (() => {
+                      try {
+                        const dirs = JSON.parse(task.directorDependency)
+                        return dirs.length > 0 ? (
+                          <span className="badge" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.2)' }}>
+                            👔 {dirs.join(', ')}
+                          </span>
+                        ) : null
+                      } catch { return null }
+                    })()}
                     {sla && <span className="badge" style={{ background: sla.bg, color: sla.color }}>{sla.label}</span>}
                   </div>
                 </div>
@@ -461,6 +481,16 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     {task.monthDates && ` — Dates: ${JSON.parse(task.monthDates).join(', ')}`}
                   </div>
                 )}
+                {task.directorDependency && (() => {
+                  try {
+                    const dirs = JSON.parse(task.directorDependency)
+                    return dirs.length > 0 ? (
+                      <div style={{ padding: '8px 12px', background: 'var(--purple-l)', borderRadius: 6, color: 'var(--purple)', fontWeight: 600 }}>
+                        👔 Director: {dirs.join(', ')}
+                      </div>
+                    ) : null
+                  } catch { return null }
+                })()}
                 {task.createdAt && (
                   <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
                     <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Created:</span> {new Date(task.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}

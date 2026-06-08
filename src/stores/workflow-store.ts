@@ -66,10 +66,10 @@ interface WorkflowStore {
 const initialState = {
   activeView: 'dashboard' as ActiveView,
   activePage: 'dashboard',
-  currentUserId: 'user-admin',
-  currentUserName: 'Arti Sharma',
-  currentRole: 'ADMIN' as UserRole,
-  currentUser: { username: 'admin', role: 'admin', name: 'Arti Sharma' },
+  currentUserId: '',
+  currentUserName: '',
+  currentRole: 'EMPLOYEE' as UserRole,
+  currentUser: null as { username: string; role: string; name: string } | null,
   sidebarOpen: false,
   darkMode: false,
   isDark: false,
@@ -132,15 +132,16 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   },
   removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
   login: (username: string, password: string) => {
-    const users: Record<string, { password: string; role: UserRole; name: string }> = {
-      admin: { password: 'admin123', role: 'ADMIN', name: 'Arti Sharma' },
-      ea: { password: 'ea123', role: 'EA', name: 'Executive Assistant' },
-      ashish: { password: 'ashish123', role: 'DIRECTOR', name: 'Ashish Kumar' },
+    const users: Record<string, { password: string; role: UserRole; name: string; userId: string }> = {
+      admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
+      ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
+      ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
+      samarth: { password: 'Samarth@2025', role: 'DIRECTOR', name: 'Samarth Sir', userId: 'user-dir4' },
     }
     const user = users[username]
     if (user && user.password === password) {
       set({
-        currentUserId: `user-${username}`,
+        currentUserId: user.userId,
         currentUserName: user.name,
         currentRole: user.role,
         currentUser: { username, role: user.role, name: user.name },

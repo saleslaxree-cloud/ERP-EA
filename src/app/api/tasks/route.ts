@@ -270,6 +270,7 @@ export async function POST(request: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         workflowId: createdWorkflowId,
         parentTaskId: parentTaskId || null,
+        directorDependency: directorDependencies.length > 0 ? JSON.stringify(directorDependencies) : null,
         taskSteps: {
           create: taskStepsData.map((step: { title: string; order: number; directorName?: string | null; directorNote?: string | null }) => ({
             title: step.title,

@@ -62,7 +62,7 @@ export function LaxreeLogin() {
             fontSize: 12, marginTop: 10,
           }}>{error}</div>
         )}
-        <div className="lf-hint">Demo: admin / admin123 · ea / ea123 · ashish / ashish123</div>
+        <div className="lf-hint">Admin: admin / Laxree@2025 · EA: ea / EA@Laxree · Directors: ashish / Ashish@2025 · samarth / Samarth@2025</div>
       </div>
     </div>
   )

@@ -223,6 +223,7 @@ model Task {
   frequency       String?        // 'One Time', 'Daily', 'Weekly', 'Monthly'
   weekDays        String?        // JSON array of selected weekdays e.g. '["Monday","Wednesday"]'
   monthDates      String?        // JSON array of selected dates e.g. '[1,15,28]'
+  directorDependency String?     // JSON array of director names e.g. '["Ashish Sir","Samarth Sir"]'
 }
 
 model TaskStep {

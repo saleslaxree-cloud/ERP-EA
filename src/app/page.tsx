@@ -14,6 +14,7 @@ import { LaxreeSidebar } from '@/components/laxree/laxree-sidebar'
 import { LaxreeTopbar } from '@/components/laxree/laxree-topbar'
 import { LaxreeCommandPalette } from '@/components/laxree/laxree-command-palette'
 import { LaxreeNotifPanel } from '@/components/laxree/laxree-notif-panel'
+import { LaxreeLogin } from '@/components/laxree/laxree-login'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -767,13 +768,18 @@ function SettingsView() {
    Main Page Export
    ═══════════════════════════════════════════════════════════ */
 export default function HomePage() {
-  const { darkMode } = useWorkflowStore()
+  const { darkMode, currentUser } = useWorkflowStore()
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', darkMode)
     }
   }, [darkMode])
+
+  // Login gate — show login page if not authenticated
+  if (!currentUser) {
+    return <LaxreeLogin />
+  }
 
   return (
     <ErrorBoundary>
