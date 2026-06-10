@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 
 export function LaxreeTopbar() {
-  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen } = useWorkflowStore()
+  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen, setCreateTaskOpen } = useWorkflowStore()
   const [time, setTime] = useState('')
 
   useEffect(() => {
@@ -44,6 +44,24 @@ export function LaxreeTopbar() {
         <span style={{ fontSize: '11.5px', color: 'var(--t3)', whiteSpace: 'nowrap' }}>{time}</span>
       </div>
       <div className="tb-right">
+        <button
+          onClick={() => setCreateTaskOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'linear-gradient(135deg, #8B6914, #D4AA50)',
+            color: '#fff', border: 'none', borderRadius: 8,
+            padding: '6px 14px', fontFamily: "'DM Sans', sans-serif",
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            transition: 'all .15s', boxShadow: '0 1px 3px rgba(139,105,20,.3)',
+            whiteSpace: 'nowrap',
+          }}
+          title="Create New Task"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          New Task
+        </button>
         <div className="tb-icon-btn" onClick={toggleNotifPanel} title="Notifications">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />

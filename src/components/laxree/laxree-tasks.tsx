@@ -205,7 +205,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
           <p>{pageDesc}</p>
         </div>
         <div className="ph-right">
-          {(currentUser?.role === 'admin' || currentUser?.role === 'ea') && !showCancelled && !showExtHold && !showEscalations && (
+          {!showCancelled && !showExtHold && !showEscalations && (
             <button className="btn btn-gold" onClick={() => setCreateTaskOpen(true)}>+ Create Task</button>
           )}
         </div>
