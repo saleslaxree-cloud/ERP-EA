@@ -28,102 +28,190 @@ function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length;
 function getInitials(name: string) { return name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?' }
 
 export function LaxreeApprovals() {
-  const { currentUser, addToast, currentUserId } = useWorkflowStore()
+  const { currentUser, addToast, currentUserId, currentRole } = useWorkflowStore()
   const queryClient = useQueryClient()
   const [comment, setComment] = useState('')
-  const [actionWorkflow, setActionWorkflow] = useState<string | null>(null)
-  const [approvalTab, setApprovalTab] = useState('pending')
-
-  const { data: workflows = [] } = useQuery({
-    queryKey: ['workflows-approvals'],
-    queryFn: () => fetch('/api/workflows').then(r => r.json()),
-  })
+  const [actionTask, setActionTask] = useState<string | null>(null)
+  const [approvalTab, setApprovalTab] = useState('ea_review')
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks-approvals'],
     queryFn: () => fetch('/api/tasks').then(r => r.json()),
   })
 
-  const { data: approvals = [] } = useQuery({
-    queryKey: ['approvals'],
-    queryFn: () => fetch('/api/approvals?userId=user-admin').then(r => r.json()),
+  const { data: workflows = [] } = useQuery({
+    queryKey: ['workflows-approvals'],
+    queryFn: () => fetch('/api/workflows').then(r => r.json()),
   })
 
-  const approveMutation = useMutation({
-    mutationFn: (data: any) => fetch('/api/approvals', {
+  // Approval action mutation (uses the proper approval-action API)
+  const approvalActionMutation = useMutation({
+    mutationFn: (data: any) => fetch('/api/approval-action', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workflows-approvals'] })
-      queryClient.invalidateQueries({ queryKey: ['approvals'] })
       queryClient.invalidateQueries({ queryKey: ['tasks-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['workflows-approvals'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       addToast('ok', 'Action completed')
       setComment('')
-      setActionWorkflow(null)
+      setActionTask(null)
     },
   })
 
-  const taskStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) }).then(r => r.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-approvals'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      addToast('ok', 'Task status updated')
-      setActionWorkflow(null)
-    },
-  })
+  // Categorize tasks by their workflow state
+  const allTasks = Array.isArray(tasks) ? tasks : []
 
-  // Get tasks needing approval - PENDING and IN_PROGRESS tasks with workflow
-  const pendingTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
-    t.status === 'PENDING' || t.status === 'IN_PROGRESS'
-  ) : []
+  // Tasks at EA Review stage (IN_REVIEW, EA step is active)
+  const eaReviewTasks = allTasks.filter((t: any) =>
+    t.status === 'IN_REVIEW' && t.workflowId
+  )
 
-  const awaitingDirector = Array.isArray(tasks) ? tasks.filter((t: any) =>
-    t.status === 'ON_HOLD' || t.status === 'IN_REVIEW'
-  ) : []
+  // Tasks at Director stage (ON_HOLD = waiting for director)
+  const directorReviewTasks = allTasks.filter((t: any) =>
+    t.status === 'ON_HOLD'
+  )
 
-  const completedTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
-    t.status === 'COMPLETED'
-  ) : []
+  // Tasks at EA Final Review (after director approved, back to EA)
+  const eaFinalTasks = allTasks.filter((t: any) =>
+    t.status === 'IN_REVIEW' && t.workflow?.status === 'IN_REVIEW' &&
+    t.workflow?.steps?.some((s: any) => s.name.includes('EA Final') && s.status === 'IN_REVIEW')
+  )
 
-  const pendingEA = workflows.filter((w: any) => w.status === 'PENDING' || w.status === 'IN_REVIEW')
-  const directorActions = workflows.filter((w: any) => w.status === 'ESCALATED' || w.status === 'ON_HOLD')
+  // Completed tasks
+  const completedTasks = allTasks.filter((t: any) => t.status === 'COMPLETED')
+
+  // Rejected tasks
+  const rejectedTasks = allTasks.filter((t: any) => t.status === 'REJECTED')
+
+  // Tasks approved by all, waiting for employee final submit
+  const approvedTasks = allTasks.filter((t: any) =>
+    t.status === 'IN_PROGRESS' && t.workflow?.status === 'APPROVED'
+  )
 
   const tabs = [
-    { id: 'pending', label: 'Pending Review', count: pendingTasks.length + pendingEA.length },
-    { id: 'director', label: 'Awaiting Director', count: awaitingDirector.length },
-    { id: 'actions', label: 'Director Actions', count: directorActions.length },
+    { id: 'ea_review', label: 'EA Review', count: eaReviewTasks.length },
+    { id: 'director', label: 'Director Review', count: directorReviewTasks.length },
+    { id: 'ea_final', label: 'EA Final', count: eaFinalTasks.length },
+    { id: 'approved', label: 'Approved', count: approvedTasks.length },
     { id: 'completed', label: 'Completed', count: completedTasks.length },
   ]
 
-  const handleApprove = (workflowId: string, action: string) => {
-    approveMutation.mutate({
-      workflowId,
-      action: action === 'approve' ? 'APPROVED' : action === 'reject' ? 'REJECTED' : 'ON_HOLD',
-      comments: comment,
-      approverId: currentUserId,
-      stepInstanceId: workflowId,
-    })
+  const handleEAApprove = (task: any) => {
+    // EA approves at EA Review stage → send to Director
+    const workflow = task.workflow
+    if (!workflow) return
+
+    const eaReviewStep = workflow.steps?.find((s: any) => s.name.includes('EA Review') && !s.name.includes('Final'))
+
+    if (eaReviewStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: eaReviewStep.id,
+        action: 'APPROVE',
+        comments: comment || 'EA verified and sent to Director',
+        approverId: currentUserId,
+      })
+    }
   }
 
-  const handleTaskAction = (taskId: string, action: string) => {
-    let newStatus = 'IN_PROGRESS'
-    if (action === 'approve') newStatus = 'COMPLETED'  // Backend intercepts if task has workflow
-    else if (action === 'reject') newStatus = 'PENDING'  // Return to employee
-    else if (action === 'return') newStatus = 'PENDING'  // Return to employee
-    else if (action === 'director') newStatus = 'ON_HOLD'  // Send to director (triggers workflow step advancement)
-    else if (action === 'done') newStatus = 'COMPLETED'  // Backend intercepts if task has workflow → routes to EA Review
-    else if (action === 'ea_final') newStatus = 'IN_REVIEW'  // Director approved, send to EA final review
+  const handleDirectorApprove = (task: any) => {
+    // Director approves → goes to EA Final Review
+    const workflow = task.workflow
+    if (!workflow) return
 
-    taskStatusMutation.mutate({ id: taskId, status: newStatus })
+    const directorStep = workflow.steps?.find((s: any) => s.name.includes('Director'))
+
+    if (directorStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: directorStep.id,
+        action: 'APPROVE',
+        comments: comment || 'Director approved',
+        approverId: currentUserId,
+      })
+    }
   }
 
-  const renderTaskCard = (task: any) => {
+  const handleDirectorReject = (task: any) => {
+    // Director rejects → return to employee
+    const workflow = task.workflow
+    if (!workflow) return
+
+    const directorStep = workflow.steps?.find((s: any) => s.name.includes('Director'))
+
+    if (directorStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: directorStep.id,
+        action: 'REJECT',
+        comments: comment || 'Director rejected',
+        approverId: currentUserId,
+      })
+    }
+  }
+
+  const handleDirectorSendBack = (task: any) => {
+    // Director sends back to EA
+    const workflow = task.workflow
+    if (!workflow) return
+
+    const directorStep = workflow.steps?.find((s: any) => s.name.includes('Director'))
+
+    if (directorStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: directorStep.id,
+        action: 'SEND_BACK',
+        comments: comment || 'Director sent back to EA',
+        approverId: currentUserId,
+      })
+    }
+  }
+
+  const handleEAFinalApprove = (task: any) => {
+    // EA Final approves → send back to employee for final submit
+    const workflow = task.workflow
+    if (!workflow) return
+
+    const eaFinalStep = workflow.steps?.find((s: any) => s.name.includes('EA Final'))
+
+    if (eaFinalStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: eaFinalStep.id,
+        action: 'APPROVE',
+        comments: comment || 'EA Final approved - ready for employee submission',
+        approverId: currentUserId,
+      })
+    }
+  }
+
+  const handleEAFinalReject = (task: any) => {
+    // EA Final rejects → return to employee
+    const workflow = task.workflow
+    if (!workflow) return
+
+    const eaFinalStep = workflow.steps?.find((s: any) => s.name.includes('EA Final'))
+
+    if (eaFinalStep) {
+      approvalActionMutation.mutate({
+        workflowId: workflow.id,
+        stepInstanceId: eaFinalStep.id,
+        action: 'REJECT',
+        comments: comment || 'EA Final rejected - needs revision',
+        approverId: currentUserId,
+      })
+    }
+  }
+
+  const renderTaskCard = (task: any, mode: 'ea_review' | 'director' | 'ea_final' | 'approved' | 'completed') => {
     const sBadge = statusBadgeStyle[task.status] || statusBadgeStyle.PENDING
     const owner = task.owner
     const stepsTotal = task.taskSteps?.length || 0
     const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+    const workflow = task.workflow
+    const isActive = actionTask === task.id
 
     return (
       <div key={task.id} style={{
@@ -150,7 +238,14 @@ export function LaxreeApprovals() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
           {task.department && <span className="badge b-gray" style={{ fontSize: 9 }}>{task.department}</span>}
           {task.category && <span className="badge" style={{ fontSize: 9, background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
-          {task.frequency && <span className="badge" style={{ fontSize: 9, background: 'var(--blue-l)', color: 'var(--blue)' }}>🔄 {task.frequency}</span>}
+          {task.directorDependency && (() => {
+            try {
+              const dirs = JSON.parse(task.directorDependency)
+              return dirs.length > 0 ? (
+                <span className="badge" style={{ fontSize: 9, background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.2)' }}>👔 {dirs.join(', ')}</span>
+              ) : null
+            } catch { return null }
+          })()}
           <span className="badge" style={{ fontSize: 9, background: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? 'var(--red-l)' : 'var(--bg2)', color: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? 'var(--red)' : 'var(--t3)' }}>
             {task.priority}
           </span>
@@ -166,66 +261,135 @@ export function LaxreeApprovals() {
           </div>
         )}
 
-        {/* Workflow flow */}
-        <div className="wf-flow" style={{ marginBottom: 10, fontSize: 11 }}>
-          <span className="wf-stage wf-stage-ea" style={{ padding: '3px 8px', fontSize: 9 }}>📋 EA Review</span>
-          <span className="wf-arrow">→</span>
-          <span className="wf-stage wf-stage-dir" style={{ padding: '3px 8px', fontSize: 9 }}>👔 Director</span>
-          <span className="wf-arrow">→</span>
-          <span className="wf-stage" style={{ padding: '3px 8px', fontSize: 9, background: 'var(--green-l)', color: 'var(--green)' }}>✅ EA Final</span>
-          <span className="wf-arrow">→</span>
-          <span className="wf-stage wf-stage-done" style={{ padding: '3px 8px', fontSize: 9 }}>Done</span>
-        </div>
-
-        {/* Action buttons */}
-        {actionWorkflow === task.id ? (
-          <div style={{ marginTop: 10 }}>
-            <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
-              onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button className="btn btn-green btn-sm" onClick={() => handleTaskAction(task.id, 'approve')}>✓ Approve & Send to Review</button>
-              <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }} onClick={() => handleTaskAction(task.id, 'director')}>📤 Send to Director</button>
-              <button className="btn btn-red btn-sm" onClick={() => handleTaskAction(task.id, 'reject')}>↩ Reject & Return to Employee</button>
-              <button className="btn btn-sm" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)' }} onClick={() => handleTaskAction(task.id, 'return')}>↩ Return to Employee</button>
-              <button className="btn btn-ghost btn-sm" onClick={() => { setActionWorkflow(null); setComment('') }}>Cancel</button>
-            </div>
+        {/* Workflow step indicators */}
+        {workflow?.steps && (
+          <div style={{ marginBottom: 10, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+            {workflow.steps.map((ws: any, wi: number) => {
+              const isDone = ws.status === 'APPROVED' || ws.status === 'COMPLETED'
+              const isActive = ws.status === 'IN_REVIEW' || ws.status === 'IN_PROGRESS'
+              const isRejected = ws.status === 'REJECTED'
+              let bg = 'var(--bg2)', color = 'var(--t3)'
+              if (isActive) { bg = 'var(--amber-l)'; color = 'var(--amber)' }
+              if (isDone) { bg = 'var(--green-l)'; color = 'var(--green)' }
+              if (isRejected) { bg = 'var(--red-l)'; color = 'var(--red)' }
+              const shortName = ws.name.replace('Employee Task Completion', 'Employee').replace('EA Review & Verification', 'EA Review').replace('Director Approval', 'Director').replace('EA Final Review & Submit', 'EA Final')
+              return (
+                <span key={ws.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span className="badge" style={{ fontSize: 9, padding: '3px 8px', background: bg, color, fontWeight: 700, border: isActive ? '2px solid currentColor' : 'none' }}>
+                    {isDone ? '✅' : isActive ? '🔄' : isRejected ? '❌' : '⏳'} {shortName}
+                  </span>
+                  {wi < workflow.steps.length - 1 && <span style={{ color: 'var(--t3)' }}>→</span>}
+                </span>
+              )
+            })}
           </div>
-        ) : (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-sm"
-              style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid var(--green)', fontWeight: 700 }}
-              onClick={() => setActionWorkflow(task.id)}
-            >
+        )}
+
+        {/* Action buttons based on mode */}
+        {mode === 'ea_review' && (
+          isActive ? (
+            <div style={{ marginTop: 10 }}>
+              <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
+                onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button className="btn btn-green btn-sm" onClick={() => handleEAApprove(task)} disabled={approvalActionMutation.isPending}>
+                  ✓ Verify & Send to Director
+                </button>
+                <button className="btn btn-red btn-sm" onClick={() => {
+                  // EA rejects - send back to employee
+                  const eaReviewStep = workflow?.steps?.find((s: any) => s.name.includes('EA Review') && !s.name.includes('Final'))
+                  if (eaReviewStep) {
+                    approvalActionMutation.mutate({
+                      workflowId: workflow.id,
+                      stepInstanceId: eaReviewStep.id,
+                      action: 'REJECT',
+                      comments: comment || 'EA rejected - needs revision',
+                      approverId: currentUserId,
+                    })
+                  }
+                }} disabled={approvalActionMutation.isPending}>
+                  ↩ Return to Employee
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setActionTask(null); setComment('') }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-sm" style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid var(--green)', fontWeight: 700 }}
+              onClick={() => setActionTask(task.id)}>
               ✓ Review & Act
             </button>
-            {task.status === 'IN_PROGRESS' && (
-              <button
-                className="btn btn-sm"
-                style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid rgba(21,128,61,.3)', fontWeight: 700 }}
-                onClick={() => handleTaskAction(task.id, 'done')}
-              >
-                ✓ Submit for Review
-              </button>
-            )}
-            {(task.status === 'PENDING' || task.status === 'IN_PROGRESS') && (
-              <button
-                className="btn btn-sm"
-                style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.3)', fontWeight: 700 }}
-                onClick={() => handleTaskAction(task.id, 'director')}
-              >
-                📤 Send to Director
-              </button>
-            )}
+          )
+        )}
+
+        {mode === 'director' && (
+          isActive ? (
+            <div style={{ marginTop: 10 }}>
+              <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
+                onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button className="btn btn-green btn-sm" onClick={() => handleDirectorApprove(task)} disabled={approvalActionMutation.isPending}>
+                  ✓ Approve & Send to EA Final
+                </button>
+                <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }}
+                  onClick={() => handleDirectorSendBack(task)} disabled={approvalActionMutation.isPending}>
+                  ↩ Send Back to EA
+                </button>
+                <button className="btn btn-red btn-sm" onClick={() => handleDirectorReject(task)} disabled={approvalActionMutation.isPending}>
+                  ✕ Reject & Return to Employee
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setActionTask(null); setComment('') }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }}
+              onClick={() => setActionTask(task.id)}>
+              👔 Review & Act
+            </button>
+          )
+        )}
+
+        {mode === 'ea_final' && (
+          isActive ? (
+            <div style={{ marginTop: 10 }}>
+              <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
+                onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button className="btn btn-green btn-sm" onClick={() => handleEAFinalApprove(task)} disabled={approvalActionMutation.isPending}>
+                  ✓ Final Approve & Send to Employee
+                </button>
+                <button className="btn btn-red btn-sm" onClick={() => handleEAFinalReject(task)} disabled={approvalActionMutation.isPending}>
+                  ✕ Reject & Return to Employee
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => { setActionTask(null); setComment('') }}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn-sm" style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid var(--green)', fontWeight: 700 }}
+              onClick={() => setActionTask(task.id)}>
+              ✅ Final Review & Act
+            </button>
+          )
+        )}
+
+        {mode === 'approved' && (
+          <div style={{ marginTop: 10, padding: 10, background: 'var(--green-l)', borderRadius: 8, fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+            ✅ All approvals done. Waiting for employee to do final submit.
+          </div>
+        )}
+
+        {mode === 'completed' && (
+          <div style={{ marginTop: 10, padding: 10, background: 'var(--green-l)', borderRadius: 8, fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+            ✅ Task fully completed.
           </div>
         )}
       </div>
     )
   }
 
-  const currentList = approvalTab === 'pending' ? pendingTasks
-    : approvalTab === 'director' ? awaitingDirector
-    : approvalTab === 'actions' ? directorActions
+  const currentList = approvalTab === 'ea_review' ? eaReviewTasks
+    : approvalTab === 'director' ? directorReviewTasks
+    : approvalTab === 'ea_final' ? eaFinalTasks
+    : approvalTab === 'approved' ? approvedTasks
     : completedTasks
 
   return (
@@ -233,7 +397,7 @@ export function LaxreeApprovals() {
       <div className="ph">
         <div className="ph-left">
           <h2>Approval Center</h2>
-          <p>Review and manage task approvals · EA → Director routing</p>
+          <p>Review and manage task approvals · EA → Director → EA Final routing</p>
         </div>
       </div>
 
@@ -250,47 +414,37 @@ export function LaxreeApprovals() {
         ))}
       </div>
 
-      {/* Pending approval pulse */}
-      {pendingTasks.length > 0 && approvalTab === 'pending' && (
+      {/* Pending review alert */}
+      {eaReviewTasks.length > 0 && approvalTab === 'ea_review' && (
         <div className="alert alert-gold" style={{ marginBottom: 14 }}>
           <div className="alert-icon">🔔</div>
           <div className="alert-body">
-            <div className="alert-title" style={{ color: 'var(--g2)' }}>{pendingTasks.length} Item(s) Pending Review</div>
-            <div className="alert-sub">Employee work submissions awaiting verification</div>
+            <div className="alert-title" style={{ color: 'var(--g2)' }}>{eaReviewTasks.length} Task(s) Need EA Review</div>
+            <div className="alert-sub">Employee steps with director dependency are waiting for your verification</div>
           </div>
-          <span className="alert-cnt" style={{ background: 'var(--amber)', animation: 'ap-pulse 2s infinite' }}>{pendingTasks.length}</span>
+          <span className="alert-cnt" style={{ background: 'var(--amber)', animation: 'ap-pulse 2s infinite' }}>{eaReviewTasks.length}</span>
         </div>
       )}
 
-      {/* Task approval cards */}
+      {directorReviewTasks.length > 0 && approvalTab === 'director' && (
+        <div className="alert alert-gold" style={{ marginBottom: 14 }}>
+          <div className="alert-icon">👔</div>
+          <div className="alert-body">
+            <div className="alert-title" style={{ color: 'var(--purple)' }}>{directorReviewTasks.length} Task(s) Need Director Approval</div>
+            <div className="alert-sub">EA has verified and sent these tasks for your approval</div>
+          </div>
+          <span className="alert-cnt" style={{ background: 'var(--purple)', animation: 'ap-pulse 2s infinite' }}>{directorReviewTasks.length}</span>
+        </div>
+      )}
+
+      {/* Task cards */}
       {currentList.length === 0 ? (
         <div className="empty">
           <h3>No items in this category</h3>
           <p>All caught up! No items pending review.</p>
         </div>
       ) : (
-        currentList.map(renderTaskCard)
-      )}
-
-      {/* Completed history */}
-      {approvalTab === 'completed' && (
-        <div className="lcard" style={{ marginTop: 14 }}>
-          <div className="ch"><div className="ct">📜 Completed Tasks</div></div>
-          <div className="cb">
-            {completedTasks.length === 0 ? (
-              <div className="empty"><p>No completed tasks yet</p></div>
-            ) : completedTasks.map((task: any) => (
-              <div key={task.id} style={{ display: 'flex', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--b1)', alignItems: 'center' }}>
-                <div className="av" style={{ background: 'var(--green)' }}>✓</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700 }}>{task.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--t3)' }}>{task.owner?.name || 'Unassigned'} · {task.completedAt ? new Date(task.completedAt).toLocaleString() : ''}</div>
-                </div>
-                <span className="badge b-green" style={{ fontSize: 9 }}>Completed</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        currentList.map((task: any) => renderTaskCard(task, approvalTab as any))
       )}
     </>
   )

@@ -203,3 +203,29 @@ Stage Summary:
 - Live score shows real task breakdown (on-time, in-progress, overdue)
 - Next week plan remains manual entry by employee
 - Build compiles successfully with all changes
+---
+Task ID: 1
+Agent: Main Agent
+Task: Rebuild task workflow system from scratch - remove all tasks, remove Done button, add step-based workflow buttons
+
+Work Log:
+- Cleared all existing tasks, workflows, and related data from database
+- Added new fields to TaskStep schema: needsDirectorApproval, directorName, directorNote
+- Pushed schema changes to database with prisma db push
+- Rewrote /api/tasks POST route: removed auto-workflow creation at task time; workflow now created on-the-fly when a step needing director approval is completed
+- Rewrote /api/tasks/[id]/steps PATCH route: step completion now intelligently routes to approval workflow only when step needsDirectorApproval; steps without director complete normally
+- Rewrote /api/tasks/[id] PATCH route: simplified workflow intercept logic; final submit only allowed when workflow is APPROVED
+- Rewrote /api/approval-action POST route: fixed Director → EA Final routing; proper approval chain handling
+- Rewrote laxree-tasks.tsx: removed direct "Done" button; added step-based workflow buttons showing next actionable step; purple buttons for steps needing director approval, green for normal steps; visual step progress with approval indicators
+- Rewrote laxree-approvals.tsx: tabbed view with EA Review, Director Review, EA Final, Approved, Completed sections; proper action buttons per role; uses approval-action API correctly
+- Updated next.config.ts to add turbopack config for Next.js 16 build compatibility
+- Tested complete workflow end-to-end: Employee steps 1-2 → Step 3 (needs director) auto-routes → EA Review → Director → EA Final → Employee Final Submit → COMPLETED
+- Tested Director rejection: task returns to PENDING, step needing approval is reset
+
+Stage Summary:
+- All tasks cleared from database, starting fresh
+- "Done" button removed, replaced with step-by-step workflow buttons
+- Step-level director approval routing works: steps without director complete directly, steps with director auto-create workflow and route to EA → Director → EA Final
+- Director approval → EA Final routing bug fixed
+- Complete workflow verified: Employee → EA → Director → EA Final → Employee Submit → COMPLETED
+- Director rejection verified: returns task to employee with approval step reset

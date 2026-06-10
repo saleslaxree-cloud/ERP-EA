@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     ".space-z.ai",
   ],
+  turbopack: {},
   webpack: (config, { isServer }) => {
-    // Exclude examples and skills directories from being processed
     config.watchOptions = {
       ...config.watchOptions,
       ignored: ['**/examples/**', '**/skills/**', '**/node_modules/**'],
