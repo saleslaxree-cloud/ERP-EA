@@ -110,16 +110,65 @@ export async function GET(request: NextRequest) {
       !([WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] as WorkflowStatus[]).includes(t.status)
     )
 
+    // ══ PENDING APPROVALS ══
+    const pendingApprovals = await db.workflowInstance.count({
+      where: { status: { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_REVIEW, WorkflowStatus.ON_HOLD] } },
+    })
+    const escalationCount = await db.workflowInstance.count({
+      where: { status: WorkflowStatus.ESCALATED },
+    })
+
+    // ══ NOTIFICATIONS ══
+    const notifications = await db.notification.findMany({
+      where: { receiverId: userId || 'user-admin', isRead: false },
+      select: {
+        id: true, type: true, title: true, message: true, isRead: true, createdAt: true,
+        sender: { select: { id: true, name: true, role: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 15,
+    })
+
+    // ══ PENDING APPROVALS LIST ══
+    const pendingApprovalsList = await db.workflowInstance.findMany({
+      where: { status: { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_REVIEW] } },
+      select: {
+        id: true, title: true, status: true, priority: true,
+        creator: { select: { id: true, name: true, role: true, department: true } },
+        steps: { select: { id: true, name: true, status: true, order: true, assignee: { select: { id: true, name: true, role: true } } }, orderBy: { order: 'asc' } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    })
+
+    // ══ RECENT ACTIVITIES ══
+    const recentStatusChanges = await db.statusHistory.findMany({
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true, fromStatus: true, toStatus: true, reason: true, createdAt: true,
+        workflow: { select: { id: true, title: true } },
+        changedBy: true,
+      },
+    })
+    const recentActivities = recentStatusChanges.map(sh => ({
+      id: sh.id,
+      action: `${sh.workflow?.title || 'Workflow'}: ${sh.fromStatus} → ${sh.toStatus}`,
+      time: sh.createdAt?.toISOString(),
+      reason: sh.reason,
+    }))
+
     return NextResponse.json({
       statusCounts,
-      totalWorkflows: 0,
+      totalWorkflows: await db.workflowInstance.count(),
       totalTasks, completedTasks, pendingTasks, inProgressTasks, overdueTasks,
-      todayTasks, upcomingTasks, externalHoldTasks: 0,
-      pendingApprovals: 0, escalationCount: 0,
+      todayTasks, upcomingTasks,
+      externalHoldTasks: await db.task.count({ where: { status: WorkflowStatus.EXTERNAL_HOLD } }),
+      pendingApprovals, escalationCount,
       completionRate, performanceScore: completionRate,
       allTasks: [], // Removed for performance - use /api/tasks instead
       allUsers, userPerformance, deptMap, catMap,
-      recentActivities: [],
+      recentActivities,
       todayTasksList: todayTasksList.map(t => ({
         id: t.id, title: t.title, status: t.status, priority: t.priority,
         department: t.department, category: t.category, dueDate: t.dueDate?.toISOString(), owner: t.owner,
@@ -132,8 +181,8 @@ export async function GET(request: NextRequest) {
         id: t.id, title: t.title, status: t.status, priority: t.priority,
         department: t.department, category: t.category, dueDate: t.dueDate?.toISOString(), owner: t.owner,
       })),
-      pendingApprovalsList: [],
-      notifications: [],
+      pendingApprovalsList,
+      notifications,
     })
   } catch (error) {
     console.error('Dashboard error:', error)
