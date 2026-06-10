@@ -52,3 +52,26 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Agent context
+/agent-ctx/
+
+# Uploads and downloads
+/upload/
+/download/
+
+# Database files
+*.db
+*.db-journal
+
+# Screenshots
+screenshot-*.png
+
+# PID / runtime files
+3000
+
+# Internal worklog
+worklog.md
+
+# HTML previews
+laxree-page.html
