@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
+  relationMode      = "prisma"
 }
 
 enum UserRole {
@@ -213,7 +215,7 @@ model Task {
 
   workflow        WorkflowInstance? @relation(fields: [workflowId], references: [id])
   owner           User              @relation("TaskOwner", fields: [ownerId], references: [id])
-  parentTask      Task?             @relation("TaskChildren", fields: [parentTaskId], references: [id])
+  parentTask      Task?             @relation("TaskChildren", fields: [parentTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   subTasks        Task[]            @relation("TaskChildren")
   dependencies    TaskDependency[]  @relation("TaskDependsOn")
   dependents      TaskDependency[]  @relation("TaskRequiredBy")
@@ -242,7 +244,7 @@ model TaskStep {
   updatedAt             DateTime       @updatedAt
 
   task        Task           @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  assignee    User?          @relation("StepAssigneeTask", fields: [assigneeId], references: [id])
+  assignee    User?          @relation("StepAssigneeTask", fields: [assigneeId], references: [id], onDelete: SetNull, onUpdate: Restrict)
 }
 
 model Category {
@@ -270,8 +272,8 @@ model TaskDependency {
   dependencyType  String   @default("FINISH_TO_START")
   createdAt       DateTime @default(now())
 
-  task            Task     @relation("TaskDependsOn", fields: [taskId], references: [id], onDelete: Cascade)
-  dependsOnTask   Task     @relation("TaskRequiredBy", fields: [dependsOnTaskId], references: [id], onDelete: Cascade)
+  task            Task     @relation("TaskDependsOn", fields: [taskId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  dependsOnTask   Task     @relation("TaskRequiredBy", fields: [dependsOnTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
 }
 
 model Notification {

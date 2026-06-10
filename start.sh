@@ -1,6 +1,10 @@
 #!/bin/bash
 cd /home/z/my-project
 
+# Neon PostgreSQL Database URLs
+export DATABASE_URL="postgresql://neondb_owner:npg_V0CoL3SDNcKm@ep-noisy-bonus-app8563v.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require"
+export DIRECT_URL="postgresql://neondb_owner:npg_V0CoL3SDNcKm@ep-noisy-bonus-app8563v.c-7.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
 # Ensure Prisma client is generated
 npx prisma generate --no-hints 2>/dev/null
 
