@@ -68,3 +68,34 @@ Stage Summary:
 - Fix: Double-fork pattern detaches the server process from the agent's shell tree
 - Server now runs persistently and auto-restarts if it crashes
 - Application accessible at port 81 (via Caddy reverse proxy) and port 3000 (direct)
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix Director Dependency workflow - tasks not showing, workflow routing broken
+
+Work Log:
+- Analyzed screenshots: Director Dependency page shows 0 pending even after tasks are sent to director
+- Root cause: "Send to Director" in Approvals page just changed task status to ON_HOLD without advancing workflow steps
+- The /api/approvals query only looked at StepInstance by assigneeId, missing tasks that were routed via status change
+- Fixed task PATCH API (/api/tasks/[id]/route.ts): When status changes to ON_HOLD, it now auto-advances workflow steps - marks EA step APPROVED and activates Director step with correct assignee
+- Fixed approval-action API: Complete workflow flow now works properly:
+  - EA APPROVE → advances to Director step (task = ON_HOLD)
+  - Director APPROVE → advances to EA Final Review step (task = IN_REVIEW)
+  - EA Final APPROVE → advances to Employee Continue step or completes (task = COMPLETED)
+  - Director REJECT → sends task back to employee (task = PENDING)
+  - Director SEND_BACK → sends task back to EA (task = IN_REVIEW)
+  - EA Final REJECT → sends task back to employee (task = PENDING)
+- Fixed Director Dependency page (laxree-dir-dependency.tsx): Now queries BOTH workflow steps AND tasks with ON_HOLD/IN_REVIEW status, so tasks always appear regardless of how they were routed
+- Fixed Approvals page (laxree-approvals.tsx): 
+  - "Send to Director" button now available for both PENDING and IN_PROGRESS tasks
+  - Workflow flow diagram updated to show: EA Review → Director → EA Final → Done
+  - Reject now returns to employee (PENDING) instead of REJECTED
+- Rebuilt and verified: all builds compile, server runs HTTP 200
+
+Stage Summary:
+- Complete workflow flow: Employee → EA Review → Director Approval → EA Final Review → Employee Continue → Complete
+- Tasks now appear in Director Dependency page when sent to director
+- Director can Approve, Send Back to EA, or Reject (returns to employee)
+- EA Final Review step added after director approves before task completes
+- If employee hasn't done work, reject/return sends task back to employee as PENDING

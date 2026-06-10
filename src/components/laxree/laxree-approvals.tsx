@@ -74,13 +74,13 @@ export function LaxreeApprovals() {
     },
   })
 
-  // Get tasks needing approval - PENDING and IN_PROGRESS tasks
+  // Get tasks needing approval - PENDING and IN_PROGRESS tasks with workflow
   const pendingTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
     t.status === 'PENDING' || t.status === 'IN_PROGRESS'
   ) : []
 
   const awaitingDirector = Array.isArray(tasks) ? tasks.filter((t: any) =>
-    t.status === 'ON_HOLD'
+    t.status === 'ON_HOLD' || t.status === 'IN_REVIEW'
   ) : []
 
   const completedTasks = Array.isArray(tasks) ? tasks.filter((t: any) =>
@@ -110,10 +110,11 @@ export function LaxreeApprovals() {
   const handleTaskAction = (taskId: string, action: string) => {
     let newStatus = 'IN_PROGRESS'
     if (action === 'approve') newStatus = 'COMPLETED'
-    else if (action === 'reject') newStatus = 'REJECTED'
-    else if (action === 'return') newStatus = 'PENDING'
-    else if (action === 'director') newStatus = 'ON_HOLD'
+    else if (action === 'reject') newStatus = 'PENDING'  // Return to employee
+    else if (action === 'return') newStatus = 'PENDING'  // Return to employee
+    else if (action === 'director') newStatus = 'ON_HOLD'  // Send to director (triggers workflow step advancement)
     else if (action === 'done') newStatus = 'COMPLETED'
+    else if (action === 'ea_final') newStatus = 'IN_REVIEW'  // Director approved, send to EA final review
 
     taskStatusMutation.mutate({ id: taskId, status: newStatus })
   }
@@ -167,9 +168,11 @@ export function LaxreeApprovals() {
 
         {/* Workflow flow */}
         <div className="wf-flow" style={{ marginBottom: 10, fontSize: 11 }}>
-          <span className="wf-stage wf-stage-ea" style={{ padding: '3px 8px', fontSize: 9 }}>EA Review</span>
+          <span className="wf-stage wf-stage-ea" style={{ padding: '3px 8px', fontSize: 9 }}>📋 EA Review</span>
           <span className="wf-arrow">→</span>
-          <span className="wf-stage wf-stage-dir" style={{ padding: '3px 8px', fontSize: 9 }}>Director</span>
+          <span className="wf-stage wf-stage-dir" style={{ padding: '3px 8px', fontSize: 9 }}>👔 Director</span>
+          <span className="wf-arrow">→</span>
+          <span className="wf-stage" style={{ padding: '3px 8px', fontSize: 9, background: 'var(--green-l)', color: 'var(--green)' }}>✅ EA Final</span>
           <span className="wf-arrow">→</span>
           <span className="wf-stage wf-stage-done" style={{ padding: '3px 8px', fontSize: 9 }}>Done</span>
         </div>
@@ -181,9 +184,9 @@ export function LaxreeApprovals() {
               onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button className="btn btn-green btn-sm" onClick={() => handleTaskAction(task.id, 'approve')}>✓ Approve & Complete</button>
-              <button className="btn btn-red btn-sm" onClick={() => handleTaskAction(task.id, 'reject')}>✕ Reject</button>
-              <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)' }} onClick={() => handleTaskAction(task.id, 'director')}>📤 Send to Director</button>
-              <button className="btn btn-sm" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)' }} onClick={() => handleTaskAction(task.id, 'return')}>↩ Return</button>
+              <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }} onClick={() => handleTaskAction(task.id, 'director')}>📤 Send to Director</button>
+              <button className="btn btn-red btn-sm" onClick={() => handleTaskAction(task.id, 'reject')}>↩ Reject & Return to Employee</button>
+              <button className="btn btn-sm" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)' }} onClick={() => handleTaskAction(task.id, 'return')}>↩ Return to Employee</button>
               <button className="btn btn-ghost btn-sm" onClick={() => { setActionWorkflow(null); setComment('') }}>Cancel</button>
             </div>
           </div>
@@ -205,7 +208,7 @@ export function LaxreeApprovals() {
                 ✓ Mark Done
               </button>
             )}
-            {task.status === 'PENDING' && (
+            {(task.status === 'PENDING' || task.status === 'IN_PROGRESS') && (
               <button
                 className="btn btn-sm"
                 style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.3)', fontWeight: 700 }}

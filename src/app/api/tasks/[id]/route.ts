@@ -54,7 +54,7 @@ export async function PATCH(
 
     const task = await db.task.findUnique({
       where: { id },
-      include: { dependencies: true, workflow: { include: { steps: true } } },
+      include: { dependencies: true, workflow: { include: { steps: { orderBy: { order: 'asc' } } } }, owner: true },
     })
 
     if (!task) {
@@ -106,6 +106,120 @@ export async function PATCH(
         where: { id: taskStepId },
         data: { status: taskStepStatus as WorkflowStatus, completedAt: taskStepStatus === 'COMPLETED' ? now : null },
       })
+    }
+
+    // ═══ WORKFLOW STEP ADVANCEMENT LOGIC ═══
+    // When task status changes, advance the workflow steps accordingly
+    if (status && task.workflowId && task.workflow) {
+      const workflow = task.workflow
+
+      if (status === WorkflowStatus.IN_PROGRESS) {
+        // Employee started working → advance step 1 (Employee Task Completion) to IN_PROGRESS
+        const employeeStep = workflow.steps.find(s => s.order === 1)
+        if (employeeStep && employeeStep.status === WorkflowStatus.PENDING) {
+          await db.stepInstance.update({
+            where: { id: employeeStep.id },
+            data: { status: WorkflowStatus.IN_PROGRESS, startedAt: now },
+          })
+        }
+      }
+
+      if (status === WorkflowStatus.ON_HOLD) {
+        // EA sends task to Director → advance EA step to APPROVED, Director step to IN_REVIEW
+        const eaStep = workflow.steps.find(s => s.name.includes('EA Review') && !s.name.includes('Final'))
+        const directorStep = workflow.steps.find(s => s.name.includes('Director'))
+
+        if (eaStep) {
+          await db.stepInstance.update({
+            where: { id: eaStep.id },
+            data: { status: WorkflowStatus.APPROVED, completedAt: now },
+          })
+          // Create approval record
+          const eaUser = await db.user.findFirst({ where: { role: 'EA', isActive: true } })
+          if (eaUser) {
+            await db.approval.create({
+              data: {
+                stepInstanceId: eaStep.id,
+                workflowId: workflow.id,
+                approverId: eaUser.id,
+                action: WorkflowStatus.APPROVED,
+                comments: 'EA verified and sent to Director',
+                level: eaStep.order,
+              },
+            })
+          }
+        }
+
+        if (directorStep) {
+          // Find the right director based on task's directorDependency
+          let directorAssigneeId = directorStep.assigneeId
+          if (task.directorDependency) {
+            try {
+              const dirNames: string[] = JSON.parse(task.directorDependency)
+              if (dirNames.length > 0) {
+                const matchedDirector = await db.user.findFirst({
+                  where: {
+                    role: 'DIRECTOR',
+                    isActive: true,
+                    name: { contains: dirNames[0].replace(' Sir', '').replace(' sir', '') },
+                  },
+                })
+                if (matchedDirector) directorAssigneeId = matchedDirector.id
+              }
+            } catch {}
+          }
+          // Fallback: find any active director if no assignee
+          if (!directorAssigneeId) {
+            const anyDirector = await db.user.findFirst({ where: { role: 'DIRECTOR', isActive: true } })
+            if (anyDirector) directorAssigneeId = anyDirector.id
+          }
+
+          await db.stepInstance.update({
+            where: { id: directorStep.id },
+            data: {
+              status: WorkflowStatus.IN_REVIEW,
+              assigneeId: directorAssigneeId,
+              startedAt: now,
+            },
+          })
+
+          // Update workflow current step
+          await db.workflowInstance.update({
+            where: { id: workflow.id },
+            data: { currentStepOrder: directorStep.order, status: WorkflowStatus.IN_REVIEW },
+          })
+
+          // Notify director
+          if (directorAssigneeId) {
+            await db.notification.create({
+              data: {
+                type: 'APPROVAL_REQUIRED',
+                title: `Director Approval Required: ${task.title}`,
+                message: `Task "${task.title}" has been verified by EA and requires your approval. Please review and approve or send back.`,
+                senderId: task.ownerId,
+                receiverId: directorAssigneeId,
+                workflowId: workflow.id,
+              },
+            })
+          }
+
+          // Log status change
+          await db.statusHistory.create({
+            data: {
+              workflowId: workflow.id,
+              fromStatus: WorkflowStatus.PENDING,
+              toStatus: WorkflowStatus.IN_REVIEW,
+              changedBy: task.ownerId,
+              reason: 'EA verified task and sent to Director for approval',
+            },
+          })
+        }
+      }
+
+      if (status === WorkflowStatus.IN_REVIEW) {
+        // Director approved → move to EA Final Review
+        // This is handled when task comes back from director approval
+      }
     }
 
     const updatedTask = await db.task.update({

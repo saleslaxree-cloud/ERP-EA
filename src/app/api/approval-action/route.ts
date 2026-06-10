@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { WorkflowStatus } from '@prisma/client'
 
 // POST /api/approval-action - Handle approval actions for workflow steps
+// Complete workflow: Employee → EA Review → Director → EA Final Review → Employee (continue) → Complete
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     const workflow = await db.workflowInstance.findUnique({
       where: { id: workflowId },
-      include: { steps: { orderBy: { order: 'asc' } }, tasks: true },
+      include: { steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } }, tasks: true },
     })
 
     if (!workflow) {
@@ -30,6 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date()
+    const task = workflow.tasks[0]
 
     if (action === 'APPROVE') {
       // Mark current step as approved
@@ -53,16 +55,45 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      // Move to next step
-      const nextOrder = stepInstance.order + 1
-      const nextStep = workflow.steps.find(s => s.order === nextOrder)
+      // Determine next step
+      const currentOrder = stepInstance.order
+      const nextStep = workflow.steps.find(s => s.order > currentOrder && s.status !== WorkflowStatus.APPROVED && s.status !== WorkflowStatus.COMPLETED)
 
       if (nextStep) {
-        // Update next step to in progress/review
+        // Find the right assignee for next step
+        let nextAssigneeId = nextStep.assigneeId
+
+        if (nextStep.name.includes('Director')) {
+          // Find director based on task's directorDependency
+          if (task?.directorDependency) {
+            try {
+              const dirNames: string[] = JSON.parse(task.directorDependency)
+              if (dirNames.length > 0) {
+                const matchedDirector = await db.user.findFirst({
+                  where: { role: 'DIRECTOR', isActive: true, name: { contains: dirNames[0].replace(' Sir', '').replace(' sir', '') } },
+                })
+                if (matchedDirector) nextAssigneeId = matchedDirector.id
+              }
+            } catch {}
+          }
+          if (!nextAssigneeId) {
+            const anyDirector = await db.user.findFirst({ where: { role: 'DIRECTOR', isActive: true } })
+            if (anyDirector) nextAssigneeId = anyDirector.id
+          }
+        } else if (nextStep.name.includes('EA')) {
+          const eaUser = await db.user.findFirst({ where: { role: 'EA', isActive: true } })
+          if (eaUser) nextAssigneeId = eaUser.id
+        } else if (nextStep.name.includes('Employee')) {
+          // Send back to the original task owner (employee)
+          if (task?.ownerId) nextAssigneeId = task.ownerId
+        }
+
+        // Update next step
         await db.stepInstance.update({
           where: { id: nextStep.id },
           data: {
             status: nextStep.stepType === 'APPROVAL' ? WorkflowStatus.IN_REVIEW : WorkflowStatus.IN_PROGRESS,
+            assigneeId: nextAssigneeId,
             startedAt: now,
           },
         })
@@ -70,41 +101,68 @@ export async function POST(request: NextRequest) {
         // Update workflow current step
         await db.workflowInstance.update({
           where: { id: workflowId },
-          data: { currentStepOrder: nextOrder },
+          data: { currentStepOrder: nextStep.order, status: WorkflowStatus.IN_REVIEW },
         })
 
+        // Update task status based on what step we're at
+        if (task) {
+          let newTaskStatus: WorkflowStatus = WorkflowStatus.IN_REVIEW
+
+          if (nextStep.name.includes('Director')) {
+            newTaskStatus = WorkflowStatus.ON_HOLD // Waiting for director
+          } else if (nextStep.name.includes('EA Final')) {
+            newTaskStatus = WorkflowStatus.IN_REVIEW // Back to EA for final review
+          } else if (nextStep.name.includes('Employee') || nextStep.name.includes('employee')) {
+            newTaskStatus = WorkflowStatus.IN_PROGRESS // Back to employee to continue steps
+          }
+
+          await db.task.update({
+            where: { id: task.id },
+            data: { status: newTaskStatus },
+          })
+        }
+
         // Notify next assignee
-        if (nextStep.assigneeId) {
+        if (nextAssigneeId) {
+          let notificationMessage = `Step "${nextStep.name}" in workflow "${workflow.title}" is now ready for your review.`
+
+          if (nextStep.name.includes('EA Final')) {
+            notificationMessage = `Director has approved the task. Please do final review and submit. Director comments: ${comments || 'No comments'}`
+          } else if (nextStep.name.includes('Employee') || nextStep.name.includes('employee')) {
+            notificationMessage = `Your task has been fully approved! Please continue with any remaining steps.`
+          }
+
           await db.notification.create({
             data: {
               type: 'APPROVAL_REQUIRED',
               title: `Action Required: ${nextStep.name}`,
-              message: `Step "${nextStep.name}" in workflow "${workflow.title}" is now ready for your review. Previous step was approved.`,
+              message: notificationMessage,
               senderId: approverId,
-              receiverId: nextStep.assigneeId,
+              receiverId: nextAssigneeId,
               workflowId,
             },
           })
         }
 
-        // Update task status based on current step
-        const task = workflow.tasks[0]
-        if (task) {
-          if (nextStep.name.includes('Director')) {
-            await db.task.update({ where: { id: task.id }, data: { status: WorkflowStatus.IN_REVIEW } })
-          } else if (nextStep.name.includes('EA Final')) {
-            await db.task.update({ where: { id: task.id }, data: { status: WorkflowStatus.IN_REVIEW } })
-          }
-        }
+        // Create status history
+        await db.statusHistory.create({
+          data: {
+            workflowId,
+            fromStatus: stepInstance.status,
+            toStatus: WorkflowStatus.APPROVED,
+            changedBy: approverId,
+            reason: `Step "${stepInstance.name}" approved, advancing to "${nextStep.name}". ${comments || ''}`,
+          },
+        })
+
       } else {
-        // No more steps - workflow completed
+        // No more steps - workflow completed!
         await db.workflowInstance.update({
           where: { id: workflowId },
           data: { status: WorkflowStatus.COMPLETED },
         })
 
         // Complete the associated task
-        const task = workflow.tasks[0]
         if (task) {
           await db.task.update({
             where: { id: task.id },
@@ -123,18 +181,18 @@ export async function POST(request: NextRequest) {
             workflowId,
           },
         })
-      }
 
-      // Create status history
-      await db.statusHistory.create({
-        data: {
-          workflowId,
-          fromStatus: stepInstance.status,
-          toStatus: WorkflowStatus.APPROVED,
-          changedBy: approverId,
-          reason: comments || `Step ${stepInstance.order} approved`,
-        },
-      })
+        // Create status history
+        await db.statusHistory.create({
+          data: {
+            workflowId,
+            fromStatus: stepInstance.status,
+            toStatus: WorkflowStatus.COMPLETED,
+            changedBy: approverId,
+            reason: 'All steps approved - workflow complete',
+          },
+        })
+      }
 
     } else if (action === 'REJECT') {
       // Mark current step as rejected
@@ -164,26 +222,27 @@ export async function POST(request: NextRequest) {
         data: { status: WorkflowStatus.REJECTED },
       })
 
-      // Update task status
-      const task = workflow.tasks[0]
+      // Update task status - send back to employee as PENDING
       if (task) {
         await db.task.update({
           where: { id: task.id },
-          data: { status: WorkflowStatus.REJECTED },
+          data: { status: WorkflowStatus.PENDING },
         })
       }
 
-      // Notify creator
-      await db.notification.create({
-        data: {
-          type: 'REJECTED',
-          title: `Workflow Rejected: ${workflow.title}`,
-          message: `Step "${stepInstance.name}" was rejected. Reason: ${comments || 'No reason provided'}`,
-          senderId: approverId,
-          receiverId: workflow.creatorId,
-          workflowId,
-        },
-      })
+      // Notify task owner (employee) that their work was rejected
+      if (task?.ownerId) {
+        await db.notification.create({
+          data: {
+            type: 'REJECTED',
+            title: `Task Returned: ${workflow.title}`,
+            message: `Your task was returned at step "${stepInstance.name}". Reason: ${comments || 'No reason provided'}. Please redo and resubmit.`,
+            senderId: approverId,
+            receiverId: task.ownerId,
+            workflowId,
+          },
+        })
+      }
 
       // Create status history
       await db.statusHistory.create({
@@ -192,7 +251,7 @@ export async function POST(request: NextRequest) {
           fromStatus: stepInstance.status,
           toStatus: WorkflowStatus.REJECTED,
           changedBy: approverId,
-          reason: comments || `Step ${stepInstance.order} rejected`,
+          reason: comments || `Step "${stepInstance.name}" rejected - sent back to employee`,
         },
       })
 
@@ -202,7 +261,7 @@ export async function POST(request: NextRequest) {
       const prevStep = workflow.steps.find(s => s.order === prevOrder)
 
       if (prevStep) {
-        // Reset current step
+        // Reset current step to PENDING
         await db.stepInstance.update({
           where: { id: stepInstanceId },
           data: {
@@ -212,10 +271,12 @@ export async function POST(request: NextRequest) {
         })
 
         // Reactivate previous step
+        const eaUser = await db.user.findFirst({ where: { role: 'EA', isActive: true } })
         await db.stepInstance.update({
           where: { id: prevStep.id },
           data: {
             status: WorkflowStatus.IN_REVIEW,
+            assigneeId: eaUser?.id || prevStep.assigneeId,
             startedAt: now,
           },
         })
@@ -223,18 +284,26 @@ export async function POST(request: NextRequest) {
         // Update workflow current step
         await db.workflowInstance.update({
           where: { id: workflowId },
-          data: { currentStepOrder: prevOrder },
+          data: { currentStepOrder: prevOrder, status: WorkflowStatus.IN_REVIEW },
         })
 
-        // Notify previous assignee
-        if (prevStep.assigneeId) {
+        // Update task status back to IN_REVIEW
+        if (task) {
+          await db.task.update({
+            where: { id: task.id },
+            data: { status: WorkflowStatus.IN_REVIEW },
+          })
+        }
+
+        // Notify previous assignee (EA)
+        if (prevStep.assigneeId || eaUser?.id) {
           await db.notification.create({
             data: {
               type: 'STATUS_CHANGE',
-              title: `Task Returned: ${workflow.title}`,
-              message: `Director has completed their review and sent the task back. Director remarks: ${comments || 'No comments'}. Please review and finalize.`,
+              title: `Task Returned from Director: ${workflow.title}`,
+              message: `Director has sent the task back with comments: ${comments || 'No comments'}. Please review and take action.`,
               senderId: approverId,
-              receiverId: prevStep.assigneeId,
+              receiverId: prevStep.assigneeId || eaUser?.id || '',
               workflowId,
             },
           })
@@ -247,7 +316,7 @@ export async function POST(request: NextRequest) {
             fromStatus: stepInstance.status,
             toStatus: WorkflowStatus.IN_REVIEW,
             changedBy: approverId,
-            reason: `Director completed review, sent back to EA. Comments: ${comments || 'None'}`,
+            reason: `Director sent task back to EA. Comments: ${comments || 'None'}`,
           },
         })
       }
