@@ -28,7 +28,7 @@ db.user.count().then(c => {
 # Start the server - restart if it dies
 while true; do
   echo "[$(date)] Starting LAXREE server..."
-  node server.js
+  node --max-old-space-size=4096 server.js
   EXIT_CODE=$?
   echo "[$(date)] Server exited with code $EXIT_CODE, restarting in 3 seconds..."
   sleep 3
