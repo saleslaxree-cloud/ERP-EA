@@ -93,6 +93,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name and email are required' }, { status: 400 })
     }
 
+    // Check for duplicate email
+    const existing = await db.user.findUnique({ where: { email } })
+    if (existing) {
+      return NextResponse.json({ error: 'An employee with this email already exists' }, { status: 400 })
+    }
+
     // Only Arti Sharma can be ADMIN - prevent others from getting ADMIN role
     const requestedRole = (role as UserRole) || UserRole.EMPLOYEE
     if (requestedRole === UserRole.ADMIN) {
@@ -132,5 +138,110 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Employees POST error:', error)
     return NextResponse.json({ error: 'Failed to create employee' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { userId, isActive, name, department, designation, phone, location, role } = body
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    }
+
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (isActive !== undefined) updateData.isActive = isActive
+    if (name !== undefined) updateData.name = name
+    if (department !== undefined) updateData.department = department
+    if (designation !== undefined) updateData.designation = designation
+    if (phone !== undefined) updateData.phone = phone
+    if (location !== undefined) updateData.location = location
+    if (role !== undefined) updateData.role = role as UserRole
+
+    const updated = await db.user.update({
+      where: { id: userId },
+      data: updateData,
+    })
+
+    // If deactivating (employee left), create notification
+    if (isActive === false && user.isActive) {
+      const admins = await db.user.findMany({ where: { role: UserRole.ADMIN }, select: { id: true } })
+      for (const admin of admins) {
+        await db.notification.create({
+          data: {
+            type: 'STATUS_CHANGE',
+            title: `Employee Deactivated: ${user.name}`,
+            message: `${user.name} has been removed from the active team. Their tasks remain in the system.`,
+            receiverId: admin.id,
+          },
+        })
+      }
+    }
+
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('Employees PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update employee' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const userId = request.nextUrl.searchParams.get('userId')
+
+    if (!userId) {
+      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      include: {
+        tasks: { where: { status: { notIn: ['COMPLETED', 'CANCELLED'] } } },
+        assignedTaskSteps: { where: { status: { notIn: ['COMPLETED'] } } },
+      },
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    }
+
+    // Don't allow deleting the last admin
+    if (user.role === UserRole.ADMIN) {
+      const adminCount = await db.user.count({ where: { role: UserRole.ADMIN, isActive: true } })
+      if (adminCount <= 1) {
+        return NextResponse.json({ error: 'Cannot remove the last admin' }, { status: 403 })
+      }
+    }
+
+    // Instead of hard deleting, deactivate the employee (soft delete)
+    // This preserves their task history and data
+    await db.user.update({
+      where: { id: userId },
+      data: { isActive: false },
+    })
+
+    // Notify admins
+    const admins = await db.user.findMany({ where: { role: UserRole.ADMIN }, select: { id: true } })
+    for (const admin of admins) {
+      await db.notification.create({
+        data: {
+          type: 'STATUS_CHANGE',
+          title: `Employee Removed: ${user.name}`,
+          message: `${user.name} (${user.role}) has been removed from the team. Their existing tasks remain in the system.`,
+          receiverId: admin.id,
+        },
+      })
+    }
+
+    return NextResponse.json({ success: true, message: `${user.name} has been removed from the team` })
+  } catch (error) {
+    console.error('Employees DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to remove employee' }, { status: 500 })
   }
 }

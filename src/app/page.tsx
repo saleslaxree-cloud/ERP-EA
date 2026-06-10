@@ -426,6 +426,12 @@ function DepartmentsView() {
    Team View
    ═══════════════════════════════════════════════════════════ */
 function TeamView() {
+  const qc = useQueryClient()
+  const [showAddDialog, setShowAddDialog] = useState(false)
+  const [addForm, setAddForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: '', designation: '', phone: '', location: '' })
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
+  const [teamTab, setTeamTab] = useState('active')
+
   const { data: users = [] } = useQuery({ queryKey: ['users-list'], queryFn: () => fetch('/api/users').then(r => r.json()) })
   const { data } = useQuery({ queryKey: ['dashboard', 'user-admin'], queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()) })
   const d = data as any
@@ -433,29 +439,112 @@ function TeamView() {
   const getInitials = (name: string) => name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
   const roleBadge: Record<string, string> = { ADMIN: 'b-gold', DIRECTOR: 'b-purple', EA: 'b-blue', MANAGER: 'b-green', EMPLOYEE: 'b-gray' }
 
+  // Fetch ALL users (including inactive) for full team view
+  const { data: allUsersData } = useQuery({
+    queryKey: ['all-users-team'],
+    queryFn: () => fetch('/api/employees').then(r => r.json()),
+  })
+  const allUsers = (allUsersData as any)?.employees || []
+  const activeUsers = allUsers.filter((u: any) => u.isActive)
+  const inactiveUsers = allUsers.filter((u: any) => !u.isActive)
+
+  const displayUsers = teamTab === 'active' ? activeUsers : teamTab === 'inactive' ? inactiveUsers : allUsers
+
+  const addMutation = useMutation({
+    mutationFn: (formData: typeof addForm) => fetch('/api/employees', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData),
+    }).then(async r => {
+      const res = await r.json()
+      if (!r.ok) throw new Error(res.error || 'Failed to add employee')
+      return res
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users-list'] })
+      qc.invalidateQueries({ queryKey: ['all-users-team'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      setShowAddDialog(false)
+      setAddForm({ name: '', email: '', role: 'EMPLOYEE', department: '', designation: '', phone: '', location: '' })
+    },
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => fetch(`/api/employees?userId=${userId}`, {
+      method: 'DELETE',
+    }).then(async r => {
+      const res = await r.json()
+      if (!r.ok) throw new Error(res.error || 'Failed to remove employee')
+      return res
+    }),
+    onSuccess: (data: any) => {
+      qc.invalidateQueries({ queryKey: ['users-list'] })
+      qc.invalidateQueries({ queryKey: ['all-users-team'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      setRemoveConfirm(null)
+    },
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (userId: string) => fetch('/api/employees', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, isActive: true }),
+    }).then(r => r.json()),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users-list'] })
+      qc.invalidateQueries({ queryKey: ['all-users-team'] })
+    },
+  })
+
+  const tabs = [
+    { id: 'active', label: 'Active', count: activeUsers.length },
+    { id: 'inactive', label: 'Left / Inactive', count: inactiveUsers.length },
+    { id: 'all', label: 'All', count: allUsers.length },
+  ]
+
   return (
     <div>
-      <div className="ph"><div className="ph-left"><h2>Team Members</h2><p>Team management and performance tracking</p></div><div className="ph-right"><span className="badge b-gold">{users.length} Members</span></div></div>
+      <div className="ph">
+        <div className="ph-left"><h2>Team Members</h2><p>Team management — add new members or remove those who left</p></div>
+        <div className="ph-right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="badge b-gold">{activeUsers.length} Active</span>
+          <button className="btn btn-gold" onClick={() => setShowAddDialog(true)}>+ Add Employee</button>
+        </div>
+      </div>
       <div className="page-accent" />
+
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        {tabs.map(tab => (
+          <div key={tab.id} className={`tab${teamTab === tab.id ? ' active' : ''}`}
+            onClick={() => setTeamTab(tab.id)}>
+            {tab.label}
+            {tab.count > 0 && <span className="tab-cnt">{tab.count}</span>}
+          </div>
+        ))}
+      </div>
+
       <div className="mc-grid">
-        {users.map((u: any) => {
+        {displayUsers.map((u: any) => {
           const perf = userPerf.find((p: any) => p.id === u.id)
           const score = perf?.score || 0
           const scoreCol = score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)'
+          const isRemoving = removeConfirm === u.id
+
           return (
-            <div key={u.id} className="mc">
+            <div key={u.id} className="mc" style={u.isActive ? {} : { opacity: 0.6, borderLeft: '3px solid var(--red)' }}>
               <div className="mc-top">
-                <div className="av" style={{ width: 38, height: 38, fontSize: 14, background: 'linear-gradient(135deg,var(--g1),var(--g3))' }}>{getInitials(u.name)}</div>
+                <div className="av" style={{ width: 38, height: 38, fontSize: 14, background: u.isActive ? 'linear-gradient(135deg,var(--g1),var(--g3))' : 'var(--red)' }}>{getInitials(u.name)}</div>
                 <div className="mc-info">
                   <div className="mc-name">{u.name}</div>
-                  <div className="mc-role" style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <div className="mc-role" style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className={`badge ${roleBadge[u.role] || 'b-gray'}`} style={{ fontSize: 9, padding: '1px 6px' }}>{u.role}</span>
                     <span>{u.department || '—'}</span>
                   </div>
                 </div>
               </div>
               <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 4 }}>{u.email}</div>
-              {perf && (
+              {u.designation && <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 4 }}>{u.designation}</div>}
+              {u.phone && <div style={{ fontSize: 10, color: 'var(--t3)', marginBottom: 4 }}>📞 {u.phone}</div>}
+              {perf && u.isActive && (
                 <>
                   <div className="mc-stat"><span>Tasks</span><span>{perf.total}</span></div>
                   <div className="mc-stat"><span>Completed</span><span>{perf.done}</span></div>
@@ -463,11 +552,117 @@ function TeamView() {
                   <div className="mc-score"><span>Score:</span><span style={{ fontSize: 18, color: scoreCol }}>{score}</span></div>
                 </>
               )}
-              <div style={{ marginTop: 8 }}><span className={`badge ${u.isActive ? 'b-green' : 'b-red'}`} style={{ fontSize: 10 }}>{u.isActive ? '● Active' : '● Inactive'}</span></div>
+              <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className={`badge ${u.isActive ? 'b-green' : 'b-red'}`} style={{ fontSize: 10 }}>
+                  {u.isActive ? '● Active' : '● Left'}
+                </span>
+                {u.isActive && u.role !== 'ADMIN' && (
+                  isRemoving ? (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button className="btn btn-red btn-sm" style={{ fontSize: 10, padding: '2px 8px' }}
+                        onClick={() => removeMutation.mutate(u.id)} disabled={removeMutation.isPending}>
+                        {removeMutation.isPending ? 'Removing...' : '✓ Confirm Remove'}
+                      </button>
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 8px' }}
+                        onClick={() => setRemoveConfirm(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button style={{ fontSize: 9, padding: '1px 6px', background: 'var(--red-l)', color: 'var(--red)',
+                      border: '1px solid rgba(220,38,38,.3)', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}
+                      onClick={() => setRemoveConfirm(u.id)}>
+                      ✕ Remove
+                    </button>
+                  )
+                )}
+                {!u.isActive && (
+                  <button style={{ fontSize: 9, padding: '1px 6px', background: 'var(--green-l)', color: 'var(--green)',
+                    border: '1px solid rgba(21,128,61,.3)', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}
+                    onClick={() => reactivateMutation.mutate(u.id)} disabled={reactivateMutation.isPending}>
+                    ↩ Reactivate
+                  </button>
+                )}
+              </div>
             </div>
           )
         })}
+        {displayUsers.length === 0 && (
+          <div className="lcard" style={{ gridColumn: '1 / -1' }}>
+            <div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>No team members found</div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>Click "+ Add Employee" to add a new team member</div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Add Employee Dialog */}
+      {showAddDialog && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setShowAddDialog(false) }}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+            <button className="mx" onClick={() => setShowAddDialog(false)}>✕</button>
+            <div className="mt">Add New Employee</div>
+            <div className="ms">Add a new team member to LAXREE</div>
+            <div className="gold-divider" />
+            <div className="form-row fr-2">
+              <div className="fg">
+                <label>Full Name <span style={{ color: 'var(--red)' }}>*</span></label>
+                <input className="fi" placeholder="Enter full name" value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} />
+              </div>
+              <div className="fg">
+                <label>Email <span style={{ color: 'var(--red)' }}>*</span></label>
+                <input className="fi" type="email" placeholder="Enter email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-row fr-2">
+              <div className="fg">
+                <label>Role</label>
+                <select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}>
+                  <option value="EMPLOYEE">Employee</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="EA">EA (Executive Assistant)</option>
+                  <option value="DIRECTOR">Director</option>
+                </select>
+              </div>
+              <div className="fg">
+                <label>Department</label>
+                <select className="fi" value={addForm.department} onChange={e => setAddForm({ ...addForm, department: e.target.value })}>
+                  <option value="">Select Department</option>
+                  <option value="Sales">Sales</option>
+                  <option value="Account">Account</option>
+                  <option value="HR">HR</option>
+                  <option value="Coordinator">Coordinator</option>
+                  <option value="Back Office">Back Office</option>
+                  <option value="Admin">Admin</option>
+                  <option value="Management">Management</option>
+                </select>
+              </div>
+            </div>
+            <div className="form-row fr-2">
+              <div className="fg">
+                <label>Designation</label>
+                <input className="fi" placeholder="e.g. Sales Executive" value={addForm.designation} onChange={e => setAddForm({ ...addForm, designation: e.target.value })} />
+              </div>
+              <div className="fg">
+                <label>Phone</label>
+                <input className="fi" placeholder="Enter phone number" value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-row fr-1">
+              <div className="fg">
+                <label>Location</label>
+                <input className="fi" placeholder="e.g. Ajmer Office" value={addForm.location} onChange={e => setAddForm({ ...addForm, location: e.target.value })} />
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-ghost" onClick={() => setShowAddDialog(false)}>Cancel</button>
+              <button className="btn btn-gold" onClick={() => addMutation.mutate(addForm)} disabled={addMutation.isPending || !addForm.name || !addForm.email}>
+                {addMutation.isPending ? 'Adding...' : '✓ Add Employee'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -569,48 +764,121 @@ function HolidaysView() {
 function EmployeesView() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: '', designation: '', phone: '', location: '' })
-  const [addLoading, setAddLoading] = useState(false)
+  const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
+  const [empTab, setEmpTab] = useState('active')
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['employees'],
-    queryFn: () => fetch('/api/users').then(r => r.json()),
+    queryFn: () => fetch('/api/employees').then(r => r.json()),
   })
 
   const addMutation = useMutation({
     mutationFn: (formData: typeof addForm) => fetch('/api/employees', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(formData),
-    }).then(r => r.json()),
+    }).then(async r => {
+      const res = await r.json()
+      if (!r.ok) throw new Error(res.error || 'Failed to add employee')
+      return res
+    }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); setShowAddDialog(false); setAddForm({ name: '', email: '', role: 'EMPLOYEE', department: '', designation: '', phone: '', location: '' }) },
   })
 
-  const users: any[] = Array.isArray(data) ? data : []
+  const removeMutation = useMutation({
+    mutationFn: (userId: string) => fetch(`/api/employees?userId=${userId}`, { method: 'DELETE' }).then(async r => {
+      const res = await r.json()
+      if (!r.ok) throw new Error(res.error || 'Failed to remove')
+      return res
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }); setRemoveConfirm(null) },
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: (userId: string) => fetch('/api/employees', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, isActive: true }),
+    }).then(r => r.json()),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }) },
+  })
+
+  const employees: any[] = (data as any)?.employees || []
+  const stats = (data as any)?.stats || {}
+  const activeEmps = employees.filter(e => e.isActive)
+  const inactiveEmps = employees.filter(e => !e.isActive)
+  const displayEmps = empTab === 'active' ? activeEmps : empTab === 'inactive' ? inactiveEmps : employees
 
   if (isLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>Loading employees…</div>
+
+  const tabs = [
+    { id: 'active', label: 'Active', count: activeEmps.length },
+    { id: 'inactive', label: 'Left / Inactive', count: inactiveEmps.length },
+    { id: 'all', label: 'All', count: employees.length },
+  ]
 
   return (
     <div>
       <div className="ph">
         <div className="ph-left"><h2>Employees</h2><p>Employee directory and management</p></div>
-        <div className="ph-right"><button className="btn btn-gold" onClick={() => setShowAddDialog(true)}>+ Add Employee</button></div>
+        <div className="ph-right">
+          <span className="badge b-gold" style={{ marginRight: 8 }}>{stats.active || 0} Active</span>
+          <button className="btn btn-gold" onClick={() => setShowAddDialog(true)}>+ Add Employee</button>
+        </div>
       </div>
       <div className="page-accent" />
 
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: 14 }}>
+        {tabs.map(tab => (
+          <div key={tab.id} className={`tab${empTab === tab.id ? ' active' : ''}`}
+            onClick={() => setEmpTab(tab.id)}>
+            {tab.label}
+            {tab.count > 0 && <span className="tab-cnt">{tab.count}</span>}
+          </div>
+        ))}
+      </div>
+
       <div className="lcard">
-        <div className="ch"><div className="ct">👥 Employee Directory</div><span className="badge b-gold">{users.length} employees</span></div>
+        <div className="ch"><div className="ct">👥 Employee Directory</div><span className="badge b-gold">{employees.length} employees</span></div>
         <div className="tw">
           <table className="ltable">
-            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Status</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Department</th><th>Designation</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
-              {users.map((u: any) => (
-                <tr key={u.id}>
-                  <td style={{ fontWeight: 600 }}>{u.name}</td>
-                  <td style={{ color: 'var(--t3)', fontSize: 12 }}>{u.email}</td>
-                  <td><span className="badge b-gray" style={{ fontSize: 9 }}>{u.role}</span></td>
-                  <td>{u.department || '—'}</td>
-                  <td><span className={`badge ${u.isActive ? 'b-green' : 'b-red'}`} style={{ fontSize: 9 }}>{u.isActive ? 'Active' : 'Inactive'}</span></td>
-                </tr>
-              ))}
+              {displayEmps.map((u: any) => {
+                const isRemoving = removeConfirm === u.id
+                return (
+                  <tr key={u.id} style={!u.isActive ? { opacity: 0.6 } : {}}>
+                    <td style={{ fontWeight: 600 }}>{u.name}</td>
+                    <td style={{ color: 'var(--t3)', fontSize: 12 }}>{u.email}</td>
+                    <td><span className="badge b-gray" style={{ fontSize: 9 }}>{u.role}</span></td>
+                    <td>{u.department || '—'}</td>
+                    <td style={{ fontSize: 11, color: 'var(--t3)' }}>{u.designation || '—'}</td>
+                    <td><span className={`badge ${u.isActive ? 'b-green' : 'b-red'}`} style={{ fontSize: 9 }}>{u.isActive ? 'Active' : 'Left'}</span></td>
+                    <td>
+                      {u.isActive && u.role !== 'ADMIN' && (
+                        isRemoving ? (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button className="btn btn-red btn-sm" style={{ fontSize: 9, padding: '2px 6px' }}
+                              onClick={() => removeMutation.mutate(u.id)} disabled={removeMutation.isPending}>
+                              {removeMutation.isPending ? '...' : '✓ Confirm'}
+                            </button>
+                            <button className="btn btn-ghost btn-sm" style={{ fontSize: 9, padding: '2px 6px' }}
+                              onClick={() => setRemoveConfirm(null)}>✕</button>
+                          </div>
+                        ) : (
+                          <button style={{ fontSize: 9, padding: '2px 6px', background: 'var(--red-l)', color: 'var(--red)',
+                            border: '1px solid rgba(220,38,38,.3)', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}
+                            onClick={() => setRemoveConfirm(u.id)}>Remove</button>
+                        )
+                      )}
+                      {!u.isActive && (
+                        <button style={{ fontSize: 9, padding: '2px 6px', background: 'var(--green-l)', color: 'var(--green)',
+                          border: '1px solid rgba(21,128,61,.3)', borderRadius: 4, cursor: 'pointer', fontWeight: 700 }}
+                          onClick={() => reactivateMutation.mutate(u.id)} disabled={reactivateMutation.isPending}>Reactivate</button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -622,17 +890,22 @@ function EmployeesView() {
             <button className="mx" onClick={() => setShowAddDialog(false)}>✕</button>
             <div className="mt">Add Employee</div>
             <div className="ms">Add a new team member to LAXREE</div>
+            <div className="gold-divider" />
             <div className="form-row fr-2">
-              <div className="fg"><label>Full Name</label><input className="fi" placeholder="Enter name" value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
-              <div className="fg"><label>Email</label><input className="fi" type="email" placeholder="Enter email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} /></div>
+              <div className="fg"><label>Full Name <span style={{ color: 'var(--red)' }}>*</span></label><input className="fi" placeholder="Enter name" value={addForm.name} onChange={e => setAddForm({ ...addForm, name: e.target.value })} /></div>
+              <div className="fg"><label>Email <span style={{ color: 'var(--red)' }}>*</span></label><input className="fi" type="email" placeholder="Enter email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} /></div>
             </div>
             <div className="form-row fr-2">
-              <div className="fg"><label>Role</label><select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="EA">EA</option><option value="DIRECTOR">Director</option><option value="ADMIN">Admin</option></select></div>
-              <div className="fg"><label>Department</label><select className="fi" value={addForm.department} onChange={e => setAddForm({ ...addForm, department: e.target.value })}><option value="">Select</option><option value="Sales">Sales</option><option value="Account">Account</option><option value="HR">HR</option><option value="Coordinator">Coordinator</option><option value="Back Office">Back Office</option><option value="Admin">Admin</option></select></div>
+              <div className="fg"><label>Role</label><select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="EA">EA</option><option value="DIRECTOR">Director</option></select></div>
+              <div className="fg"><label>Department</label><select className="fi" value={addForm.department} onChange={e => setAddForm({ ...addForm, department: e.target.value })}><option value="">Select</option><option value="Sales">Sales</option><option value="Account">Account</option><option value="HR">HR</option><option value="Coordinator">Coordinator</option><option value="Back Office">Back Office</option><option value="Admin">Admin</option><option value="Management">Management</option></select></div>
+            </div>
+            <div className="form-row fr-2">
+              <div className="fg"><label>Designation</label><input className="fi" placeholder="e.g. Sales Executive" value={addForm.designation} onChange={e => setAddForm({ ...addForm, designation: e.target.value })} /></div>
+              <div className="fg"><label>Phone</label><input className="fi" placeholder="Enter phone" value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} /></div>
             </div>
             <div className="form-actions">
               <button className="btn btn-ghost" onClick={() => setShowAddDialog(false)}>Cancel</button>
-              <button className="btn btn-gold" onClick={() => addMutation.mutate(addForm)} disabled={addMutation.isPending || !addForm.name || !addForm.email}>{addMutation.isPending ? 'Adding...' : 'Add Employee'}</button>
+              <button className="btn btn-gold" onClick={() => addMutation.mutate(addForm)} disabled={addMutation.isPending || !addForm.name || !addForm.email}>{addMutation.isPending ? 'Adding...' : '✓ Add Employee'}</button>
             </div>
           </div>
         </div>
