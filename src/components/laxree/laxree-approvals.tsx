@@ -109,11 +109,11 @@ export function LaxreeApprovals() {
 
   const handleTaskAction = (taskId: string, action: string) => {
     let newStatus = 'IN_PROGRESS'
-    if (action === 'approve') newStatus = 'COMPLETED'
+    if (action === 'approve') newStatus = 'COMPLETED'  // Backend intercepts if task has workflow
     else if (action === 'reject') newStatus = 'PENDING'  // Return to employee
     else if (action === 'return') newStatus = 'PENDING'  // Return to employee
     else if (action === 'director') newStatus = 'ON_HOLD'  // Send to director (triggers workflow step advancement)
-    else if (action === 'done') newStatus = 'COMPLETED'
+    else if (action === 'done') newStatus = 'COMPLETED'  // Backend intercepts if task has workflow → routes to EA Review
     else if (action === 'ea_final') newStatus = 'IN_REVIEW'  // Director approved, send to EA final review
 
     taskStatusMutation.mutate({ id: taskId, status: newStatus })
@@ -183,7 +183,7 @@ export function LaxreeApprovals() {
             <textarea className="fi" placeholder="Add comment (optional)..." value={comment}
               onChange={e => setComment(e.target.value)} style={{ minHeight: 60, marginBottom: 8, fontSize: 12 }} />
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              <button className="btn btn-green btn-sm" onClick={() => handleTaskAction(task.id, 'approve')}>✓ Approve & Complete</button>
+              <button className="btn btn-green btn-sm" onClick={() => handleTaskAction(task.id, 'approve')}>✓ Approve & Send to Review</button>
               <button className="btn btn-sm" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }} onClick={() => handleTaskAction(task.id, 'director')}>📤 Send to Director</button>
               <button className="btn btn-red btn-sm" onClick={() => handleTaskAction(task.id, 'reject')}>↩ Reject & Return to Employee</button>
               <button className="btn btn-sm" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)' }} onClick={() => handleTaskAction(task.id, 'return')}>↩ Return to Employee</button>
@@ -205,7 +205,7 @@ export function LaxreeApprovals() {
                 style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1px solid rgba(21,128,61,.3)', fontWeight: 700 }}
                 onClick={() => handleTaskAction(task.id, 'done')}
               >
-                ✓ Mark Done
+                ✓ Submit for Review
               </button>
             )}
             {(task.status === 'PENDING' || task.status === 'IN_PROGRESS') && (

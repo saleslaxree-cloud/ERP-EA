@@ -176,11 +176,14 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     IN_PROGRESS: { bg: '#DBEAFE', color: '#1D4ED8', label: 'In Progress' },
     COMPLETED: { bg: '#DCFCE7', color: '#15803D', label: 'Done' },
     CANCELLED: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelled' },
-    ON_HOLD: { bg: '#EDE9FE', color: '#6D28D9', label: 'On Hold' },
+    ON_HOLD: { bg: '#EDE9FE', color: '#6D28D9', label: 'Director Review' },
     ESCALATED: { bg: '#FEE2E2', color: '#DC2626', label: 'Escalated' },
     EXTERNAL_HOLD: { bg: '#FFF7ED', color: '#C2410C', label: 'Ext Hold' },
     DRAFT: { bg: '#F3F4F6', color: '#6B7280', label: 'Draft' },
-    IN_REVIEW: { bg: '#DBEAFE', color: '#1D4ED8', label: 'In Review' },
+    IN_REVIEW: { bg: '#FEF3C7', color: '#92400E', label: 'EA Review' },
+    APPROVED: { bg: '#DCFCE7', color: '#15803D', label: 'Approved' },
+    REJECTED: { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
+    RE_OPENED: { bg: '#FEF3C7', color: '#92400E', label: 'Re-Opened' },
   }
 
   const getSlaStatus = (task: any) => {
@@ -343,8 +346,30 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       </button>
                     )}
 
-                    {/* DONE Button - The key missing feature */}
-                    {(task.status === 'IN_PROGRESS' || task.status === 'PENDING') && (
+                    {/* DONE / Submit Button - context-aware based on workflow state */}
+                    {task.status === 'IN_PROGRESS' && task.workflow?.status === 'APPROVED' && (
+                      <button
+                        className="btn btn-xs"
+                        style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                        onClick={() => completeMutation.mutate({ id: task.id })}
+                        disabled={completeMutation.isPending}
+                        title="Final Submit"
+                      >
+                        ✓ Final Submit
+                      </button>
+                    )}
+                    {task.status === 'IN_PROGRESS' && task.workflow && task.workflow.status !== 'APPROVED' && (
+                      <button
+                        className="btn btn-xs"
+                        style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)', fontWeight: 800, padding: '4px 12px' }}
+                        onClick={() => completeMutation.mutate({ id: task.id })}
+                        disabled={completeMutation.isPending}
+                        title="Submit for Review"
+                      >
+                        📤 Submit
+                      </button>
+                    )}
+                    {task.status === 'IN_PROGRESS' && !task.workflow && (
                       <button
                         className="btn btn-xs"
                         style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
@@ -546,13 +571,17 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               {/* Workflow Flow */}
               {task.workflow && (
                 <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>Workflow</div>
+                  <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>Approval Flow</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <div style={{ background: 'var(--amber-l)', color: 'var(--amber)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>EA Review</div>
+                    <div style={{ background: 'var(--amber-l)', color: 'var(--amber)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>📋 EA Review</div>
                     <span style={{ color: 'var(--t3)', fontWeight: 900 }}>→</span>
-                    <div style={{ background: 'var(--purple-l)', color: 'var(--purple)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>Director</div>
+                    <div style={{ background: 'var(--purple-l)', color: 'var(--purple)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>👔 Director</div>
                     <span style={{ color: 'var(--t3)', fontWeight: 900 }}>→</span>
-                    <div style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>Done</div>
+                    <div style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>✅ EA Final</div>
+                    <span style={{ color: 'var(--t3)', fontWeight: 900 }}>→</span>
+                    <div style={{ background: 'var(--blue-l)', color: 'var(--blue)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>👤 Employee Submit</div>
+                    <span style={{ color: 'var(--t3)', fontWeight: 900 }}>→</span>
+                    <div style={{ background: 'var(--green-l)', color: 'var(--green)', padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800 }}>✅ Done</div>
                   </div>
                 </div>
               )}
@@ -570,7 +599,29 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     ▶ Start Task
                   </button>
                 )}
-                {(task.status === 'IN_PROGRESS' || task.status === 'PENDING') && (
+                {task.status === 'IN_PROGRESS' && task.workflow && task.workflow.status === 'APPROVED' && (
+                  <button className="btn btn-green" onClick={async () => {
+                    await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
+                    queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                    addToast('ok', 'Task submitted! ✓')
+                    setSelectedTaskId(null)
+                  }}>
+                    ✓ Final Submit
+                  </button>
+                )}
+                {task.status === 'IN_PROGRESS' && task.workflow && task.workflow.status !== 'APPROVED' && (
+                  <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)', fontWeight: 800 }} onClick={async () => {
+                    await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
+                    queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                    addToast('ok', 'Submitted for review! ✓')
+                    setSelectedTaskId(null)
+                  }}>
+                    📤 Submit for Review
+                  </button>
+                )}
+                {task.status === 'IN_PROGRESS' && !task.workflow && (
                   <button className="btn btn-green" onClick={async () => {
                     await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
                     queryClient.invalidateQueries({ queryKey: ['tasks-list'] })

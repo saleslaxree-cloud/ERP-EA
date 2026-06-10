@@ -99,3 +99,107 @@ Stage Summary:
 - Director can Approve, Send Back to EA, or Reject (returns to employee)
 - EA Final Review step added after director approves before task completes
 - If employee hasn't done work, reject/return sends task back to employee as PENDING
+
+---
+Task ID: 6
+Agent: Task Agent
+Task: Fix the task approval flow backend
+
+Work Log:
+- Fixed `/api/tasks/[id]/route.ts` PATCH handler:
+  - When employee sets task to COMPLETED and task has a workflow with employee step still PENDING/IN_PROGRESS:
+    - Instead of completing directly, completes the Employee workflow step, activates EA Review step, sets task to IN_REVIEW
+    - Notifies EA that task is ready for review
+  - When employee sets task to COMPLETED and workflow is already APPROVED (EA Final approved):
+    - Allows direct completion (Final Submit), marks workflow as COMPLETED
+  - When task status changes to IN_REVIEW from ON_HOLD (Director approves):
+    - Marks Director workflow step as APPROVED, activates EA Final step
+    - Notifies EA for final review
+  - When task status changes to PENDING from ON_HOLD (Director rejects):
+    - Marks Director step as REJECTED, resets employee step to PENDING
+    - Sets workflow to REJECTED, notifies employee to redo work
+
+- Fixed `/api/tasks/[id]/steps/route.ts` PATCH handler:
+  - When all task steps are completed and task has a workflow with employee step still PENDING/IN_PROGRESS:
+    - Instead of auto-completing task, triggers the workflow: completes employee step, activates EA Review step, sets task to IN_REVIEW
+  - When workflow is already APPROVED (EA Final approved):
+    - Allows direct completion (Final Submit), marks workflow as COMPLETED
+  - When task has no workflow: still auto-completes as before
+
+- Fixed `/api/approval-action/route.ts` POST handler:
+  - When EA Final APPROVE and there are no more workflow steps:
+    - Instead of completing the workflow and task, sets workflow to APPROVED
+    - Sets task status to IN_PROGRESS (back to employee for final submission)
+    - Notifies employee to do final submission
+  - This creates the final step: Employee must do "Final Submit" after all approvals
+
+- Updated frontend components:
+  - `laxree-task-detail.tsx`: Added "✓ Submit for Review" and "✓ Final Submit" buttons based on workflow status; Director approve now sends IN_REVIEW instead of COMPLETED; Director reject sends PENDING instead of REJECTED
+  - `laxree-dir-dependency.tsx`: Changed "✓ Final Submit & Complete" to "✓ Submit to Employee" for EA Final step
+  - `laxree-approvals.tsx`: Changed "✓ Mark Done" to "✓ Submit for Review"; Changed "✓ Approve & Complete" to "✓ Approve & Send to Review"
+  - `task-list.tsx`: Added "Submit for Review" button for IN_PROGRESS tasks with workflow (not approved); Added "Final Submit" button for IN_PROGRESS tasks with APPROVED workflow; Updated EA Final action label to "Submit to Employee"
+
+Stage Summary:
+- Complete workflow flow now correctly implements: Employee → EA Review → Director → EA Final → Employee Final Submit → COMPLETED
+- Employee cannot bypass workflow by clicking "Done" — backend intercepts and routes to EA Review
+- EA Final approval no longer completes the task directly — sends back to employee for final submission
+- Director reject properly resets workflow and sends task back to employee as PENDING
+- Frontend buttons properly reflect the current workflow stage (Submit for Review vs Final Submit)
+
+---
+Task ID: 9
+Agent: Task Agent
+Task: Fix Monday Meeting Live Score Auto-Update
+
+Work Log:
+- Created new API endpoint `/api/weekly-score/route.ts`:
+  - Accepts userId, weekStart, weekEnd query parameters
+  - Queries all tasks owned by the user relevant to the selected week (by dueDate, createdAt, or completedAt)
+  - Calculates task statistics: completedOnTime, completedLate, inProgressOnTrack, overdue, pending, rejected
+  - Computes percentage scores: greenScore (on-time%), yellowScore (in-progress+late%), redScore (overdue+rejected%)
+  - Auto-calculates PR Score from the live scores
+  - Returns full JSON breakdown with totalTasks count and category breakdown
+
+- Updated frontend `/src/components/laxree/laxree-monday.tsx`:
+  - Added WeeklyScoreData type and LiveBadge component with pulse animation
+  - Added query to fetch weekly score from new API when user+week is selected
+  - Actual scores auto-populate from live task data with green-bordered inputs and "LIVE" badge
+  - Info banner shows task count breakdown (on-time, in-progress/late, overdue/rejected)
+  - EA can manually override actual scores — switches to "Override" mode with amber badge
+  - "Reset to Live" button allows reverting overrides back to auto-calculated values
+  - PR Score auto-calculates from live data when not overridden
+  - Performance distribution bar shows "Live from task data" indicator
+  - Plan scores (This Week Plan, Next Week Plan), commitments, notes remain manual entry
+  - Refactored state management to separate planForm from actualOverrides for clean tracking
+  - Used derived state (useMemo) instead of effects to avoid React lint issues
+  - All lint checks pass
+
+Stage Summary:
+- Actual Score row now auto-calculates from live task performance data
+- Live badge with pulse animation indicates auto-calculated scores
+- EA can override auto-calculated values and reset back to live
+- PR Score auto-calculates from actual scores
+- This Week Plan, Next Week Plan remain manual entry as required
+---
+Task ID: 6-10
+Agent: Main Agent
+Task: Fix complete task approval flow, workflow step routing, Monday meeting live score
+
+Work Log:
+- Fixed backend approval flow in /api/tasks/[id]/route.ts: Employee COMPLETED intercept routes to EA Review instead of completing; Director Approve intercept activates EA Final step; Director Reject intercept resets employee step and sends back to employee
+- Fixed /api/tasks/[id]/steps/route.ts: When all steps complete, triggers EA Review workflow instead of auto-completing task
+- Fixed /api/approval-action/route.ts: EA Final APPROVE sends task back to employee for final submission (IN_PROGRESS + workflow APPROVED) instead of completing
+- Updated laxree-tasks.tsx: Context-aware buttons (Submit for Review vs Final Submit vs Done), updated workflow flow diagram, added status labels for IN_REVIEW/APPROVED/REJECTED/RE_OPENED
+- Updated laxree-task-detail.tsx: Submit for Review / Final Submit buttons based on workflow state, Director approve/reject buttons
+- Updated laxree-dir-dependency.tsx: EA Final button changed to "Submit to Employee"
+- Created /api/weekly-score/route.ts: New API endpoint for live score calculation from task data
+- Updated laxree-monday.tsx: Live score auto-population with LIVE badge, reset to live button, task breakdown display
+- Rewrote laxree-monday-scorecard.tsx: Side panel now shows live score data with LIVE badge and PR score
+
+Stage Summary:
+- Complete approval flow: Employee → EA Review → Director → EA Final → Employee Final Submit → COMPLETED
+- Director Reject → Returns to Employee as PENDING
+- Monday meeting actual scores auto-calculated from task data (no manual finding)
+- Live score shows real task breakdown (on-time, in-progress, overdue)
+- Next week plan remains manual entry by employee
+- Build compiles successfully with all changes

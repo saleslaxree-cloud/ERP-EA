@@ -156,40 +156,43 @@ export async function POST(request: NextRequest) {
         })
 
       } else {
-        // No more steps - workflow completed!
+        // No more workflow steps - EA Final has approved
+        // Instead of completing the task, send it back to the employee for final submission
         await db.workflowInstance.update({
           where: { id: workflowId },
-          data: { status: WorkflowStatus.COMPLETED },
+          data: { status: WorkflowStatus.APPROVED },
         })
 
-        // Complete the associated task
+        // Set task back to IN_PROGRESS for employee to do final submit
         if (task) {
           await db.task.update({
             where: { id: task.id },
-            data: { status: WorkflowStatus.COMPLETED, completedAt: now },
+            data: { status: WorkflowStatus.IN_PROGRESS, updatedAt: now },
           })
         }
 
-        // Notify creator
-        await db.notification.create({
-          data: {
-            type: 'APPROVED',
-            title: `Workflow Completed: ${workflow.title}`,
-            message: `All approval steps have been completed. Task is now marked as completed.`,
-            senderId: approverId,
-            receiverId: workflow.creatorId,
-            workflowId,
-          },
-        })
+        // Notify employee to do final submission
+        if (task?.ownerId) {
+          await db.notification.create({
+            data: {
+              type: 'APPROVED',
+              title: `Task Approved - Ready for Final Submit: ${workflow.title}`,
+              message: `Your task has been approved through all review stages. Please review and do the final submission.`,
+              senderId: approverId,
+              receiverId: task.ownerId,
+              workflowId,
+            },
+          })
+        }
 
         // Create status history
         await db.statusHistory.create({
           data: {
             workflowId,
             fromStatus: stepInstance.status,
-            toStatus: WorkflowStatus.COMPLETED,
+            toStatus: WorkflowStatus.APPROVED,
             changedBy: approverId,
-            reason: 'All steps approved - workflow complete',
+            reason: 'EA Final approved - workflow complete, task sent back to employee for final submission',
           },
         })
       }

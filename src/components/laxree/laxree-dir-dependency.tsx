@@ -181,7 +181,7 @@ export function LaxreeDirDependency() {
           {stage === 'EA Final' && (
             <>
               <button className="btn btn-green btn-xs" onClick={() => handleApproval(step, 'APPROVE')} disabled={approvalMutation.isPending}>
-                ✓ Final Submit & Complete
+                ✓ Submit to Employee
               </button>
               <button className="btn btn-red btn-xs" onClick={() => handleApproval(step, 'REJECT')} disabled={approvalMutation.isPending}>
                 ↩ Return to Employee
@@ -409,9 +409,9 @@ export function LaxreeDirDependency() {
                             return
                           }
                         }
-                        taskActionMutation.mutate({ id: t.id, status: 'COMPLETED' })
+                        taskActionMutation.mutate({ id: t.id, status: 'IN_PROGRESS' })
                       }} disabled={approvalMutation.isPending || taskActionMutation.isPending}>
-                        ✓ Final Submit & Complete
+                        ✓ Submit to Employee
                       </button>
                       <button className="btn btn-red btn-xs" onClick={() => {
                         if (t.workflow?.steps) {

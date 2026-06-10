@@ -342,7 +342,7 @@ export function TaskList() {
 
     // EA can do Final Review
     if ((isEA || isAdmin) && activeStep.name?.includes('EA Final')) {
-      return { canAct: true, stepId: activeStep.id, stepName: 'EA Final Review', actionLabel: 'Final Submit & Complete', workflowId: task.workflow.id }
+      return { canAct: true, stepId: activeStep.id, stepName: 'EA Final Review', actionLabel: 'Submit to Employee', workflowId: task.workflow.id }
     }
 
     // Admin can act on any step
@@ -581,6 +581,20 @@ export function TaskList() {
                           </button>
                         )}
 
+                        {/* Submit for Review button for IN_PROGRESS tasks WITH workflow (not yet approved) */}
+                        {t.status === 'IN_PROGRESS' && t.workflowId && t.workflow?.status !== 'APPROVED' && (
+                          <button className="btn btn-green btn-xs" style={{ fontSize: 9 }} onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
+                            Submit for Review
+                          </button>
+                        )}
+
+                        {/* Final Submit button for IN_PROGRESS tasks with APPROVED workflow */}
+                        {t.status === 'IN_PROGRESS' && t.workflowId && t.workflow?.status === 'APPROVED' && (
+                          <button className="btn btn-green btn-xs" style={{ fontSize: 9, background: 'var(--green)', color: '#fff' }} onClick={() => updateMutation.mutate({ id: t.id, status: 'COMPLETED' })}>
+                            Final Submit
+                          </button>
+                        )}
+
                         {/* Approval workflow action button */}
                         {approvalAction?.canAct && (
                           <button className="btn btn-xs" style={{ fontSize: 9, background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid var(--purple)', fontWeight: 700 }} onClick={() => handleApprovalAction(t, 'APPROVE')}>
@@ -762,6 +776,16 @@ export function TaskList() {
               {taskDetail.status === 'IN_PROGRESS' && !taskDetail.workflowId && (
                 <button className="btn btn-green btn-sm" onClick={() => { updateMutation.mutate({ id: taskDetail.id, status: 'COMPLETED' }); setDetailTask(null) }}>
                   Mark Complete
+                </button>
+              )}
+              {taskDetail.status === 'IN_PROGRESS' && taskDetail.workflowId && taskDetail.workflow?.status !== 'APPROVED' && (
+                <button className="btn btn-green btn-sm" onClick={() => { updateMutation.mutate({ id: taskDetail.id, status: 'COMPLETED' }); setDetailTask(null) }}>
+                  Submit for Review
+                </button>
+              )}
+              {taskDetail.status === 'IN_PROGRESS' && taskDetail.workflowId && taskDetail.workflow?.status === 'APPROVED' && (
+                <button className="btn btn-green btn-sm" style={{ background: 'var(--green)', color: '#fff' }} onClick={() => { updateMutation.mutate({ id: taskDetail.id, status: 'COMPLETED' }); setDetailTask(null) }}>
+                  Final Submit
                 </button>
               )}
               {canEditTask(taskDetail as Task) && !['COMPLETED', 'CANCELLED'].includes(taskDetail.status) && (

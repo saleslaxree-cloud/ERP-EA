@@ -108,9 +108,13 @@ export function LaxreeTaskDetail() {
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.8px', color: 'var(--t3)', marginBottom: 6 }}>Approval Routing</div>
           <div className="wf-flow" style={{ fontSize: 13 }}>
-            <span className={`wf-stage wf-stage-ea ${task.status !== 'PENDING' ? 'wf-stage-done' : ''}`}>EA Review</span>
+            <span className={`wf-stage wf-stage-ea ${task.status === 'IN_REVIEW' || task.status === 'ON_HOLD' || task.status === 'COMPLETED' || (task.workflow && task.workflow.status === 'APPROVED') ? 'wf-stage-done' : ''}`}>EA Review</span>
             <span className="wf-arrow">→</span>
             <span className={`wf-stage ${task.status === 'ON_HOLD' ? 'wf-stage-dir' : task.status === 'COMPLETED' ? 'wf-stage-done' : ''}`}>Director</span>
+            <span className="wf-arrow">→</span>
+            <span className={`wf-stage ${task.status === 'IN_REVIEW' && task.workflow?.status !== 'PENDING' ? 'wf-stage-done' : ''}`}>EA Final</span>
+            <span className="wf-arrow">→</span>
+            <span className={`wf-stage ${task.workflow?.status === 'APPROVED' ? 'wf-stage-dir' : task.status === 'COMPLETED' ? 'wf-stage-done' : ''}`}>Employee Submit</span>
             <span className="wf-arrow">→</span>
             <span className={`wf-stage ${task.status === 'COMPLETED' ? 'wf-stage-done' : ''}`}>Done</span>
           </div>
@@ -138,20 +142,23 @@ export function LaxreeTaskDetail() {
               {isEA && <button className="dd-btn-send-dir" onClick={() => handleStatusChange('ON_HOLD')}>↗ Send to Director</button>}
             </>
           )}
-          {task.status === 'IN_PROGRESS' && (
-            <button className="btn btn-green" onClick={() => handleStatusChange('COMPLETED')}>✓ Complete</button>
+          {task.status === 'IN_PROGRESS' && task.workflow && task.workflow.status === 'APPROVED' && (
+            <button className="btn btn-green" onClick={() => handleStatusChange('COMPLETED')}>✓ Final Submit</button>
+          )}
+          {task.status === 'IN_PROGRESS' && (!task.workflow || task.workflow.status !== 'APPROVED') && (
+            <button className="btn btn-green" onClick={() => handleStatusChange('COMPLETED')}>✓ Submit for Review</button>
           )}
           {task.status === 'ON_HOLD' && isDirector && (
             <>
-              <button className="dd-btn-dir-approve" onClick={() => handleStatusChange('COMPLETED')}>✓ Approve</button>
-              <button className="dd-btn-dir-reject" onClick={() => handleStatusChange('REJECTED')}>✗ Reject</button>
+              <button className="dd-btn-dir-approve" onClick={() => handleStatusChange('IN_REVIEW')}>✓ Approve & Send to EA</button>
+              <button className="dd-btn-dir-reject" onClick={() => handleStatusChange('PENDING')}>✗ Reject & Return to Employee</button>
               <button className="dd-btn-send-ea" onClick={() => handleStatusChange('IN_REVIEW')}>↩ Send to EA</button>
             </>
           )}
           {task.status === 'ESCALATED' && isDirector && (
             <>
-              <button className="dd-btn-dir-approve" onClick={() => handleStatusChange('COMPLETED')}>✓ Approve</button>
-              <button className="dd-btn-dir-reject" onClick={() => handleStatusChange('REJECTED')}>✗ Reject</button>
+              <button className="dd-btn-dir-approve" onClick={() => handleStatusChange('IN_REVIEW')}>✓ Approve & Send to EA</button>
+              <button className="dd-btn-dir-reject" onClick={() => handleStatusChange('PENDING')}>✗ Reject & Return to Employee</button>
             </>
           )}
           <button className="btn btn-red btn-sm" onClick={() => handleStatusChange('CANCELLED')} style={{ marginLeft: 'auto' }}>Cancel Task</button>

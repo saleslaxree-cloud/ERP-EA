@@ -89,6 +89,171 @@ export async function PATCH(
       if (status === WorkflowStatus.COMPLETED) updateData.completedAt = now
       if (status === WorkflowStatus.CANCELLED) updateData.completedAt = now
     }
+
+    // ═══ INTERCEPT: Employee marks task COMPLETED but task has workflow ═══
+    // Instead of completing directly, route to EA Review
+    // Exception: If workflow is already APPROVED (EA Final approved), allow direct completion (Final Submit)
+    if (status === WorkflowStatus.COMPLETED && task.workflowId && task.workflow) {
+      const workflow = task.workflow
+
+      // If workflow is APPROVED, the employee is doing a "Final Submit" — allow it
+      if (workflow.status === WorkflowStatus.APPROVED) {
+        // Mark the workflow as COMPLETED too
+        await db.workflowInstance.update({
+          where: { id: workflow.id },
+          data: { status: WorkflowStatus.COMPLETED },
+        })
+
+        // Notify employee that task is fully complete
+        if (task.ownerId) {
+          await db.notification.create({
+            data: {
+              type: 'APPROVED',
+              title: `Task Completed: ${task.title}`,
+              message: `Your task "${task.title}" has been fully completed through all review stages.`,
+              senderId: task.ownerId,
+              receiverId: task.ownerId,
+              workflowId: workflow.id,
+            },
+          })
+        }
+
+        await db.statusHistory.create({
+          data: {
+            workflowId: workflow.id,
+            fromStatus: WorkflowStatus.IN_PROGRESS,
+            toStatus: WorkflowStatus.COMPLETED,
+            changedBy: task.ownerId,
+            reason: 'Employee did final submit after all approvals - task completed',
+          },
+        })
+      } else {
+        // Workflow is NOT yet APPROVED — route to EA Review instead of completing
+        // But only if the employee step hasn't already been completed (workflow still at early stage)
+        const employeeStep = workflow.steps.find(s => s.order === 1)
+        const eaReviewStep = workflow.steps.find(s => s.name.includes('EA Review') && !s.name.includes('Final'))
+
+        // Only intercept if employee step is still PENDING or IN_PROGRESS (hasn't been completed yet)
+        // If employee step is already COMPLETED/APPROVED, the workflow has progressed past this point
+        if (employeeStep && eaReviewStep && (employeeStep.status === WorkflowStatus.PENDING || employeeStep.status === WorkflowStatus.IN_PROGRESS)) {
+          // Complete employee step
+          await db.stepInstance.update({
+            where: { id: employeeStep.id },
+            data: { status: WorkflowStatus.COMPLETED, completedAt: now },
+          })
+
+          // Activate EA Review step
+          const eaUser = await db.user.findFirst({ where: { role: 'EA', isActive: true } })
+          await db.stepInstance.update({
+            where: { id: eaReviewStep.id },
+            data: { status: WorkflowStatus.IN_REVIEW, assigneeId: eaUser?.id, startedAt: now },
+          })
+
+          // Update workflow
+          await db.workflowInstance.update({
+            where: { id: workflow.id },
+            data: { currentStepOrder: eaReviewStep.order, status: WorkflowStatus.IN_REVIEW },
+          })
+
+          // Override: don't complete the task, put it in IN_REVIEW
+          updateData.status = WorkflowStatus.IN_REVIEW
+          delete updateData.completedAt
+
+          // Notify EA
+          if (eaUser) {
+            await db.notification.create({
+              data: {
+                type: 'APPROVAL_REQUIRED',
+                title: `Task Ready for Review: ${task.title}`,
+                message: `Employee has completed their work on "${task.title}". Please review and verify.`,
+                senderId: task.ownerId,
+                receiverId: eaUser.id,
+                workflowId: workflow.id,
+              },
+            })
+          }
+
+          // Log status change
+          await db.statusHistory.create({
+            data: {
+              workflowId: workflow.id,
+              fromStatus: WorkflowStatus.IN_PROGRESS,
+              toStatus: WorkflowStatus.IN_REVIEW,
+              changedBy: task.ownerId,
+              reason: 'Employee completed work and submitted for EA review',
+            },
+          })
+        }
+      }
+    }
+
+    // ═══ INTERCEPT: Task goes to IN_REVIEW and workflow is at EA Final step ═══
+    // This handles Director approval routing to EA Final Review
+    if (status === WorkflowStatus.IN_REVIEW && task.workflowId && task.workflow) {
+      const workflow = task.workflow
+      const eaFinalStep = workflow.steps.find(s => s.name.includes('EA Final'))
+      const directorStep = workflow.steps.find(s => s.name.includes('Director'))
+
+      // If director step is IN_REVIEW (Director is approving now) or already APPROVED,
+      // and EA Final is not yet active, mark Director as APPROVED and activate EA Final
+      if (directorStep && (directorStep.status === WorkflowStatus.IN_REVIEW || directorStep.status === WorkflowStatus.APPROVED) && eaFinalStep && eaFinalStep.status === WorkflowStatus.PENDING) {
+        // Mark Director step as APPROVED if it's currently IN_REVIEW
+        if (directorStep.status === WorkflowStatus.IN_REVIEW) {
+          await db.stepInstance.update({
+            where: { id: directorStep.id },
+            data: { status: WorkflowStatus.APPROVED, completedAt: now },
+          })
+
+          // Create approval record for Director
+          await db.approval.create({
+            data: {
+              stepInstanceId: directorStep.id,
+              workflowId: workflow.id,
+              approverId: directorStep.assigneeId || task.ownerId,
+              action: WorkflowStatus.APPROVED,
+              comments: 'Director approved and sent to EA Final Review',
+              level: directorStep.order,
+            },
+          })
+        }
+
+        // Activate EA Final step
+        const eaUser = await db.user.findFirst({ where: { role: 'EA', isActive: true } })
+        await db.stepInstance.update({
+          where: { id: eaFinalStep.id },
+          data: { status: WorkflowStatus.IN_REVIEW, assigneeId: eaUser?.id, startedAt: now },
+        })
+
+        await db.workflowInstance.update({
+          where: { id: workflow.id },
+          data: { currentStepOrder: eaFinalStep.order, status: WorkflowStatus.IN_REVIEW },
+        })
+
+        // Notify EA for final review
+        if (eaUser) {
+          await db.notification.create({
+            data: {
+              type: 'APPROVAL_REQUIRED',
+              title: `Final Review Required: ${task.title}`,
+              message: `Director has approved "${task.title}". Please do final review and submit.`,
+              senderId: task.ownerId,
+              receiverId: eaUser.id,
+              workflowId: workflow.id,
+            },
+          })
+        }
+
+        await db.statusHistory.create({
+          data: {
+            workflowId: workflow.id,
+            fromStatus: WorkflowStatus.ON_HOLD,
+            toStatus: WorkflowStatus.IN_REVIEW,
+            changedBy: directorStep.assigneeId || task.ownerId,
+            reason: 'Director approved - routed to EA Final Review',
+          },
+        })
+      }
+    }
     if (title !== undefined) updateData.title = title
     if (description !== undefined) updateData.description = description
     if (priority !== undefined) updateData.priority = priority
@@ -216,9 +381,71 @@ export async function PATCH(
         }
       }
 
-      if (status === WorkflowStatus.IN_REVIEW) {
-        // Director approved → move to EA Final Review
-        // This is handled when task comes back from director approval
+      // IN_REVIEW logic is handled above in the intercept section
+
+      if (status === WorkflowStatus.PENDING && task.status === WorkflowStatus.ON_HOLD) {
+        // Director rejected the task → send back to employee as PENDING
+        const directorStep = workflow.steps.find(s => s.name.includes('Director'))
+        const employeeStep = workflow.steps.find(s => s.order === 1)
+
+        if (directorStep && directorStep.status === WorkflowStatus.IN_REVIEW) {
+          // Mark Director step as REJECTED
+          await db.stepInstance.update({
+            where: { id: directorStep.id },
+            data: { status: WorkflowStatus.REJECTED, completedAt: now },
+          })
+
+          // Create rejection approval record
+          await db.approval.create({
+            data: {
+              stepInstanceId: directorStep.id,
+              workflowId: workflow.id,
+              approverId: directorStep.assigneeId || task.ownerId,
+              action: WorkflowStatus.REJECTED,
+              comments: 'Director rejected - task returned to employee for redo',
+              level: directorStep.order,
+            },
+          })
+        }
+
+        // Reset employee step so they can redo their work
+        if (employeeStep) {
+          await db.stepInstance.update({
+            where: { id: employeeStep.id },
+            data: { status: WorkflowStatus.PENDING, startedAt: null, completedAt: null },
+          })
+        }
+
+        // Update workflow status
+        await db.workflowInstance.update({
+          where: { id: workflow.id },
+          data: { status: WorkflowStatus.REJECTED, currentStepOrder: 1 },
+        })
+
+        // Notify employee
+        if (task.ownerId) {
+          await db.notification.create({
+            data: {
+              type: 'REJECTED',
+              title: `Task Returned: ${task.title}`,
+              message: `Director has rejected your task. Please redo and resubmit your work.`,
+              senderId: directorStep?.assigneeId || task.ownerId,
+              receiverId: task.ownerId,
+              workflowId: workflow.id,
+            },
+          })
+        }
+
+        // Log status change
+        await db.statusHistory.create({
+          data: {
+            workflowId: workflow.id,
+            fromStatus: WorkflowStatus.ON_HOLD,
+            toStatus: WorkflowStatus.PENDING,
+            changedBy: directorStep?.assigneeId || task.ownerId,
+            reason: 'Director rejected task - returned to employee for redo',
+          },
+        })
       }
     }
 
