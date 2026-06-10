@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true, title: true, description: true, status: true, priority: true,
         department: true, category: true, dueDate: true, completedAt: true, createdAt: true,
-        frequency: true, weekDays: true, monthDates: true,
+        frequency: true, weekDays: true, monthDates: true, directorDependency: true,
         owner: { select: { id: true, name: true, department: true, role: true } },
         taskSteps: { select: { id: true, title: true, status: true, order: true }, orderBy: { order: 'asc' } },
       },
