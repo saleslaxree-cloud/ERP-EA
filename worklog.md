@@ -47,3 +47,24 @@ Stage Summary:
 - Root cause: CSS classes were defined in component JSX but never added to globals.css stylesheet
 - Fixed by adding comprehensive CSS for: login form, command palette, loader/splash screen, Monday meeting scorecard, director dependency status, department view, and utility classes
 - All 55+ missing CSS classes now defined and included in production build
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix "Sandbox is inactive" - server keeps dying
+
+Work Log:
+- Discovered server process was being killed when the agent's bash shell session ended
+- Child processes of the agent's bash shell are terminated when the shell exits
+- Tested multiple approaches: nohup, disown, setsid - all failed because parent shell termination cascades
+- Found that double-fork pattern (`( node server.js & ) &`) successfully detaches the process from the parent shell
+- Server now stays alive indefinitely after being launched with double-fork
+- Updated keep-alive.sh and start.sh to use double-fork pattern with auto-restart loop
+- Verified: Server responds HTTP 200 on both port 3000 (direct) and port 81 (Caddy proxy)
+- Login page renders with full HTML/CSS/JS, API endpoints return data
+
+Stage Summary:
+- Root cause: Sandbox environment kills child processes when the agent's bash session ends
+- Fix: Double-fork pattern detaches the server process from the agent's shell tree
+- Server now runs persistently and auto-restarts if it crashes
+- Application accessible at port 81 (via Caddy reverse proxy) and port 3000 (direct)

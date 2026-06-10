@@ -20,5 +20,18 @@ db.user.count().then(c => {
 }).catch(() => db.\$disconnect());
 " 2>/dev/null &
 
-# Start the server using custom server.js with increased memory
-exec node --max-old-space-size=4096 server.js
+# Use double-fork to fully detach from parent shell
+# This prevents the server from being killed when the agent's bash exits
+(
+  while true; do
+    echo "[$(date)] Starting LAXREE server..."
+    node --max-old-space-size=4096 server.js 2>&1
+    EXIT_CODE=$?
+    echo "[$(date)] Server exited with code $EXIT_CODE, restarting in 3 seconds..."
+    sleep 3
+  done
+) &
+
+# Give server a moment to start
+sleep 3
+echo "LAXREE server started in background (detached)"

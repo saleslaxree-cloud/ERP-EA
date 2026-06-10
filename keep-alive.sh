@@ -1,9 +1,11 @@
 #!/bin/bash
 # LAXREE Server Keep-Alive Script
+# Uses double-fork to fully detach from the parent shell
+# so the server survives when the agent's bash session ends.
 cd /home/z/my-project
 
 # Kill any existing server
-pkill -f "node server.js" 2>/dev/null
+pkill -f "node.*server.js" 2>/dev/null
 sleep 1
 
 # Ensure Prisma client is generated
@@ -25,11 +27,19 @@ db.user.count().then(c => {
 }).catch(() => db.\$disconnect());
 " 2>/dev/null &
 
-# Start the server - restart if it dies
-while true; do
-  echo "[$(date)] Starting LAXREE server..."
-  node --max-old-space-size=4096 server.js
-  EXIT_CODE=$?
-  echo "[$(date)] Server exited with code $EXIT_CODE, restarting in 3 seconds..."
-  sleep 3
-done
+# Double-fork to fully detach from parent shell
+# This prevents the server from being killed when the agent's bash exits
+(
+  # Start the server with auto-restart in a detached session
+  while true; do
+    echo "[$(date)] Starting LAXREE server..."
+    node --max-old-space-size=4096 server.js 2>&1
+    EXIT_CODE=$?
+    echo "[$(date)] Server exited with code $EXIT_CODE, restarting in 3 seconds..."
+    sleep 3
+  done
+) &
+
+# Wait a moment for the server to start, then report
+sleep 3
+echo "LAXREE server started in background (detached)"
