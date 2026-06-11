@@ -1,11 +1,14 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
+import { useWorkflowStore } from '@/stores/workflow-store'
 
 export function LaxreeAnalytics() {
+  const { currentUserId } = useWorkflowStore()
   const { data: dash } = useQuery({
-    queryKey: ['dashboard-analytics'],
-    queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()),
+    queryKey: ['dashboard-analytics', currentUserId],
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
+    enabled: !!currentUserId,
   })
 
   const { data: workflows = [] } = useQuery({

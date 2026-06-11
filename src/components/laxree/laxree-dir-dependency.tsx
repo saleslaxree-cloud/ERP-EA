@@ -43,10 +43,10 @@ export function LaxreeDirDependency() {
     t.workflowId
   ) : []
 
-  // EA review tasks - PENDING or IN_PROGRESS tasks with workflow
+  // EA review tasks - IN_REVIEW tasks with workflow (at EA Review stage, not EA Final)
   const eaReviewTasks = Array.isArray(allTasks) ? allTasks.filter((t: any) =>
-    (t.status === 'PENDING' || t.status === 'IN_PROGRESS') &&
-    t.workflowId
+    t.status === 'IN_REVIEW' && t.workflowId &&
+    !(t.workflow?.steps?.some((s: any) => s.name?.includes('EA Final') && s.status === 'IN_REVIEW'))
   ) : []
 
   // EA Final review tasks - tasks where director has already approved (workflow step at EA Final)
@@ -253,18 +253,61 @@ export function LaxreeDirDependency() {
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>{task.title}</div>
             <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
-              {owner?.name || 'Unassigned'} · {owner?.department || '—'} · {task.status}
+              {owner?.name || 'Unassigned'} · {owner?.department || '—'} · EA Review
             </div>
           </div>
           <span className="badge" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid rgba(217,119,6,.3)', fontWeight: 700 }}>
             EA Review
           </span>
         </div>
+        <div style={{ marginBottom: 8 }}>
+          <input
+            className="fi"
+            placeholder="Add comments…"
+            value={actionComments[task.id] || ''}
+            onChange={e => setActionComments(prev => ({ ...prev, [task.id]: e.target.value }))}
+            style={{ fontSize: 11, padding: '6px 10px' }}
+          />
+        </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          <button className="btn btn-green btn-xs" onClick={() => taskActionMutation.mutate({ id: task.id, status: 'ON_HOLD' })} disabled={taskActionMutation.isPending}>
+          <button className="btn btn-green btn-xs" onClick={() => {
+            // Use the proper approval-action API
+            if (task.workflow?.steps) {
+              const eaReviewStep = task.workflow.steps.find((s: any) => s.name?.includes('EA Review') && !s.name?.includes('Final'))
+              if (eaReviewStep) {
+                approvalMutation.mutate({
+                  workflowId: task.workflowId,
+                  stepInstanceId: eaReviewStep.id,
+                  action: 'APPROVE',
+                  comments: actionComments[task.id] || 'EA verified and sent to Director',
+                  approverId: currentUserId,
+                })
+                return
+              }
+            }
+            // Fallback
+            taskActionMutation.mutate({ id: task.id, status: 'ON_HOLD' })
+          }} disabled={approvalMutation.isPending || taskActionMutation.isPending}>
             ✓ Verify & Send to Director
           </button>
-          <button className="btn btn-red btn-xs" onClick={() => taskActionMutation.mutate({ id: task.id, status: 'PENDING' })} disabled={taskActionMutation.isPending}>
+          <button className="btn btn-red btn-xs" onClick={() => {
+            // Use the proper approval-action API
+            if (task.workflow?.steps) {
+              const eaReviewStep = task.workflow.steps.find((s: any) => s.name?.includes('EA Review') && !s.name?.includes('Final'))
+              if (eaReviewStep) {
+                approvalMutation.mutate({
+                  workflowId: task.workflowId,
+                  stepInstanceId: eaReviewStep.id,
+                  action: 'REJECT',
+                  comments: actionComments[task.id] || 'EA rejected - needs revision',
+                  approverId: currentUserId,
+                })
+                return
+              }
+            }
+            // Fallback
+            taskActionMutation.mutate({ id: task.id, status: 'PENDING' })
+          }} disabled={approvalMutation.isPending || taskActionMutation.isPending}>
             ↩ Return to Employee
           </button>
         </div>

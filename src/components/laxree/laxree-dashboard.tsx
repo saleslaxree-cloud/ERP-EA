@@ -35,11 +35,12 @@ const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#
 function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length] }
 
 export function LaxreeDashboard() {
-  const { currentUser, setActivePage } = useWorkflowStore()
+  const { currentUser, setActivePage, currentUserId } = useWorkflowStore()
 
   const { data: dash, isLoading } = useQuery<DashboardData>({
-    queryKey: ['dashboard'],
-    queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()),
+    queryKey: ['dashboard', currentUserId],
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
+    enabled: !!currentUserId,
   })
 
   const { data: users = [] } = useQuery<User[]>({

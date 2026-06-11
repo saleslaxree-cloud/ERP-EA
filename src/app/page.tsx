@@ -426,6 +426,7 @@ function DepartmentsView() {
    Team View
    ═══════════════════════════════════════════════════════════ */
 function TeamView() {
+  const { currentUserId } = useWorkflowStore()
   const qc = useQueryClient()
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [addForm, setAddForm] = useState({ name: '', email: '', role: 'EMPLOYEE', department: '', designation: '', phone: '', location: '' })
@@ -433,7 +434,7 @@ function TeamView() {
   const [teamTab, setTeamTab] = useState('active')
 
   const { data: users = [] } = useQuery({ queryKey: ['users-list'], queryFn: () => fetch('/api/users').then(r => r.json()) })
-  const { data } = useQuery({ queryKey: ['dashboard', 'user-admin'], queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()) })
+  const { data } = useQuery({ queryKey: ['dashboard', currentUserId], queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()) })
   const d = data as any
   const userPerf = d?.userPerformance || []
   const getInitials = (name: string) => name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)

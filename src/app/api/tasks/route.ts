@@ -16,7 +16,11 @@ export async function GET(request: NextRequest) {
       where: { ...where, parentTaskId: null },
       include: {
         owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
-        workflow: { select: { id: true, title: true, status: true, currentStepOrder: true } },
+        workflow: {
+          include: {
+            steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
+          },
+        },
         taskSteps: {
           orderBy: { order: 'asc' },
           include: { assignee: { select: { id: true, name: true, role: true } } },

@@ -62,9 +62,10 @@ export function LaxreeApprovals() {
   // Categorize tasks by their workflow state
   const allTasks = Array.isArray(tasks) ? tasks : []
 
-  // Tasks at EA Review stage (IN_REVIEW, EA step is active)
+  // Tasks at EA Review stage (IN_REVIEW, EA step is active - but NOT EA Final)
   const eaReviewTasks = allTasks.filter((t: any) =>
-    t.status === 'IN_REVIEW' && t.workflowId
+    t.status === 'IN_REVIEW' && t.workflowId &&
+    !(t.workflow?.steps?.some((s: any) => s.name?.includes('EA Final') && s.status === 'IN_REVIEW'))
   )
 
   // Tasks at Director stage (ON_HOLD = waiting for director)

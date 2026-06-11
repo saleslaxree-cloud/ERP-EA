@@ -4,14 +4,14 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 export function LaxreeNotifPanel() {
-  const { notifPanelOpen, toggleNotifPanel, currentUser } = useWorkflowStore()
+  const { notifPanelOpen, toggleNotifPanel, currentUser, currentUserId } = useWorkflowStore()
   const queryClient = useQueryClient()
 
   const { data: notifData, refetch } = useQuery({
-    queryKey: ['notifications-panel'],
-    queryFn: () => fetch(`/api/notifications?userId=user-admin`).then(r => r.json()).catch(() => ({ notifications: [], unreadCount: 0 })),
+    queryKey: ['notifications-panel', currentUserId],
+    queryFn: () => fetch(`/api/notifications?userId=${currentUserId}`).then(r => r.json()).catch(() => ({ notifications: [], unreadCount: 0 })),
     refetchInterval: 30000,
-    enabled: notifPanelOpen,
+    enabled: notifPanelOpen && !!currentUserId,
   })
 
   const notifications = notifData?.notifications || []

@@ -26,6 +26,15 @@ export async function PATCH(
     const now = new Date()
 
     if (action === 'complete') {
+      // Auto-start the task if it's still PENDING
+      const currentTask = await db.task.findUnique({ where: { id: taskId } })
+      if (currentTask?.status === WorkflowStatus.PENDING) {
+        await db.task.update({
+          where: { id: taskId },
+          data: { status: WorkflowStatus.IN_PROGRESS },
+        })
+      }
+
       // Complete this step
       const updatedStep = await db.taskStep.update({
         where: { id: stepId },

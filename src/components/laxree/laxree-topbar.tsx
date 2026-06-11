@@ -5,13 +5,13 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
 export function LaxreeTopbar() {
-  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen, setCreateTaskOpen } = useWorkflowStore()
+  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen, setCreateTaskOpen, currentUserId } = useWorkflowStore()
   const [time, setTime] = useState('')
-
   const { data: notifData } = useQuery({
-    queryKey: ['topbar-notifs'],
-    queryFn: () => fetch('/api/notifications?userId=user-admin').then(r => r.json()).catch(() => ({ notifications: [], unreadCount: 0 })),
+    queryKey: ['topbar-notifs', currentUserId],
+    queryFn: () => fetch(`/api/notifications?userId=${currentUserId}`).then(r => r.json()).catch(() => ({ notifications: [], unreadCount: 0 })),
     refetchInterval: 30000,
+    enabled: !!currentUserId,
   })
   const unreadCount = notifData?.unreadCount || 0
 

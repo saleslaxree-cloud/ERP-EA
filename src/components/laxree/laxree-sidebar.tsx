@@ -14,11 +14,12 @@ interface NavItem {
 }
 
 export function LaxreeSidebar() {
-  const { activePage, setActivePage, currentUser, sidebarOpen, setSidebarOpen, logout } = useWorkflowStore()
+  const { activePage, setActivePage, currentUser, sidebarOpen, setSidebarOpen, logout, currentUserId } = useWorkflowStore()
 
   const { data: dashData } = useQuery({
-    queryKey: ['sidebar-stats'],
-    queryFn: () => fetch('/api/dashboard?userId=user-admin').then(r => r.json()),
+    queryKey: ['sidebar-stats', currentUserId],
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
+    enabled: !!currentUserId,
   })
 
   const d = dashData as any

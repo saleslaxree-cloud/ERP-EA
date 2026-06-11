@@ -208,14 +208,13 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   // Determine the next actionable step for a task (for the step button)
   const getNextActionableStep = (task: any) => {
     if (!task.taskSteps || task.taskSteps.length === 0) return null
-    // Only show step button if the task is in a state the employee can act on
-    if (task.status === 'PENDING' || task.status === 'IN_PROGRESS' || task.status === 'REJECTED' || task.status === 'DRAFT') {
+    // Only show step buttons if the task is started (IN_PROGRESS) or returned (REJECTED/RE_OPENED)
+    // PENDING tasks show the Start button first
+    if (task.status === 'IN_PROGRESS' || task.status === 'REJECTED' || task.status === 'RE_OPENED') {
+      // If workflow is APPROVED, don't show step button - Final Submit button handles it
+      if (task.workflow?.status === 'APPROVED') return null
       const nextStep = task.taskSteps.find((s: any) => s.status !== 'COMPLETED')
       return nextStep || null
-    }
-    // If workflow is APPROVED, show final submit step
-    if (task.status === 'IN_PROGRESS' && task.workflow?.status === 'APPROVED') {
-      return null // Handled by Final Submit button
     }
     return null
   }
@@ -355,8 +354,8 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
                   {/* Action Buttons - Step-based workflow */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {/* Start Button */}
-                    {task.status === 'PENDING' && stepsTotal === 0 && (
+                    {/* Start Button - shows for all PENDING tasks */}
+                    {task.status === 'PENDING' && (
                       <button
                         className="btn btn-xs"
                         style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1px solid var(--blue)', fontWeight: 700 }}
@@ -650,7 +649,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               {/* ACTION BUTTONS */}
               <div className="gold-divider" />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {(task.status === 'PENDING') && stepsTotal === 0 && (
+                {(task.status === 'PENDING') && (
                   <button className="btn" style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}
                     onClick={async () => {
                       await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }) })
