@@ -10,8 +10,6 @@ interface LaxreeTasksProps {
   showEscalations?: boolean
 }
 
-const DEPTS = ['Sales', 'Account', 'HR', 'Coordinator', 'Admin', 'Back Office']
-
 export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: LaxreeTasksProps) {
   const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId, addToast, setCreateTaskOpen, currentRole } = useWorkflowStore()
   const queryClient = useQueryClient()
@@ -77,6 +75,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
       }).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       addToast('ok', 'Task started')
       setMenuOpenId(null)
     },
@@ -92,7 +91,24 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      addToast('ok', 'Task submitted! ✓')
+      addToast('ok', 'Task completed! ✓')
+      setMenuOpenId(null)
+      setSelectedTaskId(null)
+    },
+  })
+
+  // Revise mutation - reopens a completed task back to IN_PROGRESS
+  const reviseMutation = useMutation({
+    mutationFn: ({ id }: { id: string }) =>
+      fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+      }).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      addToast('ok', 'Task reopened for revision')
       setMenuOpenId(null)
     },
   })
@@ -112,7 +128,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     },
   })
 
-  // Step completion mutation - this is the main action now instead of "Done"
+  // Step completion mutation - simplified, no director approval routing
   const stepDoneMutation = useMutation({
     mutationFn: ({ taskId, stepId }: { taskId: string; stepId: string }) =>
       fetch(`/api/tasks/${taskId}/steps`, {
@@ -123,9 +139,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      if (data.routedToApproval) {
-        addToast('ok', 'Step completed! Sent for director approval ✓')
-      } else if (data.allDone) {
+      if (data.allDone) {
         addToast('ok', 'All steps done! Task completed ✓')
       } else {
         addToast('ok', 'Step completed! ✓')
@@ -184,11 +198,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     IN_PROGRESS: { bg: '#DBEAFE', color: '#1D4ED8', label: 'In Progress' },
     COMPLETED: { bg: '#DCFCE7', color: '#15803D', label: 'Done' },
     CANCELLED: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelled' },
-    ON_HOLD: { bg: '#EDE9FE', color: '#6D28D9', label: 'Director Review' },
+    ON_HOLD: { bg: '#EDE9FE', color: '#6D28D9', label: 'On Hold' },
     ESCALATED: { bg: '#FEE2E2', color: '#DC2626', label: 'Escalated' },
     EXTERNAL_HOLD: { bg: '#FFF7ED', color: '#C2410C', label: 'Ext Hold' },
     DRAFT: { bg: '#F3F4F6', color: '#6B7280', label: 'Draft' },
-    IN_REVIEW: { bg: '#FEF3C7', color: '#92400E', label: 'EA Review' },
+    IN_REVIEW: { bg: '#FEF3C7', color: '#92400E', label: 'In Review' },
     APPROVED: { bg: '#DCFCE7', color: '#15803D', label: 'Approved' },
     REJECTED: { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
     RE_OPENED: { bg: '#FEF3C7', color: '#92400E', label: 'Re-Opened' },
@@ -205,14 +219,10 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     return { label: 'On Track', bg: '#ECFDF5', color: '#059669' }
   }
 
-  // Determine the next actionable step for a task (for the step button)
+  // Determine the next actionable step for a task
   const getNextActionableStep = (task: any) => {
     if (!task.taskSteps || task.taskSteps.length === 0) return null
-    // Only show step buttons if the task is started (IN_PROGRESS) or returned (REJECTED/RE_OPENED)
-    // PENDING tasks show the Start button first
     if (task.status === 'IN_PROGRESS' || task.status === 'REJECTED' || task.status === 'RE_OPENED') {
-      // If workflow is APPROVED, don't show step button - Final Submit button handles it
-      if (task.workflow?.status === 'APPROVED') return null
       const nextStep = task.taskSteps.find((s: any) => s.status !== 'COMPLETED')
       return nextStep || null
     }
@@ -287,7 +297,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
           const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
           const owner = task.owner
           const nextStep = getNextActionableStep(task)
-          const isFinalSubmitReady = task.status === 'IN_PROGRESS' && task.workflow?.status === 'APPROVED'
 
           return (
             <div key={task.id} className="lcard" style={{ cursor: 'pointer', transition: 'all .15s' }}
@@ -321,16 +330,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       {task.department && <span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{task.department}</span>}
                       {task.category && <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
                       {task.dueDate && <span>Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</span>}
-                      {task.directorDependency && (() => {
-                        try {
-                          const dirs = JSON.parse(task.directorDependency)
-                          return dirs.length > 0 ? (
-                            <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.2)' }}>
-                              👔 {dirs.join(', ')}
-                            </span>
-                          ) : null
-                        } catch { return null }
-                      })()}
                     </div>
 
                     {/* Step Progress */}
@@ -352,9 +351,9 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     )}
                   </div>
 
-                  {/* Action Buttons - Step-based workflow */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {/* Start Button - shows for all PENDING tasks */}
+                  {/* ═══ SIMPLIFIED ACTION BUTTONS ═══ */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                    {/* PENDING → Start Button */}
                     {task.status === 'PENDING' && (
                       <button
                         className="btn btn-xs"
@@ -367,48 +366,63 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       </button>
                     )}
 
-                    {/* Final Submit - when workflow is APPROVED */}
-                    {isFinalSubmitReady && (
+                    {/* IN_PROGRESS → Done + Revise Buttons */}
+                    {task.status === 'IN_PROGRESS' && (
+                      <>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                          onClick={() => completeMutation.mutate({ id: task.id })}
+                          disabled={completeMutation.isPending}
+                          title="Mark as Done"
+                        >
+                          ✓ Done
+                        </button>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
+                          onClick={() => setEditTask(task)}
+                          title="Revise / Edit Task"
+                        >
+                          ✏ Revise
+                        </button>
+                      </>
+                    )}
+
+                    {/* COMPLETED → Revise Button (Reopen) */}
+                    {task.status === 'COMPLETED' && (
                       <button
                         className="btn btn-xs"
-                        style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
-                        onClick={() => completeMutation.mutate({ id: task.id })}
-                        disabled={completeMutation.isPending}
-                        title="Final Submit - all approvals done"
+                        style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
+                        onClick={() => reviseMutation.mutate({ id: task.id })}
+                        disabled={reviseMutation.isPending}
+                        title="Reopen task for revision"
                       >
-                        ✓ Final Submit
+                        ↩ Revise
                       </button>
                     )}
 
-                    {/* Next Step Button - shows the next step to complete */}
-                    {nextStep && (
-                      <button
-                        className="btn btn-xs"
-                        style={{
-                          background: nextStep.needsDirectorApproval ? 'var(--purple-l)' : 'var(--green-l)',
-                          color: nextStep.needsDirectorApproval ? 'var(--purple)' : 'var(--green)',
-                          border: `1.5px solid ${nextStep.needsDirectorApproval ? 'var(--purple)' : 'var(--green)'}`,
-                          fontWeight: 800, padding: '4px 10px',
-                        }}
-                        onClick={() => stepDoneMutation.mutate({ taskId: task.id, stepId: nextStep.id })}
-                        disabled={stepDoneMutation.isPending}
-                        title={nextStep.needsDirectorApproval ? `Complete "${nextStep.title}" and send for director approval` : `Complete step: ${nextStep.title}`}
-                      >
-                        {nextStep.needsDirectorApproval ? `👔 ${nextStep.title}` : `✓ Step ${nextStep.order}`}
-                      </button>
-                    )}
-
-                    {/* No steps and no workflow - just mark done */}
-                    {task.status === 'IN_PROGRESS' && !task.workflow && stepsTotal === 0 && (
-                      <button
-                        className="btn btn-xs"
-                        style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
-                        onClick={() => completeMutation.mutate({ id: task.id })}
-                        disabled={completeMutation.isPending}
-                        title="Mark as Done"
-                      >
-                        ✓ Done
-                      </button>
+                    {/* Other statuses (IN_REVIEW, ON_HOLD etc from old workflow) → show Done + Revise */}
+                    {(task.status === 'IN_REVIEW' || task.status === 'ON_HOLD' || task.status === 'ESCALATED') && (
+                      <>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                          onClick={() => completeMutation.mutate({ id: task.id })}
+                          disabled={completeMutation.isPending}
+                          title="Mark as Done"
+                        >
+                          ✓ Done
+                        </button>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
+                          onClick={() => reviseMutation.mutate({ id: task.id })}
+                          title="Revise / Reopen Task"
+                        >
+                          ↩ Revise
+                        </button>
+                      </>
                     )}
 
                     {/* 3-dot menu */}
@@ -481,7 +495,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
         const sla = getSlaStatus(task)
         const pBadge = priorityBadge[task.priority] || priorityBadge.MEDIUM
         const sStyle = statusStyle[task.status] || statusStyle.PENDING
-        const isFinalSubmitReady = task.status === 'IN_PROGRESS' && task.workflow?.status === 'APPROVED'
 
         return (
           <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setSelectedTaskId(null) }}>
@@ -500,16 +513,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     <span className="badge" style={{ background: pBadge.bg, color: pBadge.color, fontWeight: 700 }}>{task.priority}</span>
                     {task.department && <span className="badge b-gray">{task.department}</span>}
                     {task.category && <span className="badge" style={{ background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
-                    {task.directorDependency && (() => {
-                      try {
-                        const dirs = JSON.parse(task.directorDependency)
-                        return dirs.length > 0 ? (
-                          <span className="badge" style={{ background: 'var(--purple-l)', color: 'var(--purple)', border: '1px solid rgba(109,40,217,.2)' }}>
-                            👔 {dirs.join(', ')}
-                          </span>
-                        ) : null
-                      } catch { return null }
-                    })()}
                     {sla && <span className="badge" style={{ background: sla.bg, color: sla.color }}>{sla.label}</span>}
                   </div>
                 </div>
@@ -530,26 +533,21 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                 <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
                   <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Due:</span> {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No due date'}
                 </div>
-                {task.directorDependency && (() => {
-                  try {
-                    const dirs = JSON.parse(task.directorDependency)
-                    return dirs.length > 0 ? (
-                      <div style={{ padding: '8px 12px', background: 'var(--purple-l)', borderRadius: 6, color: 'var(--purple)', fontWeight: 600 }}>
-                        👔 Director: {dirs.join(', ')}
-                      </div>
-                    ) : null
-                  } catch { return null }
-                })()}
                 {task.createdAt && (
                   <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
                     <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Created:</span> {new Date(task.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                  </div>
+                )}
+                {task.completedAt && (
+                  <div style={{ padding: '8px 12px', background: 'var(--green-l)', borderRadius: 6, color: 'var(--green)', fontWeight: 600 }}>
+                    ✓ Completed: {new Date(task.completedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
               </div>
 
               <div className="gold-divider" />
 
-              {/* ═══ STEP PROGRESS WITH WORKFLOW BUTTONS ═══ */}
+              {/* Step Progress - simplified, no director approval */}
               {stepsTotal > 0 && (
                 <div style={{ marginBottom: 14 }}>
                   <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>
@@ -558,20 +556,19 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                   {task.taskSteps.map((step: any, i: number) => {
                     const isCompleted = step.status === 'COMPLETED'
                     const isCurrentStep = !isCompleted && (i === 0 || task.taskSteps[i - 1]?.status === 'COMPLETED')
-                    const needsApproval = step.needsDirectorApproval
 
                     return (
                       <div key={step.id} style={{
                         display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-                        background: isCompleted ? 'var(--green-l)' : isCurrentStep ? (needsApproval ? 'var(--purple-l)' : 'var(--blue-l)') : 'var(--bg2)',
+                        background: isCompleted ? 'var(--green-l)' : isCurrentStep ? 'var(--blue-l)' : 'var(--bg2)',
                         borderRadius: 8, marginBottom: 6,
-                        borderLeft: `3px solid ${isCompleted ? 'var(--green)' : needsApproval ? 'var(--purple)' : isCurrentStep ? 'var(--blue)' : 'var(--b2)'}`,
+                        borderLeft: `3px solid ${isCompleted ? 'var(--green)' : isCurrentStep ? 'var(--blue)' : 'var(--b2)'}`,
                         opacity: !isCompleted && !isCurrentStep ? 0.5 : 1,
                       }}>
                         <div style={{
                           width: 24, height: 24, borderRadius: '50%', fontSize: 10, fontWeight: 800,
                           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          background: isCompleted ? 'var(--green)' : isCurrentStep ? (needsApproval ? 'var(--purple)' : 'var(--blue)') : 'var(--g2)',
+                          background: isCompleted ? 'var(--green)' : isCurrentStep ? 'var(--blue)' : 'var(--g2)',
                           color: '#fff',
                         }}>
                           {isCompleted ? '✓' : i + 1}
@@ -580,31 +577,25 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                           <span style={{ fontSize: 12.5, fontWeight: isCompleted ? 600 : 700, color: isCompleted ? 'var(--green)' : 'var(--t1)' }}>
                             {step.title}
                           </span>
-                          {needsApproval && step.directorName && (
-                            <div style={{ fontSize: 10, color: 'var(--purple)', fontWeight: 600, marginTop: 2 }}>
-                              👔 Needs approval from: {step.directorName}
-                              {step.directorNote && <span style={{ color: 'var(--t3)', fontWeight: 400 }}> — {step.directorNote}</span>}
-                            </div>
-                          )}
                         </div>
                         {/* Step action button */}
-                        {!isCompleted && isCurrentStep && (
+                        {!isCompleted && isCurrentStep && task.status === 'IN_PROGRESS' && (
                           <button
                             className="btn btn-xs"
                             style={{
-                              background: needsApproval ? 'var(--purple-l)' : 'var(--green-l)',
-                              color: needsApproval ? 'var(--purple)' : 'var(--green)',
-                              border: `1px solid ${needsApproval ? 'var(--purple)' : 'var(--green)'}`,
+                              background: 'var(--green-l)',
+                              color: 'var(--green)',
+                              border: '1px solid var(--green)',
                               fontWeight: 700, whiteSpace: 'nowrap',
                             }}
                             onClick={() => stepDoneMutation.mutate({ taskId: task.id, stepId: step.id })}
                             disabled={stepDoneMutation.isPending}
                           >
-                            {needsApproval ? '👔 Send for Approval' : '✓ Complete'}
+                            ✓ Complete
                           </button>
                         )}
-                        <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: isCompleted ? 'var(--green-l)' : needsApproval ? 'var(--purple-l)' : 'var(--amber-l)', color: isCompleted ? 'var(--green)' : needsApproval ? 'var(--purple)' : 'var(--amber)' }}>
-                          {isCompleted ? 'Done' : needsApproval ? 'Needs Approval' : 'Pending'}
+                        <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: isCompleted ? 'var(--green-l)' : 'var(--amber-l)', color: isCompleted ? 'var(--green)' : 'var(--amber)' }}>
+                          {isCompleted ? 'Done' : 'Pending'}
                         </span>
                       </div>
                     )
@@ -612,62 +603,41 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                 </div>
               )}
 
-              {/* Workflow Flow - shows when task has an active workflow */}
-              {task.workflow && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>Approval Flow</div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {task.workflow.steps?.map((ws: any, wi: number) => {
-                      const isActive = ws.status === 'IN_REVIEW' || ws.status === 'IN_PROGRESS'
-                      const isDone = ws.status === 'APPROVED' || ws.status === 'COMPLETED'
-                      const isRejected = ws.status === 'REJECTED'
-                      let bg = 'var(--bg2)'
-                      let color = 'var(--t3)'
-                      let icon = '⏳'
-                      if (isActive) { bg = 'var(--amber-l)'; color = 'var(--amber)'; icon = '🔄' }
-                      if (isDone) { bg = 'var(--green-l)'; color = 'var(--green)'; icon = '✅' }
-                      if (isRejected) { bg = 'var(--red-l)'; color = 'var(--red)'; icon = '❌' }
-                      if (ws.name.includes('Director')) icon = isDone ? '✅' : isActive ? '👔' : '👔'
-                      if (ws.name.includes('EA')) icon = isDone ? '✅' : isActive ? '📋' : '📋'
-                      if (ws.name.includes('Employee')) icon = isDone ? '✅' : isActive ? '👤' : '👤'
-
-                      return (
-                        <div key={ws.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <div style={{ background: bg, color, padding: '6px 12px', borderRadius: 8, fontSize: 11, fontWeight: 800, border: isActive ? '2px solid currentColor' : '1px solid transparent' }}>
-                            {icon} {ws.name.replace('Employee Task Completion', 'Employee').replace('EA Review & Verification', 'EA Review').replace('Director Approval', 'Director').replace('EA Final Review & Submit', 'EA Final')}
-                          </div>
-                          {wi < (task.workflow.steps?.length || 0) - 1 && (
-                            <span style={{ color: 'var(--t3)', fontWeight: 900 }}>→</span>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* ACTION BUTTONS */}
+              {/* ACTION BUTTONS - Simplified */}
               <div className="gold-divider" />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {(task.status === 'PENDING') && (
+                {task.status === 'PENDING' && (
                   <button className="btn" style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}
                     onClick={async () => {
                       await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }) })
                       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
                       addToast('ok', 'Task started')
                     }}>
                     ▶ Start Task
                   </button>
                 )}
-                {isFinalSubmitReady && (
+                {(task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'ON_HOLD') && (
                   <button className="btn btn-green" onClick={async () => {
                     await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
                     queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
                     queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                    addToast('ok', 'Task submitted! ✓')
+                    addToast('ok', 'Task completed! ✓')
                     setSelectedTaskId(null)
                   }}>
-                    ✓ Final Submit
+                    ✓ Done
+                  </button>
+                )}
+                {task.status === 'COMPLETED' && (
+                  <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
+                    onClick={async () => {
+                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }) })
+                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                      addToast('ok', 'Task reopened for revision')
+                      setSelectedTaskId(null)
+                    }}>
+                    ↩ Revise
                   </button>
                 )}
                 {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
@@ -693,6 +663,12 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)' }} />
                     <span style={{ fontSize: 12, color: 'var(--t2)' }}>Last updated — {new Date(task.updatedAt).toLocaleString()}</span>
+                  </div>
+                )}
+                {task.completedAt && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)' }} />
+                    <span style={{ fontSize: 12, color: 'var(--t2)' }}>Completed — {new Date(task.completedAt).toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -726,68 +702,57 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               <div className="fg">
                 <label>Priority</label>
                 <select className="fi" value={editTask.priority || 'MEDIUM'} onChange={e => setEditTask({ ...editTask, priority: e.target.value })}>
-                  <option value="LOW">Low</option>
-                  <option value="MEDIUM">Medium</option>
-                  <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
+                  <option value="CRITICAL">CRITICAL</option>
+                  <option value="HIGH">HIGH</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="LOW">LOW</option>
                 </select>
               </div>
               <div className="fg">
                 <label>Department</label>
                 <select className="fi" value={editTask.department || ''} onChange={e => setEditTask({ ...editTask, department: e.target.value })}>
-                  <option value="">None</option>
-                  {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  <option value="">Select</option>
+                  {['Sales', 'Account', 'HR', 'Coordinator', 'Admin', 'Back Office'].map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div className="fg">
+                <label>Category</label>
+                <select className="fi" value={editTask.category || ''} onChange={e => setEditTask({ ...editTask, category: e.target.value })}>
+                  {['Routine Work', 'Reconciliation', 'One Time Work', 'Compliance', 'Operations', 'Procurement'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="form-row fr-1">
+              <div className="fg">
                 <label>Due Date</label>
-                <input className="fi" type="date" value={editTask.dueDate ? new Date(editTask.dueDate).toISOString().split('T')[0] : ''} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value })} />
+                <input className="fi" type="date" value={editTask.dueDate ? new Date(editTask.dueDate).toISOString().split('T')[0] : ''} onChange={e => setEditTask({ ...editTask, dueDate: e.target.value || null })} />
               </div>
             </div>
 
-            <div className="form-actions">
-              <button className="btn btn-ghost" onClick={() => setEditTask(null)}>Cancel</button>
-              <button className="btn btn-gold" onClick={() => editMutation.mutate({
-                id: editTask.id,
-                data: {
-                  title: editTask.title,
-                  description: editTask.description,
-                  priority: editTask.priority,
-                  department: editTask.department,
-                  category: editTask.category,
-                  dueDate: editTask.dueDate || null,
-                }
-              })} disabled={editMutation.isPending}>
-                {editMutation.isPending ? 'Saving...' : 'Save Changes'}
+            <div className="form-actions" style={{ marginTop: 16 }}>
+              <button type="button" className="btn btn-ghost" onClick={() => setEditTask(null)}>Cancel</button>
+              <button type="button" className="btn btn-gold" onClick={() => editMutation.mutate({ id: editTask.id, data: { title: editTask.title, description: editTask.description, priority: editTask.priority, department: editTask.department, category: editTask.category, dueDate: editTask.dueDate || null } })} disabled={editMutation.isPending}>
+                {editMutation.isPending ? 'Saving...' : '✓ Save Changes'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Confirm Action Modal */}
+      {/* Confirm Delete/Cancel Dialog */}
       {confirmAction && (
         <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setConfirmAction(null) }}>
-          <div className="modal" style={{ maxWidth: 400 }}>
+          <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
             <button className="mx" onClick={() => setConfirmAction(null)}>✕</button>
-            <div className="mt" style={{ fontSize: 16 }}>
-              {confirmAction.action === 'delete' ? '🗑 Delete Task?' : '🚫 Cancel Task?'}
-            </div>
-            <div className="ms" style={{ marginTop: 8 }}>
-              {confirmAction.action === 'delete'
-                ? 'This will permanently delete this task and all its data. This cannot be undone.'
-                : 'This will cancel the task. The task will be marked as cancelled.'}
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-              <button className="btn btn-ghost" onClick={() => setConfirmAction(null)}>Keep</button>
-              <button className="btn btn-red"
-                onClick={() => {
-                  if (confirmAction.action === 'delete') deleteMutation.mutate(confirmAction.id)
-                  else cancelMutation.mutate({ id: confirmAction.id })
-                }}
-                disabled={deleteMutation.isPending || cancelMutation.isPending}
-              >
-                {confirmAction.action === 'delete' ? 'Delete' : 'Cancel Task'}
+            <div className="mt">Confirm {confirmAction.action === 'delete' ? 'Delete' : 'Cancel'}</div>
+            <div className="ms">Are you sure you want to {confirmAction.action === 'delete' ? 'delete' : 'cancel'} this task? This action cannot be undone.</div>
+            <div className="form-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmAction(null)}>No, Keep It</button>
+              <button className={confirmAction.action === 'delete' ? 'btn btn-red' : 'btn btn-gold'} onClick={() => {
+                if (confirmAction.action === 'delete') deleteMutation.mutate(confirmAction.id)
+                else cancelMutation.mutate({ id: confirmAction.id })
+              }}>
+                Yes, {confirmAction.action === 'delete' ? 'Delete' : 'Cancel'}
               </button>
             </div>
           </div>

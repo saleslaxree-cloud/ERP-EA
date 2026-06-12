@@ -57,7 +57,6 @@ export async function POST(request: NextRequest) {
     const {
       title, description, priority, ownerId, dueDate, parentTaskId,
       department, category,
-      directorDependencies = [],
       frequency, weekDays, monthDates,
     } = body
 
@@ -65,18 +64,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    // Parse taskSteps from body
+    // Parse taskSteps from body - simplified, no director approval fields
     const taskStepsData = body.taskSteps || []
 
-    // Collect director names from steps that need approval
-    const stepDirectors = taskStepsData
-      .filter((step: { directorName?: string | null }) => step.directorName)
-      .map((step: { directorName?: string | null }) => step.directorName)
-      .filter(Boolean)
-    const allDirectorDeps = [...new Set([...directorDependencies, ...stepDirectors])]
-
-    // Create the task WITHOUT a workflow - workflow is created on-the-fly
-    // when a step needing director approval is completed
+    // Create the task WITHOUT a workflow - simple task management
     const task = await db.task.create({
       data: {
         title,
@@ -89,18 +80,18 @@ export async function POST(request: NextRequest) {
         dueDate: dueDate ? new Date(dueDate) : null,
         workflowId: null,
         parentTaskId: parentTaskId || null,
-        directorDependency: allDirectorDeps.length > 0 ? JSON.stringify(allDirectorDeps) : null,
+        directorDependency: null,
         frequency: frequency || null,
         weekDays: weekDays || null,
         monthDates: monthDates || null,
         taskSteps: {
-          create: taskStepsData.map((step: { title: string; order: number; directorName?: string | null; directorNote?: string | null }) => ({
+          create: taskStepsData.map((step: { title: string; order: number }) => ({
             title: step.title,
             status: WorkflowStatus.PENDING,
             order: step.order || 0,
-            needsDirectorApproval: !!step.directorName,
-            directorName: step.directorName || null,
-            directorNote: step.directorNote || null,
+            needsDirectorApproval: false,
+            directorName: null,
+            directorNote: null,
           })),
         },
       },
@@ -116,7 +107,7 @@ export async function POST(request: NextRequest) {
       data: {
         type: 'STATUS_CHANGE',
         title: `New Task Assigned: ${title}`,
-        message: `You have been assigned a new task.${allDirectorDeps.length > 0 ? ` Steps needing director approval: ${stepDirectors.length}` : ''}`,
+        message: `You have been assigned a new task "${title}". Click Start to begin working on it.`,
         receiverId: ownerId,
       },
     })

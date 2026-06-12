@@ -54,7 +54,7 @@ export async function PATCH(
 
     const task = await db.task.findUnique({
       where: { id },
-      include: { dependencies: true, workflow: { include: { steps: { orderBy: { order: 'asc' } } } }, owner: true },
+      include: { dependencies: true, workflow: true, owner: true },
     })
 
     if (!task) {
@@ -65,59 +65,38 @@ export async function PATCH(
     const updateData: Record<string, unknown> = { updatedAt: now }
 
     if (status !== undefined) {
-      // ═══ INTERCEPT: Employee marks COMPLETED but workflow is APPROVED → Final Submit ═══
-      if (status === WorkflowStatus.COMPLETED && task.workflowId && task.workflow) {
-        const workflow = task.workflow
-
-        if (workflow.status === WorkflowStatus.APPROVED) {
-          // Final Submit - employee is submitting the fully approved task
-          updateData.status = WorkflowStatus.COMPLETED
-          updateData.completedAt = now
-
-          // Mark the workflow as COMPLETED too
-          await db.workflowInstance.update({
-            where: { id: workflow.id },
-            data: { status: WorkflowStatus.COMPLETED },
-          })
-
-          // Notify employee
-          if (task.ownerId) {
-            await db.notification.create({
-              data: {
-                type: 'APPROVED',
-                title: `Task Completed: ${task.title}`,
-                message: `Your task "${task.title}" has been fully completed through all review stages.`,
-                senderId: task.ownerId,
-                receiverId: task.ownerId,
-                workflowId: workflow.id,
-              },
-            })
-          }
-
-          await db.statusHistory.create({
-            data: {
-              workflowId: workflow.id,
-              fromStatus: WorkflowStatus.IN_PROGRESS,
-              toStatus: WorkflowStatus.COMPLETED,
-              changedBy: task.ownerId,
-              reason: 'Employee did final submit after all approvals - task completed',
-            },
-          })
-        } else {
-          // Workflow is NOT yet APPROVED - don't allow direct completion
-          // The workflow steps handle the progression
-          return NextResponse.json({
-            error: 'Task cannot be completed yet - workflow approval is still pending',
-            currentWorkflowStatus: workflow.status,
-          }, { status: 400 })
-        }
-      } else if (status === WorkflowStatus.COMPLETED && !task.workflowId) {
-        // No workflow - just complete directly
+      // Simplified status transitions - no workflow approval required
+      if (status === WorkflowStatus.COMPLETED) {
         updateData.status = WorkflowStatus.COMPLETED
         updateData.completedAt = now
+
+        // If task has a workflow, mark it as COMPLETED too
+        if (task.workflowId) {
+          await db.workflowInstance.update({
+            where: { id: task.workflowId },
+            data: { status: WorkflowStatus.COMPLETED },
+          }).catch(() => {})
+        }
+      } else if (status === WorkflowStatus.IN_PROGRESS) {
+        // Allow transitioning to IN_PROGRESS from any status (for "Revise" functionality)
+        updateData.status = WorkflowStatus.IN_PROGRESS
+        // Clear completedAt if reopening
+        if (task.status === WorkflowStatus.COMPLETED) {
+          updateData.completedAt = null
+        }
+      } else if (status === WorkflowStatus.CANCELLED) {
+        updateData.status = WorkflowStatus.CANCELLED
+        updateData.completedAt = now
+
+        // Cancel linked workflow too
+        if (task.workflowId) {
+          await db.workflowInstance.update({
+            where: { id: task.workflowId },
+            data: { status: WorkflowStatus.CANCELLED },
+          }).catch(() => {})
+        }
       } else {
         updateData.status = status as WorkflowStatus
-        if (status === WorkflowStatus.CANCELLED) updateData.completedAt = now
       }
     }
 
@@ -140,14 +119,6 @@ export async function PATCH(
         workflow: { select: { id: true, title: true, status: true } },
       },
     })
-
-    // If cancelling and task has a workflow, cancel the workflow too
-    if (status === WorkflowStatus.CANCELLED && task.workflowId) {
-      await db.workflowInstance.update({
-        where: { id: task.workflowId },
-        data: { status: WorkflowStatus.CANCELLED },
-      })
-    }
 
     return NextResponse.json(updatedTask)
   } catch (error) {

@@ -8,18 +8,10 @@ const DEPTS = ['Sales', 'Account', 'HR', 'Coordinator', 'Admin', 'Back Office']
 const CATEGORIES = ['Routine Work', 'Reconciliation', 'One Time Work', 'Compliance', 'Operations', 'Procurement']
 const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 const FREQUENCIES = ['One Time', 'Daily', 'Weekly', 'Monthly']
-const ASSIGN_NEEDED_OPTIONS = ['No — Direct Step', 'Ashish Sir', 'Samarth Sir']
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const WORKFLOW_OPTIONS = [
-  { value: 'none', label: 'No Workflow', desc: 'Task without approval flow' },
-  { value: 'ea-director', label: 'EA Review → Director → Done', desc: 'Full approval chain' },
-  { value: 'ea-only', label: 'EA Review → Done', desc: 'EA approval only' },
-]
 
 interface TaskStep {
   title: string
-  assignNeeded: string
-  directorNote: string
 }
 
 export function LaxreeCreateTask() {
@@ -30,7 +22,7 @@ export function LaxreeCreateTask() {
   const [form, setForm] = useState({
     title: '', description: '', assignTo: '', department: '',
     category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '',
-    frequency: 'One Time', workflowType: 'none',
+    frequency: 'One Time',
   })
 
   const [selectedWeekDays, setSelectedWeekDays] = useState<string[]>([])
@@ -44,16 +36,16 @@ export function LaxreeCreateTask() {
   })
 
   const addStep = () => {
-    setSteps([...steps, { title: '', assignNeeded: 'No — Direct Step', directorNote: '' }])
+    setSteps([...steps, { title: '' }])
   }
 
   const removeStep = (index: number) => {
     setSteps(steps.filter((_, i) => i !== index))
   }
 
-  const updateStep = (index: number, field: keyof TaskStep, value: string) => {
+  const updateStep = (index: number, value: string) => {
     const newSteps = [...steps]
-    newSteps[index] = { ...newSteps[index], [field]: value }
+    newSteps[index] = { title: value }
     setSteps(newSteps)
   }
 
@@ -94,27 +86,8 @@ export function LaxreeCreateTask() {
         .filter(s => s.title.trim())
         .map((s, i) => ({
           title: s.title.trim(),
-          assigneeId: null as string | null,
-          directorName: s.assignNeeded !== 'No — Direct Step' ? s.assignNeeded : null,
-          directorNote: s.assignNeeded !== 'No — Direct Step' ? s.directorNote : null,
           order: i + 1,
         }))
-
-      const directorDeps = steps
-        .filter(s => s.assignNeeded !== 'No — Direct Step')
-        .map(s => s.assignNeeded)
-        .filter((v, i, a) => a.indexOf(v) === i)
-
-      // Determine workflow dependencies based on selected workflow type
-      let deptDeps: string[] = []
-      let dirDeps = directorDeps
-
-      if (form.workflowType === 'ea-director') {
-        // Force director dependency
-        if (dirDeps.length === 0) dirDeps = ['Ashish Sir']
-      } else if (form.workflowType === 'ea-only') {
-        dirDeps = [] // No director needed
-      }
 
       const res = await fetch('/api/tasks', {
         method: 'POST',
@@ -128,8 +101,6 @@ export function LaxreeCreateTask() {
           department: form.department || undefined,
           category: form.category,
           taskSteps,
-          departmentDependencies: deptDeps,
-          directorDependencies: dirDeps,
           frequency: form.frequency,
           weekDays: form.frequency === 'Weekly' ? JSON.stringify(selectedWeekDays) : null,
           monthDates: form.frequency === 'Monthly' ? JSON.stringify(selectedMonthDates) : null,
@@ -142,7 +113,7 @@ export function LaxreeCreateTask() {
         qc.invalidateQueries({ queryKey: ['tasks-list'] })
         qc.invalidateQueries({ queryKey: ['dashboard'] })
         setCreateTaskOpen(false)
-        setForm({ title: '', description: '', assignTo: '', department: '', category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '', frequency: 'One Time', workflowType: 'none' })
+        setForm({ title: '', description: '', assignTo: '', department: '', category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '', frequency: 'One Time' })
         setSteps([])
         setSelectedWeekDays([])
         setSelectedMonthDates([])
@@ -167,7 +138,7 @@ export function LaxreeCreateTask() {
       <div className="modal modal-lg" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
         <button className="mx" onClick={() => setCreateTaskOpen(false)}>✕</button>
         <div className="mt">Create New Task</div>
-        <div className="ms">Add a new task to the LAXREE workflow system</div>
+        <div className="ms">Add a new task to the workflow system</div>
 
         <form onSubmit={handleSubmit}>
           {/* Title */}
@@ -229,24 +200,13 @@ export function LaxreeCreateTask() {
             </div>
           </div>
 
-          {/* Frequency + Workflow Type */}
+          {/* Frequency */}
           <div className="form-row fr-2">
             <div className="fg">
               <label>Frequency</label>
               <select className="fi" value={form.frequency} onChange={e => { updateField('frequency', e.target.value); setSelectedWeekDays([]); setSelectedMonthDates([]) }}>
                 {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
-            </div>
-            <div className="fg">
-              <label>Workflow Type</label>
-              <select className="fi" value={form.workflowType} onChange={e => updateField('workflowType', e.target.value)}>
-                {WORKFLOW_OPTIONS.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
-              </select>
-              {form.workflowType !== 'none' && (
-                <div style={{ fontSize: 10, color: 'var(--purple)', marginTop: 4, fontWeight: 600 }}>
-                  {WORKFLOW_OPTIONS.find(w => w.value === form.workflowType)?.desc}
-                </div>
-              )}
             </div>
           </div>
 
@@ -320,14 +280,14 @@ export function LaxreeCreateTask() {
             </div>
           )}
 
-          {/* ═══ TASK STEPS / WORKFLOW SECTION ═══ */}
+          {/* ═══ TASK STEPS SECTION (Simplified - no director dependency) ═══ */}
           <div className="gold-divider" />
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--g2)', marginBottom: 4 }}>
               TASK STEPS (OPTIONAL)
             </div>
             <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 12 }}>
-              Break this task into ordered steps. Enable &quot;Assign Needed&quot; to route a step to a director.
+              Break this task into ordered steps to track progress.
             </div>
 
             {steps.map((step, index) => (
@@ -344,7 +304,7 @@ export function LaxreeCreateTask() {
                     className="fi"
                     placeholder={`Step ${index + 1} — what needs to be done?`}
                     value={step.title}
-                    onChange={e => updateStep(index, 'title', e.target.value)}
+                    onChange={e => updateStep(index, e.target.value)}
                     style={{ flex: 1 }}
                   />
                   <button
@@ -359,32 +319,6 @@ export function LaxreeCreateTask() {
                     ✕
                   </button>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 38 }}>
-                  <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5, flexShrink: 0 }}>
-                    ASSIGN NEEDED?
-                  </div>
-                  <select
-                    className="fi"
-                    value={step.assignNeeded}
-                    onChange={e => updateStep(index, 'assignNeeded', e.target.value)}
-                    style={{ width: 180, fontSize: 11, padding: '5px 8px' }}
-                  >
-                    {ASSIGN_NEEDED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-
-                {step.assignNeeded !== 'No — Direct Step' && (
-                  <div style={{ marginLeft: 38, marginTop: 8 }}>
-                    <input
-                      className="fi"
-                      placeholder={`What does ${step.assignNeeded} need to do?`}
-                      value={step.directorNote}
-                      onChange={e => updateStep(index, 'directorNote', e.target.value)}
-                      style={{ fontSize: 11, padding: '5px 8px' }}
-                    />
-                  </div>
-                )}
               </div>
             ))}
 

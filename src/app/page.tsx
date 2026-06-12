@@ -5,8 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { LaxreeDashboard } from '@/components/laxree/laxree-dashboard'
 import { LaxreeCreateTask } from '@/components/laxree/laxree-create-task'
 import { LaxreeTasks } from '@/components/laxree/laxree-tasks'
-import { LaxreeApprovals } from '@/components/laxree/laxree-approvals'
-import { LaxreeDirDependency } from '@/components/laxree/laxree-dir-dependency'
+// Approval center and director dependency removed - simplified workflow
 import { LaxreeExtHold } from '@/components/laxree/laxree-exthold'
 import { LaxreeEscalations } from '@/components/laxree/laxree-escalations'
 import { LaxreeMonday } from '@/components/laxree/laxree-monday'
@@ -77,8 +76,7 @@ function ActiveView() {
         return <LaxreeDashboard />
       case 'executive':
         return <ExecutiveView />
-      case 'approvals':
-        return <LaxreeApprovals />
+      // approvals removed
       case 'tasks':
         return <LaxreeTasks />
       case 'cancelled':
@@ -95,9 +93,7 @@ function ActiveView() {
         return <CategoriesView />
       case 'holidays':
         return <HolidaysView />
-      case 'dirDep':
-      case 'director-dependency':
-        return <LaxreeDirDependency />
+      // dirDep removed
       case 'exthold':
         return <LaxreeExtHold />
       case 'escalations':

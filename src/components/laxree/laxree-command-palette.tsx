@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react'
 const COMMANDS: Array<{ id: string; label: string; section: string; icon: string; shortcut?: string }> = [
   { id: 'dashboard', label: 'Go to Dashboard', section: 'Navigation', icon: '🏠' },
   { id: 'executive', label: 'Executive View', section: 'Navigation', icon: '👔', shortcut: 'E' },
-  { id: 'approvals', label: 'Approvals', section: 'Navigation', icon: '✅', shortcut: 'A' },
+
   { id: 'tasks', label: 'All Tasks', section: 'Navigation', icon: '📋', shortcut: 'T' },
   { id: 'cancelled', label: 'Cancelled Tasks', section: 'Navigation', icon: '❌' },
   { id: 'analytics', label: 'Analytics & Reports', section: 'Navigation', icon: '📊' },
@@ -15,7 +15,7 @@ const COMMANDS: Array<{ id: string; label: string; section: string; icon: string
   { id: 'team', label: 'Team Members', section: 'Navigation', icon: '👥', shortcut: 'M' },
   { id: 'categories', label: 'Categories', section: 'Navigation', icon: '📁' },
   { id: 'holidays', label: 'Holidays', section: 'Navigation', icon: '🏖️' },
-  { id: 'dirDep', label: 'Director Dependency', section: 'Navigation', icon: '🔗' },
+
   { id: 'monday', label: 'Monday Meeting', section: 'Navigation', icon: '📅' },
 ]
 
