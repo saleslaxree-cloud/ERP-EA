@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       data: {
         title,
         description: description || null,
-        status: WorkflowStatus.PENDING,
+        status: WorkflowStatus.IN_PROGRESS,
         priority: (priority as TaskPriority) || TaskPriority.MEDIUM,
         ownerId,
         department: department || null,
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         taskSteps: {
           create: taskStepsData.map((step: { title: string; order: number }) => ({
             title: step.title,
-            status: WorkflowStatus.PENDING,
+            status: WorkflowStatus.IN_PROGRESS,
             order: step.order || 0,
             needsDirectorApproval: false,
             directorName: null,
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
       data: {
         type: 'STATUS_CHANGE',
         title: `New Task Assigned: ${title}`,
-        message: `You have been assigned a new task "${title}". Click Start to begin working on it.`,
+        message: `You have been assigned a new task "${title}". It is now in progress.`,
         receiverId: ownerId,
       },
     })

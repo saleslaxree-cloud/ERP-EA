@@ -71,21 +71,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     },
   })
 
-  const startMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) =>
-      fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'IN_PROGRESS' }),
-      }).then(r => r.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      addToast('ok', 'Task started')
-      setMenuOpenId(null)
-    },
-  })
-
   const completeMutation = useMutation({
     mutationFn: ({ id }: { id: string }) =>
       fetch(`/api/tasks/${id}`, {
@@ -365,17 +350,27 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
                   {/* ═══ SIMPLIFIED ACTION BUTTONS ═══ */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {/* PENDING → Start Button */}
+                    {/* PENDING → Done + Revise Buttons (no more Start button) */}
                     {task.status === 'PENDING' && (
-                      <button
-                        className="btn btn-xs"
-                        style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1px solid var(--blue)', fontWeight: 700 }}
-                        onClick={() => startMutation.mutate({ id: task.id })}
-                        disabled={startMutation.isPending}
-                        title="Start Task"
-                      >
-                        ▶ Start
-                      </button>
+                      <>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                          onClick={() => completeMutation.mutate({ id: task.id })}
+                          disabled={completeMutation.isPending}
+                          title="Mark as Done"
+                        >
+                          ✓ Done
+                        </button>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
+                          onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
+                          title="Revise Task"
+                        >
+                          ✏ Revise
+                        </button>
+                      </>
                     )}
 
                     {/* IN_PROGRESS → Done + Revise Buttons */}
@@ -393,40 +388,29 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                         <button
                           className="btn btn-xs"
                           style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
-                          onClick={() => setEditTask(task)}
-                          title="Revise / Edit Task"
+                          onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
+                          title="Revise Task"
                         >
                           ✏ Revise
                         </button>
                       </>
                     )}
 
-                    {/* COMPLETED → Show "Completed task ✅" with score */}
+                    {/* COMPLETED → Show "Completed task ✅" only — NO Revise button */}
                     {task.status === 'COMPLETED' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{
-                          fontSize: 11, fontWeight: 800, color: 'var(--green)',
-                          background: 'var(--green-l)', padding: '3px 10px',
-                          borderRadius: 6, border: '1px solid var(--green)',
-                          display: 'flex', alignItems: 'center', gap: 4,
-                        }}>
-                          Completed ✅
-                          {task.score != null && (
-                            <span style={{ fontSize: 10, fontWeight: 700, color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)' }}>
-                              · {task.score}
-                            </span>
-                          )}
-                        </span>
-                        <button
-                          className="btn btn-xs"
-                          style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
-                          onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
-                          disabled={reviseMutation.isPending}
-                          title="Reopen task for revision"
-                        >
-                          ↩ Revise
-                        </button>
-                      </div>
+                      <span style={{
+                        fontSize: 11, fontWeight: 800, color: 'var(--green)',
+                        background: 'var(--green-l)', padding: '3px 10px',
+                        borderRadius: 6, border: '1px solid var(--green)',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}>
+                        Completed task ✅
+                        {task.score != null && (
+                          <span style={{ fontSize: 10, fontWeight: 700, color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)' }}>
+                            · {task.score}
+                          </span>
+                        )}
+                      </span>
                     )}
 
                     {/* Other statuses (IN_REVIEW, ON_HOLD etc from old workflow) → show Done + Revise */}
@@ -447,7 +431,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                           onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
                           title="Revise / Reopen Task"
                         >
-                          ↩ Revise
+                          ✏ Revise
                         </button>
                       </>
                     )}
@@ -638,55 +622,64 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
               {/* ACTION BUTTONS - Simplified */}
               <div className="gold-divider" />
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* PENDING → Done + Revise (no Start button) */}
                 {task.status === 'PENDING' && (
-                  <button className="btn" style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)' }}
-                    onClick={async () => {
-                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }) })
+                  <>
+                    <button className="btn btn-green" onClick={async () => {
+                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
                       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
                       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                      addToast('ok', 'Task started')
+                      addToast('ok', 'Task completed! ✓')
+                      setSelectedTaskId(null)
                     }}>
-                    ▶ Start Task
-                  </button>
-                )}
-                {(task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'ON_HOLD') && (
-                  <button className="btn btn-green" onClick={async () => {
-                    await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
-                    queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                    addToast('ok', 'Task completed! ✓')
-                    setSelectedTaskId(null)
-                  }}>
-                    ✓ Done
-                  </button>
-                )}
-                {task.status === 'COMPLETED' && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                    <div style={{
-                      padding: '8px 16px',
-                      background: 'var(--green-l)',
-                      borderRadius: 8,
-                      border: '1.5px solid var(--green)',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      fontSize: 14, fontWeight: 800, color: 'var(--green)',
-                    }}>
-                      Completed ✅
-                      {task.score != null && (
-                        <span style={{
-                          fontSize: 13, fontWeight: 800,
-                          color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)',
-                          background: task.score >= 70 ? 'var(--green-l)' : task.score >= 40 ? 'var(--amber-l)' : 'var(--red-l)',
-                          padding: '2px 8px', borderRadius: 4,
-                        }}>
-                          Score: {task.score}
-                        </span>
-                      )}
-                    </div>
+                      ✓ Done
+                    </button>
                     <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
                       onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
-                      ↩ Revise
+                      ✏ Revise
                     </button>
+                  </>
+                )}
+                {/* IN_PROGRESS / IN_REVIEW / ON_HOLD → Done + Revise */}
+                {(task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'ON_HOLD') && (
+                  <>
+                    <button className="btn btn-green" onClick={async () => {
+                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
+                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                      addToast('ok', 'Task completed! ✓')
+                      setSelectedTaskId(null)
+                    }}>
+                      ✓ Done
+                    </button>
+                    <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
+                      onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
+                      ✏ Revise
+                    </button>
+                  </>
+                )}
+                {/* COMPLETED → Only show Completed task ✅, NO Revise button */}
+                {task.status === 'COMPLETED' && (
+                  <div style={{
+                    padding: '8px 16px',
+                    background: 'var(--green-l)',
+                    borderRadius: 8,
+                    border: '1.5px solid var(--green)',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    fontSize: 14, fontWeight: 800, color: 'var(--green)',
+                  }}>
+                    Completed task ✅
+                    {task.score != null && (
+                      <span style={{
+                        fontSize: 13, fontWeight: 800,
+                        color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)',
+                        background: task.score >= 70 ? 'var(--green-l)' : task.score >= 40 ? 'var(--amber-l)' : 'var(--red-l)',
+                        padding: '2px 8px', borderRadius: 4,
+                      }}>
+                        Score: {task.score}
+                      </span>
+                    )}
                   </div>
                 )}
                 {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
@@ -818,7 +811,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
             <div className="gold-divider" />
 
             <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 8, marginBottom: 14, fontSize: 12, color: 'var(--amber)', fontWeight: 600 }}>
-              This task will be reopened and set back to In Progress. Please provide a reason and a new target date.
+              Please provide a reason for revision and a new target date.
             </div>
 
             <div className="form-row fr-1">

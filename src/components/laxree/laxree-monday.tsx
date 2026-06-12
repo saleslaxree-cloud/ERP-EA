@@ -729,7 +729,7 @@ export function LaxreeMonday() {
                         alignItems: 'center',
                         gap: 4,
                       }}>
-                        ✅ Actual Score
+                        ✅ Past Week Score
                         <LiveBadge isLive={isLiveScore} />
                         {actualOverrides && (
                           <span style={{
