@@ -176,10 +176,6 @@ export function LaxreeMonday() {
   // Plan form data (This Week Plan, Next Week Plan, commitments, notes)
   const [planForm, setPlanForm] = useState<PlanFormData>({ ...emptyPlanForm })
 
-  // Actual score overrides: if user manually edits, their values are stored here
-  // null means "use live values", non-null means "user overrode"
-  const [actualOverrides, setActualOverrides] = useState<{ red: number; yellow: number; green: number } | null>(null)
-
   // Computed week info
   const weekInfo = useMemo(() => {
     const now = new Date()
@@ -218,6 +214,16 @@ export function LaxreeMonday() {
     )
   }, [scorecards, weekInfo])
 
+  // Find PREVIOUS week scorecard (to auto-populate This Week Score from their Next Week Plan commitments)
+  const prevWeekScorecard = useMemo(() => {
+    const prevWeekOffset = new Date(weekInfo.monday.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const prevWeekNum = getWeekNumber(prevWeekOffset)
+    const prevYear = prevWeekOffset.getFullYear()
+    return scorecards.find((s: ScorecardData) =>
+      s.weekNumber === prevWeekNum && s.year === prevYear
+    )
+  }, [scorecards, weekInfo])
+
   // Fetch LIVE weekly score data for the selected user + week
   const { data: weeklyScoreData, isLoading: weeklyScoreLoading } = useQuery({
     queryKey: ['weekly-score', selectedUserId, weekInfo.weekNum, weekInfo.year],
@@ -228,7 +234,8 @@ export function LaxreeMonday() {
   })
   const weeklyScore: WeeklyScoreData | null = weeklyScoreData && !(weeklyScoreData as any).error ? weeklyScoreData as WeeklyScoreData : null
 
-  // Load plan form when scorecard changes (derived computation, not an effect)
+  // Load plan form when scorecard changes
+  // "This Week Score" auto-populates from previous week's "Next Week Plan" commitments
   const currentPlanForm = useMemo(() => {
     const sc = currentWeekScorecard
     if (sc) {
@@ -243,8 +250,21 @@ export function LaxreeMonday() {
         notes: sc.notes || '',
       }
     }
+    // No scorecard for this week yet — auto-populate from previous week's Next Week Plan
+    if (prevWeekScorecard) {
+      return {
+        planRedScore: prevWeekScorecard.nextRedScore || 0,
+        planYellowScore: prevWeekScorecard.nextYellowScore || 0,
+        planGreenScore: prevWeekScorecard.nextGreenScore || 0,
+        nextRedScore: 0,
+        nextYellowScore: 0,
+        nextGreenScore: 0,
+        commitments: prevWeekScorecard.commitments || '',
+        notes: '',
+      }
+    }
     return { ...emptyPlanForm }
-  }, [currentWeekScorecard])
+  }, [currentWeekScorecard, prevWeekScorecard])
 
   // Merge: if user hasn't edited planForm yet, use scorecard data
   const activePlanForm = useMemo(() => {
@@ -254,18 +274,14 @@ export function LaxreeMonday() {
     return planForm
   }, [planForm])
 
-  // Compute actual scores: live data > overrides > scorecard fallback
-  const actualScores = useMemo(() => {
-    // If user has overrides, use them
-    if (actualOverrides) {
-      return actualOverrides
-    }
+  // Compute Past Week Score: auto-calculated from live performance data (READ-ONLY)
+  const pastWeekScores = useMemo(() => {
     // If we have live weekly score data, use it
     if (weeklyScore && weeklyScore.totalTasks > 0) {
       return {
-        red: weeklyScore.redScore,
-        yellow: weeklyScore.yellowScore,
-        green: weeklyScore.greenScore,
+        red: weeklyScore.redScore || 0,
+        yellow: weeklyScore.yellowScore || 0,
+        green: weeklyScore.greenScore || 0,
       }
     }
     // Fallback to scorecard saved data
@@ -277,20 +293,20 @@ export function LaxreeMonday() {
       }
     }
     return { red: 0, yellow: 0, green: 0 }
-  }, [actualOverrides, weeklyScore, currentWeekScorecard])
+  }, [weeklyScore, currentWeekScorecard])
 
-  // Whether actual scores are showing LIVE (auto-calculated) values
+  // Whether past week scores are showing LIVE (auto-calculated) values
   const isLiveScore = useMemo(() => {
-    return !actualOverrides && !!weeklyScore && weeklyScore.totalTasks > 0
-  }, [actualOverrides, weeklyScore])
+    return !!weeklyScore && weeklyScore.totalTasks > 0
+  }, [weeklyScore])
 
-  // Auto-calculate PR from actual scores
+  // Auto-calculate PR from past week scores (read-only)
   const autoPR = useMemo(() => {
-    if (weeklyScore && weeklyScore.totalTasks > 0 && !actualOverrides) {
+    if (weeklyScore && weeklyScore.totalTasks > 0) {
       return weeklyScore.prScore
     }
-    return calculatePR(actualScores.green, actualScores.yellow, actualScores.red)
-  }, [weeklyScore, actualOverrides, actualScores])
+    return calculatePR(pastWeekScores.green, pastWeekScores.yellow, pastWeekScores.red)
+  }, [weeklyScore, pastWeekScores])
 
   // Live score detail summary for info banner
   const liveScoreDetail = useMemo(() => {
@@ -303,16 +319,14 @@ export function LaxreeMonday() {
     }
   }, [weeklyScore])
 
-  // Reset overrides when user or week changes
+  // Reset form when user or week changes
   const handleUserChange = useCallback((userId: string) => {
     setSelectedUserId(userId)
-    setActualOverrides(null)
     setPlanForm({ ...emptyPlanForm })
   }, [])
 
   const handleWeekChange = useCallback((newOffset: number) => {
     setWeekOffset(newOffset)
-    setActualOverrides(null)
     setPlanForm({ ...emptyPlanForm })
   }, [])
 
@@ -321,24 +335,11 @@ export function LaxreeMonday() {
     setPlanForm(prev => ({ ...prev, [field]: value }))
   }
 
-  // Update actual score field - marks as overridden
-  const updateActualField = (color: 'red' | 'yellow' | 'green', value: number) => {
-    setActualOverrides(prev => ({
-      ...prev || { red: actualScores.red, yellow: actualScores.yellow, green: actualScores.green },
-      [color]: value,
-    }))
-  }
-
-  // Reset actual scores back to live values
-  const resetToLive = useCallback(() => {
-    setActualOverrides(null)
-  }, [])
-
   // Save mutation
   const saveMutation = useMutation({
     mutationFn: async () => {
       setSaving(true)
-      const prScore = autoPR || calculatePR(actualScores.green, actualScores.yellow, actualScores.red)
+      const prScore = autoPR || calculatePR(pastWeekScores.green, pastWeekScores.yellow, pastWeekScores.red)
       // Use currentPlanForm for data that comes from scorecard, planForm for user edits
       const savePlanForm = { ...currentPlanForm, ...planForm }
       const res = await fetch('/api/monday-meeting', {
@@ -353,9 +354,9 @@ export function LaxreeMonday() {
           planRedScore: savePlanForm.planRedScore,
           planYellowScore: savePlanForm.planYellowScore,
           planGreenScore: savePlanForm.planGreenScore,
-          actualRedScore: actualScores.red,
-          actualYellowScore: actualScores.yellow,
-          actualGreenScore: actualScores.green,
+          actualRedScore: pastWeekScores.red,
+          actualYellowScore: pastWeekScores.yellow,
+          actualGreenScore: pastWeekScores.green,
           nextRedScore: savePlanForm.nextRedScore,
           nextYellowScore: savePlanForm.nextYellowScore,
           nextGreenScore: savePlanForm.nextGreenScore,
@@ -565,26 +566,6 @@ export function LaxreeMonday() {
                     <span style={{ color: '#F59E0B' }}>◐ In progress/Late: {liveScoreDetail.yellow}</span>
                     <span style={{ color: '#EF4444' }}>✕ Overdue/Rejected: {liveScoreDetail.red}</span>
                   </div>
-                  {actualOverrides && (
-                    <button
-                      onClick={resetToLive}
-                      style={{
-                        marginLeft: 'auto',
-                        padding: '3px 10px',
-                        fontSize: 9,
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5,
-                        background: '#059669',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: 4,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ↻ Reset to Live
-                    </button>
-                  )}
                 </div>
               )}
 
@@ -656,7 +637,7 @@ export function LaxreeMonday() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* This Week Score Row (renamed from This Week Plan) */}
+                    {/* This Week Score Row — what employee committed in previous Monday meeting */}
                     <tr>
                       <td style={{
                         padding: '10px 14px',
@@ -665,13 +646,28 @@ export function LaxreeMonday() {
                         color: 'var(--t1)',
                       }}>
                         🎯 This Week Score
+                        {prevWeekScorecard && !currentWeekScorecard && (
+                          <span style={{
+                            fontSize: 8,
+                            fontWeight: 700,
+                            color: '#2563EB',
+                            background: '#EFF6FF',
+                            padding: '1px 5px',
+                            borderRadius: 3,
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                            marginLeft: 4,
+                          }}>
+                            From last week
+                          </span>
+                        )}
                       </td>
                       <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--b1)', textAlign: 'center', background: '#FEF2F288' }}>
                         <input
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.planRedScore || ''}
+                          value={mergedPlanForm.planRedScore}
                           onChange={e => updatePlanField('planRedScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -687,7 +683,7 @@ export function LaxreeMonday() {
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.planYellowScore || ''}
+                          value={mergedPlanForm.planYellowScore}
                           onChange={e => updatePlanField('planYellowScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -703,7 +699,7 @@ export function LaxreeMonday() {
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.planGreenScore || ''}
+                          value={mergedPlanForm.planGreenScore}
                           onChange={e => updatePlanField('planGreenScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -716,7 +712,7 @@ export function LaxreeMonday() {
                       </td>
                     </tr>
 
-                    {/* Actual Score Row — AUTO-POPULATED from live data */}
+                    {/* Past Week Score Row — READ-ONLY, auto-calculated from live data */}
                     <tr style={{
                       background: isLiveScore ? 'linear-gradient(90deg, rgba(34,197,94,0.04), transparent)' : undefined,
                     }}>
@@ -731,84 +727,62 @@ export function LaxreeMonday() {
                       }}>
                         ✅ Past Week Score
                         <LiveBadge isLive={isLiveScore} />
-                        {actualOverrides && (
-                          <span style={{
-                            fontSize: 8,
-                            fontWeight: 700,
-                            color: '#D97706',
-                            background: '#FEF3C7',
-                            padding: '1px 5px',
-                            borderRadius: 3,
-                            textTransform: 'uppercase',
-                            letterSpacing: 0.5,
-                          }}>
-                            Override
-                          </span>
-                        )}
+                        <span style={{
+                          fontSize: 8,
+                          fontWeight: 700,
+                          color: '#6B7280',
+                          background: '#F3F4F6',
+                          padding: '1px 5px',
+                          borderRadius: 3,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.5,
+                          marginLeft: 2,
+                        }}>
+                          Read-only
+                        </span>
                       </td>
                       <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--b1)', textAlign: 'center', background: '#FEF2F288' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={actualScores.red || ''}
-                          onChange={e => updateActualField('red', Number(e.target.value))}
-                          style={{
-                            width: 80, textAlign: 'center', padding: '6px 8px',
-                            border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #FCA5A5',
-                            borderRadius: 6,
-                            fontSize: 13, fontWeight: 700, color: '#DC2626',
-                            background: isLiveScore ? '#F0FDF4' : '#FFF',
-                            fontFamily: "'DM Sans', sans-serif",
-                            boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
-                            transition: 'all 0.2s ease',
-                          }}
-                        />
+                        <span style={{
+                          display: 'inline-block', width: 80, textAlign: 'center', padding: '6px 8px',
+                          border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #FCA5A5',
+                          borderRadius: 6, fontSize: 13, fontWeight: 700, color: '#DC2626',
+                          background: isLiveScore ? '#F0FDF4' : '#FAFAFA',
+                          fontFamily: "'DM Sans', sans-serif",
+                          boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
+                        }}>
+                          {pastWeekScores.red}
+                        </span>
                         <span style={{ fontSize: 10, color: 'var(--t3)', marginLeft: 4 }}>%</span>
                       </td>
                       <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--b1)', textAlign: 'center', background: '#FFFBEB88' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={actualScores.yellow || ''}
-                          onChange={e => updateActualField('yellow', Number(e.target.value))}
-                          style={{
-                            width: 80, textAlign: 'center', padding: '6px 8px',
-                            border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #FCD34D',
-                            borderRadius: 6,
-                            fontSize: 13, fontWeight: 700, color: '#D97706',
-                            background: isLiveScore ? '#F0FDF4' : '#FFF',
-                            fontFamily: "'DM Sans', sans-serif",
-                            boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
-                            transition: 'all 0.2s ease',
-                          }}
-                        />
+                        <span style={{
+                          display: 'inline-block', width: 80, textAlign: 'center', padding: '6px 8px',
+                          border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #FCD34D',
+                          borderRadius: 6, fontSize: 13, fontWeight: 700, color: '#D97706',
+                          background: isLiveScore ? '#F0FDF4' : '#FAFAFA',
+                          fontFamily: "'DM Sans', sans-serif",
+                          boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
+                        }}>
+                          {pastWeekScores.yellow}
+                        </span>
                         <span style={{ fontSize: 10, color: 'var(--t3)', marginLeft: 4 }}>%</span>
                       </td>
                       <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--b1)', textAlign: 'center', background: '#F0FDF488' }}>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={actualScores.green || ''}
-                          onChange={e => updateActualField('green', Number(e.target.value))}
-                          style={{
-                            width: 80, textAlign: 'center', padding: '6px 8px',
-                            border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #86EFAC',
-                            borderRadius: 6,
-                            fontSize: 13, fontWeight: 700, color: '#15803D',
-                            background: isLiveScore ? '#F0FDF4' : '#FFF',
-                            fontFamily: "'DM Sans', sans-serif",
-                            boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
-                            transition: 'all 0.2s ease',
-                          }}
-                        />
+                        <span style={{
+                          display: 'inline-block', width: 80, textAlign: 'center', padding: '6px 8px',
+                          border: isLiveScore ? '1.5px solid #22C55E' : '1.5px solid #86EFAC',
+                          borderRadius: 6, fontSize: 13, fontWeight: 700, color: '#15803D',
+                          background: isLiveScore ? '#F0FDF4' : '#FAFAFA',
+                          fontFamily: "'DM Sans', sans-serif",
+                          boxShadow: isLiveScore ? '0 0 0 2px rgba(34,197,94,0.15)' : 'none',
+                        }}>
+                          {pastWeekScores.green}
+                        </span>
                         <span style={{ fontSize: 10, color: 'var(--t3)', marginLeft: 4 }}>%</span>
                       </td>
                     </tr>
 
-                    {/* Next Week Plan Row */}
+                    {/* Next Week Plan Row — editable, employee commits for next week */}
                     <tr>
                       <td style={{
                         padding: '10px 14px',
@@ -823,7 +797,7 @@ export function LaxreeMonday() {
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.nextRedScore || ''}
+                          value={mergedPlanForm.nextRedScore}
                           onChange={e => updatePlanField('nextRedScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -839,7 +813,7 @@ export function LaxreeMonday() {
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.nextYellowScore || ''}
+                          value={mergedPlanForm.nextYellowScore}
                           onChange={e => updatePlanField('nextYellowScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -855,7 +829,7 @@ export function LaxreeMonday() {
                           type="number"
                           min={0}
                           max={100}
-                          value={mergedPlanForm.nextGreenScore || ''}
+                          value={mergedPlanForm.nextGreenScore}
                           onChange={e => updatePlanField('nextGreenScore', Number(e.target.value))}
                           style={{
                             width: 80, textAlign: 'center', padding: '6px 8px',
@@ -886,13 +860,13 @@ export function LaxreeMonday() {
                 </div>
                 <div style={{ display: 'flex', height: 24, borderRadius: 6, overflow: 'hidden', background: 'var(--b1)' }}>
                   {(() => {
-                    const total = actualScores.red + actualScores.yellow + actualScores.green
+                    const total = pastWeekScores.red + pastWeekScores.yellow + pastWeekScores.green
                     if (total === 0) return <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: 'var(--t4)' }}>
                       {weeklyScoreLoading ? 'Loading live scores...' : 'No task data for this week'}
                     </div>
-                    const rPct = (actualScores.red / total) * 100
-                    const yPct = (actualScores.yellow / total) * 100
-                    const gPct = (actualScores.green / total) * 100
+                    const rPct = (pastWeekScores.red / total) * 100
+                    const yPct = (pastWeekScores.yellow / total) * 100
+                    const gPct = (pastWeekScores.green / total) * 100
                     return (
                       <>
                         {rPct > 0 && <div style={{ width: `${rPct}%`, background: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff' }}>{rPct >= 10 ? `${rPct.toFixed(1)}%` : ''}</div>}
