@@ -178,10 +178,7 @@ function ExecutiveView() {
             <div className="ai-bullet" style={{ background: score >= 70 ? 'var(--green)' : 'var(--amber)' }} />
             <div className="ai-text"><strong>Operations {score >= 70 ? 'stable' : 'need attention'}.</strong> Overall score at {score}%.</div>
           </div>
-          <div className="ai-item">
-            <div className="ai-bullet" style={{ background: 'var(--amber)' }} />
-            <div className="ai-text"><strong>{d?.pendingApprovals || 0} approvals pending</strong> from EA review stage.</div>
-          </div>
+
           <div className="ai-item">
             <div className="ai-bullet" style={{ background: 'var(--red)' }} />
             <div className="ai-text"><strong>{d?.overdueTasks || 0} overdue tasks</strong> require director intervention.</div>

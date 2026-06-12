@@ -50,7 +50,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { status, title, description, priority, department, category, dueDate, ownerId, frequency, weekDays, monthDates } = body
+    const { status, title, description, priority, department, category, dueDate, ownerId, frequency, weekDays, monthDates, reviseReason, reviseNextDate, score } = body
 
     const task = await db.task.findUnique({
       where: { id },
@@ -70,6 +70,25 @@ export async function PATCH(
         updateData.status = WorkflowStatus.COMPLETED
         updateData.completedAt = now
 
+        // Auto-calculate performance score based on task completion
+        // Score logic: On-time = 100, Due soon (within 2 days) = 70, Late = 40, No due date = 80
+        if (score !== undefined) {
+          updateData.score = score
+        } else if (task.dueDate) {
+          const dueDate = new Date(task.dueDate)
+          const diffMs = dueDate.getTime() - now.getTime()
+          const diffDays = diffMs / (1000 * 60 * 60 * 24)
+          if (diffDays >= 0) {
+            updateData.score = 100  // Completed on time
+          } else if (diffDays >= -2) {
+            updateData.score = 70   // Slightly late (within 2 days)
+          } else {
+            updateData.score = 40   // Significantly late
+          }
+        } else {
+          updateData.score = 80  // No due date set
+        }
+
         // If task has a workflow, mark it as COMPLETED too
         if (task.workflowId) {
           await db.workflowInstance.update({
@@ -83,6 +102,10 @@ export async function PATCH(
         // Clear completedAt if reopening
         if (task.status === WorkflowStatus.COMPLETED) {
           updateData.completedAt = null
+          // Record revise metadata
+          updateData.revisedAt = now
+          if (reviseReason !== undefined) updateData.reviseReason = reviseReason
+          if (reviseNextDate !== undefined) updateData.reviseNextDate = reviseNextDate ? new Date(reviseNextDate) : null
         }
       } else if (status === WorkflowStatus.CANCELLED) {
         updateData.status = WorkflowStatus.CANCELLED
@@ -110,6 +133,9 @@ export async function PATCH(
     if (frequency !== undefined) updateData.frequency = frequency
     if (weekDays !== undefined) updateData.weekDays = weekDays
     if (monthDates !== undefined) updateData.monthDates = monthDates
+    if (score !== undefined) updateData.score = score
+    if (reviseReason !== undefined && status !== WorkflowStatus.IN_PROGRESS) updateData.reviseReason = reviseReason
+    if (reviseNextDate !== undefined && status !== WorkflowStatus.IN_PROGRESS) updateData.reviseNextDate = reviseNextDate ? new Date(reviseNextDate) : null
 
     const updatedTask = await db.task.update({
       where: { id },

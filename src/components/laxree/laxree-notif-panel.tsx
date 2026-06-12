@@ -18,17 +18,13 @@ export function LaxreeNotifPanel() {
   const unreadCount = notifData?.unreadCount || notifications.filter((n: any) => !n.isRead).length
 
   const markAllRead = async () => {
-    for (const n of notifications.filter((n: any) => !n.isRead)) {
-      await fetch(`/api/notifications?id=${n.id}&action=markRead`, { method: 'PATCH' }).catch(() => {})
-    }
+    await fetch(`/api/notifications?action=markAllRead&userId=${currentUserId}`, { method: 'PATCH' }).catch(() => {})
     refetch()
     queryClient.invalidateQueries({ queryKey: ['topbar-notifs'] })
   }
 
   const clearAll = async () => {
-    for (const n of notifications) {
-      await fetch(`/api/notifications?id=${n.id}`, { method: 'DELETE' }).catch(() => {})
-    }
+    await fetch(`/api/notifications?userId=${currentUserId}`, { method: 'DELETE' }).catch(() => {})
     refetch()
     queryClient.invalidateQueries({ queryKey: ['topbar-notifs'] })
   }

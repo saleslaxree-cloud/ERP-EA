@@ -58,7 +58,7 @@ export function LaxreeDashboard() {
   const total = dash?.totalTasks || 0
   const completed = dash?.completedTasks || 0
   const overdue = dash?.overdueTasks || 0
-  const pending = dash?.pendingApprovals || 0
+  // pendingApprovals removed — approval center has been removed
   const inProgress = dash?.inProgressTasks || 0
   const completionRate = dash?.completionRate || 0
   const effScore = Math.max(0, completionRate - Math.round(overdue / Math.max(total, 1) * 10))
@@ -89,18 +89,6 @@ export function LaxreeDashboard() {
       </div>
 
       {/* Alert Banners */}
-      {pending > 0 && (
-        <div className="alert alert-gold">
-          <div className="alert-icon">🔔</div>
-          <div className="alert-body">
-            <div className="alert-title" style={{ color: 'var(--g2)' }}>Pending Approvals Required</div>
-            <div className="alert-sub">{pending} item(s) awaiting your review</div>
-          </div>
-          <span className="alert-cnt">{pending}</span>
-          <button className="btn btn-gold btn-sm" onClick={() => setActivePage('approvals')}>Review →</button>
-        </div>
-      )}
-
       {overdue > 0 && (
         <div className="alert alert-red">
           <div className="alert-icon">🚨</div>
@@ -232,12 +220,6 @@ export function LaxreeDashboard() {
             <div className="ai-item">
               <div className="ai-bullet" style={{ background: 'var(--red)' }} />
               <div className="ai-text"><strong>{overdue} Overdue Task(s)</strong> — Immediate attention required.</div>
-            </div>
-          )}
-          {pending > 0 && (
-            <div className="ai-item">
-              <div className="ai-bullet" style={{ background: 'var(--amber)' }} />
-              <div className="ai-text"><strong>{pending} Pending Approval(s)</strong> — EA review queue is growing.</div>
             </div>
           )}
           <div className="ai-item">

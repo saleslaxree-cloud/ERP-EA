@@ -225,7 +225,15 @@ model Task {
   frequency       String?        // 'One Time', 'Daily', 'Weekly', 'Monthly'
   weekDays        String?        // JSON array of selected weekdays e.g. '["Monday","Wednesday"]'
   monthDates      String?        // JSON array of selected dates e.g. '[1,15,28]'
-  directorDependency String?     // JSON array of director names e.g. '["Ashish Sir","Samarth Sir"]'
+  directorDependency String?     // JSON array of director names e.g. '["Ashish Sir","Samarth Sir"]' - deprecated, kept for data
+
+  // Revise tracking
+  reviseReason    String?        // Reason for revising the task
+  reviseNextDate  DateTime?      // Next target date after revision
+  revisedAt       DateTime?      // When the task was last revised
+
+  // Performance score
+  score           Float?         // Performance score for this task (0-100)
 }
 
 model TaskStep {

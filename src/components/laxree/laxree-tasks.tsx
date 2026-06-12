@@ -19,6 +19,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   const [searchQuery, setSearchQuery] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
 
+  // Revise modal state
+  const [reviseTask, setReviseTask] = useState<any>(null)
+  const [reviseReason, setReviseReason] = useState('')
+  const [reviseNextDate, setReviseNextDate] = useState('')
+
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks-list'],
     queryFn: () => fetch('/api/tasks').then(r => r.json()),
@@ -97,18 +102,25 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     },
   })
 
-  // Revise mutation - reopens a completed task back to IN_PROGRESS
+  // Revise mutation - reopens a completed task back to IN_PROGRESS with reason + next date
   const reviseMutation = useMutation({
-    mutationFn: ({ id }: { id: string }) =>
+    mutationFn: ({ id, reason, nextDate }: { id: string; reason: string; nextDate: string }) =>
       fetch(`/api/tasks/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+        body: JSON.stringify({
+          status: 'IN_PROGRESS',
+          reviseReason: reason || null,
+          reviseNextDate: nextDate || null,
+        }),
       }).then(r => r.json()),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       addToast('ok', 'Task reopened for revision')
+      setReviseTask(null)
+      setReviseReason('')
+      setReviseNextDate('')
       setMenuOpenId(null)
     },
   })
@@ -389,17 +401,32 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       </>
                     )}
 
-                    {/* COMPLETED → Revise Button (Reopen) */}
+                    {/* COMPLETED → Show "Completed task ✅" with score */}
                     {task.status === 'COMPLETED' && (
-                      <button
-                        className="btn btn-xs"
-                        style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
-                        onClick={() => reviseMutation.mutate({ id: task.id })}
-                        disabled={reviseMutation.isPending}
-                        title="Reopen task for revision"
-                      >
-                        ↩ Revise
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{
+                          fontSize: 11, fontWeight: 800, color: 'var(--green)',
+                          background: 'var(--green-l)', padding: '3px 10px',
+                          borderRadius: 6, border: '1px solid var(--green)',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}>
+                          Completed ✅
+                          {task.score != null && (
+                            <span style={{ fontSize: 10, fontWeight: 700, color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)' }}>
+                              · {task.score}
+                            </span>
+                          )}
+                        </span>
+                        <button
+                          className="btn btn-xs"
+                          style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
+                          onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
+                          disabled={reviseMutation.isPending}
+                          title="Reopen task for revision"
+                        >
+                          ↩ Revise
+                        </button>
+                      </div>
                     )}
 
                     {/* Other statuses (IN_REVIEW, ON_HOLD etc from old workflow) → show Done + Revise */}
@@ -417,7 +444,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                         <button
                           className="btn btn-xs"
                           style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
-                          onClick={() => reviseMutation.mutate({ id: task.id })}
+                          onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}
                           title="Revise / Reopen Task"
                         >
                           ↩ Revise
@@ -543,6 +570,12 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                     ✓ Completed: {new Date(task.completedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
                   </div>
                 )}
+                {task.reviseReason && (
+                  <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 6, color: 'var(--amber)', fontWeight: 600, gridColumn: '1 / -1' }}>
+                    ↩ Revised: {task.reviseReason}
+                    {task.reviseNextDate && <span style={{ marginLeft: 8 }}>· Next date: {new Date(task.reviseNextDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>}
+                  </div>
+                )}
               </div>
 
               <div className="gold-divider" />
@@ -629,16 +662,32 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                   </button>
                 )}
                 {task.status === 'COMPLETED' && (
-                  <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
-                    onClick={async () => {
-                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'IN_PROGRESS' }) })
-                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                      addToast('ok', 'Task reopened for revision')
-                      setSelectedTaskId(null)
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <div style={{
+                      padding: '8px 16px',
+                      background: 'var(--green-l)',
+                      borderRadius: 8,
+                      border: '1.5px solid var(--green)',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      fontSize: 14, fontWeight: 800, color: 'var(--green)',
                     }}>
-                    ↩ Revise
-                  </button>
+                      Completed ✅
+                      {task.score != null && (
+                        <span style={{
+                          fontSize: 13, fontWeight: 800,
+                          color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)',
+                          background: task.score >= 70 ? 'var(--green-l)' : task.score >= 40 ? 'var(--amber-l)' : 'var(--red-l)',
+                          padding: '2px 8px', borderRadius: 4,
+                        }}>
+                          Score: {task.score}
+                        </span>
+                      )}
+                    </div>
+                    <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
+                      onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
+                      ↩ Revise
+                    </button>
+                  </div>
                 )}
                 {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
                   <button className="btn btn-red btn-sm" onClick={async () => {
@@ -753,6 +802,58 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                 else cancelMutation.mutate({ id: confirmAction.id })
               }}>
                 Yes, {confirmAction.action === 'delete' ? 'Delete' : 'Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revise Task Modal — Ask reason + next date */}
+      {reviseTask && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) { setReviseTask(null); setReviseReason(''); setReviseNextDate('') } }}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+            <button className="mx" onClick={() => { setReviseTask(null); setReviseReason(''); setReviseNextDate('') }}>✕</button>
+            <div className="mt">Revise Task</div>
+            <div className="ms">{reviseTask.title}</div>
+            <div className="gold-divider" />
+
+            <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 8, marginBottom: 14, fontSize: 12, color: 'var(--amber)', fontWeight: 600 }}>
+              This task will be reopened and set back to In Progress. Please provide a reason and a new target date.
+            </div>
+
+            <div className="form-row fr-1">
+              <div className="fg">
+                <label>Reason for Revision <span style={{ color: 'var(--red)' }}>*</span></label>
+                <textarea
+                  className="fi"
+                  placeholder="e.g. Incomplete work, quality issues, needs correction..."
+                  value={reviseReason}
+                  onChange={e => setReviseReason(e.target.value)}
+                  rows={3}
+                  style={{ minHeight: 80 }}
+                />
+              </div>
+            </div>
+            <div className="form-row fr-1">
+              <div className="fg">
+                <label>Next Target Date</label>
+                <input
+                  className="fi"
+                  type="date"
+                  value={reviseNextDate}
+                  onChange={e => setReviseNextDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="form-actions" style={{ marginTop: 16 }}>
+              <button className="btn btn-ghost" onClick={() => { setReviseTask(null); setReviseReason(''); setReviseNextDate('') }}>Cancel</button>
+              <button
+                className="btn btn-gold"
+                onClick={() => reviseMutation.mutate({ id: reviseTask.id, reason: reviseReason, nextDate: reviseNextDate })}
+                disabled={reviseMutation.isPending || !reviseReason.trim()}
+              >
+                {reviseMutation.isPending ? 'Reopening...' : '↩ Revise Task'}
               </button>
             </div>
           </div>

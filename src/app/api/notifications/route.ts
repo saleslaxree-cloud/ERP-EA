@@ -10,6 +10,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
+    // ══ CLEANUP: Delete notifications older than 30 days ══
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    try {
+      await db.notification.deleteMany({
+        where: { createdAt: { lt: thirtyDaysAgo } },
+      })
+    } catch (cleanupErr) {
+      console.error('Notification cleanup error (non-fatal):', cleanupErr)
+    }
+
+    // ══ CLEANUP: Delete orphaned notifications referencing non-existent workflows ══
+    try {
+      const orphans = await db.notification.findMany({
+        where: { workflowId: { not: null } },
+        select: { id: true, workflowId: true },
+      })
+      if (orphans.length > 0) {
+        const existingWorkflowIds = new Set(
+          (await db.workflowInstance.findMany({
+            where: { id: { in: orphans.map(n => n.workflowId!) } },
+            select: { id: true },
+          })).map(w => w.id)
+        )
+        const orphanIds = orphans.filter(n => !existingWorkflowIds.has(n.workflowId!)).map(n => n.id)
+        if (orphanIds.length > 0) {
+          await db.notification.deleteMany({ where: { id: { in: orphanIds } } })
+        }
+      }
+    } catch (orphanErr) {
+      console.error('Orphan notification cleanup error (non-fatal):', orphanErr)
+    }
+
     const where: Record<string, unknown> = { receiverId: userId }
     if (unreadOnly) where.isRead = false
 

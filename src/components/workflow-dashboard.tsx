@@ -174,18 +174,6 @@ export function WorkflowDashboard() {
       </div>
 
       {/* ══ Section 1: Alert Banners ══ */}
-      {d.pendingApprovals > 0 && (
-        <div className="alert alert-gold">
-          <div className="alert-icon">🔔</div>
-          <div className="alert-body">
-            <div className="alert-title" style={{ color: 'var(--g2)' }}>Pending Approvals Required</div>
-            <div className="alert-sub">Employee completions awaiting your review</div>
-          </div>
-          <span className="alert-cnt">{d.pendingApprovals}</span>
-          <button className="btn btn-gold btn-sm" onClick={() => setActiveView('approvals')}>Review →</button>
-        </div>
-      )}
-
       {d.externalHoldTasks > 0 && (
         <div className="ext-hold-banner" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div className="ext-hold-icon">⏸</div>
@@ -354,10 +342,7 @@ export function WorkflowDashboard() {
             <div className="ai-bullet" style={{ background: 'var(--green)' }} />
             <div className="ai-text"><strong>Team performance is {performanceScore >= 70 ? 'excellent' : performanceScore >= 40 ? 'on track' : 'needs attention'}.</strong> Overall completion rate at {performanceScore}%.</div>
           </div>
-          <div className="ai-item">
-            <div className="ai-bullet" style={{ background: 'var(--amber)' }} />
-            <div className="ai-text"><strong>{d.pendingApprovals} approval{d.pendingApprovals !== 1 ? 's' : ''} pending.</strong> Review to unblock team progress.</div>
-          </div>
+
           <div className="ai-item">
             <div className="ai-bullet" style={{ background: 'var(--red)' }} />
             <div className="ai-text"><strong>{d.overdueTasks} overdue task{d.overdueTasks !== 1 ? 's' : ''}</strong> require immediate attention.</div>

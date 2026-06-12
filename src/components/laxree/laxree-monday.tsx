@@ -656,7 +656,7 @@ export function LaxreeMonday() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* This Week Plan Row */}
+                    {/* This Week Score Row (renamed from This Week Plan) */}
                     <tr>
                       <td style={{
                         padding: '10px 14px',
@@ -664,7 +664,7 @@ export function LaxreeMonday() {
                         borderBottom: '1px solid var(--b1)',
                         color: 'var(--t1)',
                       }}>
-                        📋 This Week Plan
+                        🎯 This Week Score
                       </td>
                       <td style={{ padding: '8px 14px', borderBottom: '1px solid var(--b1)', textAlign: 'center', background: '#FEF2F288' }}>
                         <input
@@ -904,10 +904,10 @@ export function LaxreeMonday() {
                 </div>
               </div>
 
-              {/* Commitments for Next Week */}
+              {/* Next Week Plan — Monday Meeting Commitments */}
               <div style={{ marginTop: 14 }}>
                 <label style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--t3)', marginBottom: 6, display: 'block' }}>
-                  🎯 Commitments for Next Week
+                  🤝 Next Week Plan — Monday Meeting Commitments
                 </label>
                 <textarea
                   className="fi"
