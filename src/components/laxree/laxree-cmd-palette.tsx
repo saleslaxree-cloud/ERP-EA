@@ -14,7 +14,7 @@ const CMD_ITEMS = [
   { label: 'Team Directory', icon: '👥', page: 'team' as const, key: '' },
   { label: 'Director Dependency', icon: '👔', page: 'dirDep' as const, key: '' },
   { label: 'Categories', icon: '🗂', page: 'categories' as const, key: '' },
-  { label: 'Holidays', icon: '📅', page: 'holidays' as const, key: '' },
+
   { label: 'Monday Meeting', icon: '🗓', page: 'monday' as const, key: '' },
 ]
 

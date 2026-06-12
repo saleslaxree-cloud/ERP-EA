@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'holidays' | 'exthold' | 'monday' | 'escalations'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations'
 
 interface NavItem {
   id: ActivePage
@@ -83,10 +83,6 @@ export function LaxreeSidebar() {
       id: 'categories', label: 'Categories',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z" /></svg>,
     },
-    {
-      id: 'holidays', label: 'Holidays',
-      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
-    },
   ]
 
   const sections = [
@@ -127,20 +123,6 @@ export function LaxreeSidebar() {
           </div>
         ))}
         <div className="sb-footer">
-          <div style={{ display: 'flex', gap: 5, marginBottom: 7 }}>
-            <button style={{
-              flex: 1, background: 'var(--blue-l)', border: '1px solid rgba(29,78,216,.2)',
-              color: 'var(--blue)', padding: 7, borderRadius: 'var(--r-sm)',
-              fontFamily: "'DM Sans', sans-serif", fontSize: '10.5px', fontWeight: 700,
-              cursor: 'pointer', transition: 'all .15s',
-            }}>⬇ Backup</button>
-            <button style={{
-              flex: 1, background: 'var(--green-l)', border: '1px solid rgba(21,128,61,.2)',
-              color: 'var(--green)', padding: 7, borderRadius: 'var(--r-sm)',
-              fontFamily: "'DM Sans', sans-serif", fontSize: '10.5px', fontWeight: 700,
-              cursor: 'pointer', transition: 'all .15s',
-            }}>⬆ Restore</button>
-          </div>
           <button className="logout-btn" onClick={logout}>⏏ Sign Out</button>
         </div>
       </aside>

@@ -91,8 +91,6 @@ function ActiveView() {
         return <TeamView />
       case 'categories':
         return <CategoriesView />
-      case 'holidays':
-        return <HolidaysView />
       // dirDep removed
       case 'exthold':
         return <LaxreeExtHold />
@@ -696,57 +694,6 @@ function CategoriesView() {
             </div>
           )
         })}
-      </div>
-    </div>
-  )
-}
-
-/* ═══════════════════════════════════════════════════════════
-   Holidays View
-   ═══════════════════════════════════════════════════════════ */
-function HolidaysView() {
-  const holidays = [
-    { name: 'New Year\'s Day', date: '2025-01-01', type: 'PUBLIC' },
-    { name: 'Republic Day', date: '2025-01-26', type: 'PUBLIC' },
-    { name: 'Holi', date: '2025-03-14', type: 'PUBLIC' },
-    { name: 'Good Friday', date: '2025-04-18', type: 'PUBLIC' },
-    { name: 'Eid ul-Fitr', date: '2025-03-31', type: 'PUBLIC' },
-    { name: 'Independence Day', date: '2025-08-15', type: 'PUBLIC' },
-    { name: 'Gandhi Jayanti', date: '2025-10-02', type: 'PUBLIC' },
-    { name: 'Dussehra', date: '2025-10-20', type: 'PUBLIC' },
-    { name: 'Diwali', date: '2025-10-28', type: 'PUBLIC' },
-    { name: 'Christmas', date: '2025-12-25', type: 'PUBLIC' },
-    { name: 'Company Foundation Day', date: '2025-06-15', type: 'COMPANY' },
-    { name: 'Year End Break', date: '2025-12-30', type: 'COMPANY' },
-  ]
-  const typeColors: Record<string, { bg: string; color: string }> = {
-    PUBLIC: { bg: 'var(--blue-l)', color: 'var(--blue)' },
-    COMPANY: { bg: 'var(--purple-l)', color: 'var(--purple)' },
-    OPTIONAL: { bg: 'var(--amber-l)', color: 'var(--amber)' },
-  }
-
-  return (
-    <div>
-      <div className="ph"><div className="ph-left"><h2>Holidays</h2><p>Holiday calendar and scheduling</p></div><div className="ph-right"><span className="badge b-gold">{holidays.length} Holidays</span></div></div>
-      <div className="page-accent" />
-      <div className="lcard">
-        <div className="ch"><div className="ct">📅 Holiday Calendar 2025</div><div style={{ display: 'flex', gap: 8 }}><span className="badge" style={{ background: 'var(--blue-l)', color: 'var(--blue)' }}>Public</span><span className="badge" style={{ background: 'var(--purple-l)', color: 'var(--purple)' }}>Company</span></div></div>
-        <div className="tw">
-          <table className="ltable">
-            <thead><tr><th>#</th><th>Holiday</th><th>Date</th><th>Day</th><th>Type</th></tr></thead>
-            <tbody>
-              {holidays.map((h, i) => (
-                <tr key={i}>
-                  <td style={{ color: 'var(--t3)', fontSize: 11 }}>{i + 1}</td>
-                  <td style={{ fontWeight: 600 }}>{h.name}</td>
-                  <td>{new Date(h.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                  <td>{new Date(h.date).toLocaleDateString('en-US', { weekday: 'long' })}</td>
-                  <td><span className="badge" style={{ background: typeColors[h.type]?.bg, color: typeColors[h.type]?.color }}>{h.type}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   )

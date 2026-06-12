@@ -19,7 +19,6 @@ async function main() {
   await prisma.project.deleteMany()
   await prisma.department.deleteMany()
   await prisma.category.deleteMany()
-  await prisma.holiday.deleteMany()
   await prisma.delegation.deleteMany()
   await prisma.user.deleteMany()
 
@@ -48,22 +47,6 @@ async function main() {
       { id: 'cat-it', name: 'IT & Tech', color: '#0F766E', icon: '💻' },
       { id: 'cat-design', name: 'Design', color: '#6D28D9', icon: '🎨' },
       { id: 'cat-roofing', name: 'Roofing', color: '#B45309', icon: '🏠' },
-    ]
-  })
-
-  // ══ HOLIDAYS ══
-  await prisma.holiday.createMany({
-    data: [
-      { id: 'hol-1', name: 'Republic Day', date: new Date('2026-01-26'), type: 'PUBLIC' },
-      { id: 'hol-2', name: 'Holi', date: new Date('2026-03-10'), type: 'PUBLIC' },
-      { id: 'hol-3', name: 'Good Friday', date: new Date('2026-04-03'), type: 'PUBLIC' },
-      { id: 'hol-4', name: 'Eid ul-Fitr', date: new Date('2026-04-01'), type: 'PUBLIC' },
-      { id: 'hol-5', name: 'Independence Day', date: new Date('2026-08-15'), type: 'PUBLIC' },
-      { id: 'hol-6', name: 'Gandhi Jayanti', date: new Date('2026-10-02'), type: 'PUBLIC' },
-      { id: 'hol-7', name: 'Dussehra', date: new Date('2026-10-20'), type: 'PUBLIC' },
-      { id: 'hol-8', name: 'Diwali', date: new Date('2026-11-08'), type: 'PUBLIC' },
-      { id: 'hol-9', name: 'Christmas', date: new Date('2026-12-25'), type: 'PUBLIC' },
-      { id: 'hol-10', name: 'Company Foundation Day', date: new Date('2026-06-15'), type: 'COMPANY' },
     ]
   })
 

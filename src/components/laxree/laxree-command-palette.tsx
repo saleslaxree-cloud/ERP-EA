@@ -14,7 +14,7 @@ const COMMANDS: Array<{ id: string; label: string; section: string; icon: string
   { id: 'departments', label: 'Departments', section: 'Navigation', icon: '🏢' },
   { id: 'team', label: 'Team Members', section: 'Navigation', icon: '👥', shortcut: 'M' },
   { id: 'categories', label: 'Categories', section: 'Navigation', icon: '📁' },
-  { id: 'holidays', label: 'Holidays', section: 'Navigation', icon: '🏖️' },
+
 
   { id: 'monday', label: 'Monday Meeting', section: 'Navigation', icon: '📅' },
 ]
