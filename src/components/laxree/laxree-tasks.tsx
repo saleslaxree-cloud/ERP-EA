@@ -350,18 +350,29 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
                   {/* ═══ SIMPLIFIED ACTION BUTTONS ═══ */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-                    {/* PENDING → Done + Revise Buttons (no more Start button) */}
+                    {/* PENDING → If has uncompleted steps show Steps button, else Done + Revise */}
                     {task.status === 'PENDING' && (
                       <>
-                        <button
-                          className="btn btn-xs"
-                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
-                          onClick={() => completeMutation.mutate({ id: task.id })}
-                          disabled={completeMutation.isPending}
-                          title="Mark as Done"
-                        >
-                          ✓ Done
-                        </button>
+                        {stepsTotal > 0 && stepsDone < stepsTotal ? (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            title="Complete steps first"
+                          >
+                            ☰ Steps {stepsDone}/{stepsTotal}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => completeMutation.mutate({ id: task.id })}
+                            disabled={completeMutation.isPending}
+                            title="Mark as Done"
+                          >
+                            ✓ Done
+                          </button>
+                        )}
                         <button
                           className="btn btn-xs"
                           style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
@@ -373,18 +384,29 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       </>
                     )}
 
-                    {/* IN_PROGRESS → Done + Revise Buttons */}
+                    {/* IN_PROGRESS → If has uncompleted steps show Steps button, else Done + Revise */}
                     {task.status === 'IN_PROGRESS' && (
                       <>
-                        <button
-                          className="btn btn-xs"
-                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
-                          onClick={() => completeMutation.mutate({ id: task.id })}
-                          disabled={completeMutation.isPending}
-                          title="Mark as Done"
-                        >
-                          ✓ Done
-                        </button>
+                        {stepsTotal > 0 && stepsDone < stepsTotal ? (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            title="Complete steps first"
+                          >
+                            ☰ Steps {stepsDone}/{stepsTotal}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => completeMutation.mutate({ id: task.id })}
+                            disabled={completeMutation.isPending}
+                            title="Mark as Done"
+                          >
+                            ✓ Done
+                          </button>
+                        )}
                         <button
                           className="btn btn-xs"
                           style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
@@ -413,18 +435,29 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       </span>
                     )}
 
-                    {/* Other statuses (IN_REVIEW, ON_HOLD etc from old workflow) → show Done + Revise */}
+                    {/* Other statuses (IN_REVIEW, ON_HOLD etc from old workflow) → if has steps show Steps, else Done + Revise */}
                     {(task.status === 'IN_REVIEW' || task.status === 'ON_HOLD' || task.status === 'ESCALATED') && (
                       <>
-                        <button
-                          className="btn btn-xs"
-                          style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
-                          onClick={() => completeMutation.mutate({ id: task.id })}
-                          disabled={completeMutation.isPending}
-                          title="Mark as Done"
-                        >
-                          ✓ Done
-                        </button>
+                        {stepsTotal > 0 && stepsDone < stepsTotal ? (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--blue-l)', color: 'var(--blue)', border: '1.5px solid var(--blue)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => setSelectedTaskId(task.id)}
+                            title="Complete steps first"
+                          >
+                            ☰ Steps {stepsDone}/{stepsTotal}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn btn-xs"
+                            style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, padding: '4px 12px' }}
+                            onClick={() => completeMutation.mutate({ id: task.id })}
+                            disabled={completeMutation.isPending}
+                            title="Mark as Done"
+                          >
+                            ✓ Done
+                          </button>
+                        )}
                         <button
                           className="btn btn-xs"
                           style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1px solid var(--amber)', fontWeight: 700 }}
@@ -595,8 +628,8 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                             {step.title}
                           </span>
                         </div>
-                        {/* Step action button */}
-                        {!isCompleted && isCurrentStep && task.status === 'IN_PROGRESS' && (
+                        {/* Step action button - show for any non-completed task status */}
+                        {!isCompleted && isCurrentStep && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
                           <button
                             className="btn btn-xs"
                             style={{
@@ -623,36 +656,62 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               {/* ACTION BUTTONS - Simplified */}
               <div className="gold-divider" />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {/* PENDING → Done + Revise (no Start button) */}
+                {/* PENDING → If has uncompleted steps show hint, else Done + Revise */}
                 {task.status === 'PENDING' && (
                   <>
-                    <button className="btn btn-green" onClick={async () => {
-                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
-                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                      addToast('ok', 'Task completed! ✓')
-                      setSelectedTaskId(null)
-                    }}>
-                      ✓ Done
-                    </button>
+                    {stepsTotal > 0 && stepsDone < stepsTotal ? (
+                      <div style={{
+                        padding: '8px 16px',
+                        background: 'var(--blue-l)',
+                        borderRadius: 8,
+                        border: '1.5px solid var(--blue)',
+                        fontSize: 13, fontWeight: 700, color: 'var(--blue)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        ☰ Complete all steps first ({stepsDone}/{stepsTotal})
+                      </div>
+                    ) : (
+                      <button className="btn btn-green" onClick={async () => {
+                        await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
+                        queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                        addToast('ok', 'Task completed! ✓')
+                        setSelectedTaskId(null)
+                      }}>
+                        ✓ Done
+                      </button>
+                    )}
                     <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
                       onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
                       ✏ Revise
                     </button>
                   </>
                 )}
-                {/* IN_PROGRESS / IN_REVIEW / ON_HOLD → Done + Revise */}
+                {/* IN_PROGRESS / IN_REVIEW / ON_HOLD → If has uncompleted steps show hint, else Done + Revise */}
                 {(task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'ON_HOLD') && (
                   <>
-                    <button className="btn btn-green" onClick={async () => {
-                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
-                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                      addToast('ok', 'Task completed! ✓')
-                      setSelectedTaskId(null)
-                    }}>
-                      ✓ Done
-                    </button>
+                    {stepsTotal > 0 && stepsDone < stepsTotal ? (
+                      <div style={{
+                        padding: '8px 16px',
+                        background: 'var(--blue-l)',
+                        borderRadius: 8,
+                        border: '1.5px solid var(--blue)',
+                        fontSize: 13, fontWeight: 700, color: 'var(--blue)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        ☰ Complete all steps first ({stepsDone}/{stepsTotal})
+                      </div>
+                    ) : (
+                      <button className="btn btn-green" onClick={async () => {
+                        await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
+                        queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
+                        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+                        addToast('ok', 'Task completed! ✓')
+                        setSelectedTaskId(null)
+                      }}>
+                        ✓ Done
+                      </button>
+                    )}
                     <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
                       onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
                       ✏ Revise
