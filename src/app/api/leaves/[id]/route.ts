@@ -30,8 +30,8 @@ export async function PATCH(
       where: { id },
       data: {
         status,
-        approvedById: action === 'approve' ? approvedById : null,
-        approvedAt: action === 'approve' ? new Date() : null,
+        approvedById: action !== 'cancel' ? approvedById : null,
+        approvedAt: action !== 'cancel' ? new Date() : null,
         eaRemark: eaRemark || null,
       },
       include: {

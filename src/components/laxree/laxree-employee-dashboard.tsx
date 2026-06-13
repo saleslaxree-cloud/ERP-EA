@@ -5,18 +5,11 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState, useRef, useEffect } from 'react'
 
 export function LaxreeEmployeeDashboard() {
-  const { currentUserId, currentUserName, currentRole, addToast } = useWorkflowStore()
+  const { currentUserId, currentUserName, currentRole, addToast, setActivePage } = useWorkflowStore()
   const queryClient = useQueryClient()
 
   // Tab navigation for employee dashboard
-  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'leaves' | 'scorecard' | 'ai'>('overview')
-
-  // Leave apply form
-  const [leaveType, setLeaveType] = useState('CASUAL')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [leaveReason, setLeaveReason] = useState('')
-  const [showLeaveForm, setShowLeaveForm] = useState(false)
+  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard' | 'ai'>('overview')
 
   // AI Assistant
   const [aiQuestion, setAiQuestion] = useState('')
@@ -67,21 +60,7 @@ export function LaxreeEmployeeDashboard() {
   const leaves = Array.isArray(leavesData) ? leavesData : (leavesData.leaves || [])
   const score = scoreData as any
 
-  // Apply leave mutation
-  const applyLeaveMutation = useMutation({
-    mutationFn: (data: any) => fetch('/api/leaves', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
-    onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['emp-leaves', currentUserId] })
-      const tag = data.leave?.applicationTag || 'AL'
-      addToast('ok', `Leave applied! Tag: ${tag === 'AL' ? 'AL (On Time)' : 'LA (Late)'}`)
-      setFromDate(''); setToDate(''); setLeaveReason(''); setShowLeaveForm(false)
-    },
-    onError: () => addToast('err', 'Failed to apply leave'),
-  })
+
 
   // AI chat mutation
   const aiMutation = useMutation({
@@ -142,7 +121,6 @@ export function LaxreeEmployeeDashboard() {
   const tabItems = [
     { id: 'overview' as const, label: 'Overview', icon: '📊' },
     { id: 'tasks' as const, label: 'My Tasks', icon: '📋' },
-    { id: 'leaves' as const, label: 'Apply Leave', icon: '🏖️' },
     { id: 'scorecard' as const, label: 'My Scorecard', icon: '📈' },
     { id: 'ai' as const, label: 'AI Assistant', icon: '🤖' },
   ]
@@ -155,8 +133,8 @@ export function LaxreeEmployeeDashboard() {
           <p>Welcome, {currentUserName || 'Employee'}</p>
         </div>
         <div className="ph-right">
-          <button className="btn btn-gold" onClick={() => { setEmpTab('leaves'); setShowLeaveForm(true) }}>
-            + Apply Leave
+          <button className="btn btn-gold" onClick={() => setActivePage('emp-leaves')}>
+            🏖️ Leave Management
           </button>
         </div>
       </div>
@@ -169,7 +147,6 @@ export function LaxreeEmployeeDashboard() {
             onClick={() => setEmpTab(tab.id)}>
             <span style={{ marginRight: 4 }}>{tab.icon}</span> {tab.label}
             {tab.id === 'tasks' && activeTasks.length > 0 && <span className="tab-cnt">{activeTasks.length}</span>}
-            {tab.id === 'leaves' && pendingLeaves.length > 0 && <span className="tab-cnt" style={{ background: 'var(--amber)' }}>{pendingLeaves.length}</span>}
           </div>
         ))}
       </div>
@@ -268,19 +245,30 @@ export function LaxreeEmployeeDashboard() {
           <div className="lcard" style={{ marginBottom: 16 }}>
             <div className="ch">
               <div className="ct">🏖️ My Recent Leaves</div>
-              <span className="badge b-gold" style={{ fontSize: 10 }}>{leaves.length}</span>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <button className="btn" style={{ fontSize: 10, padding: '3px 10px', background: 'var(--gb)', color: 'var(--g2)', fontWeight: 700 }}
+                  onClick={() => setActivePage('emp-leaves')}>
+                  View All & Apply
+                </button>
+                <span className="badge b-gold" style={{ fontSize: 10 }}>{leaves.length}</span>
+              </div>
             </div>
             <div className="cb" style={{ padding: 0 }}>
               {leaves.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 24, color: 'var(--t3)' }}>
                   <div style={{ fontWeight: 700 }}>No leaves applied</div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>Click "Apply Leave" to request time off</div>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>
+                    <button className="btn" style={{ fontSize: 11, padding: '4px 12px', background: 'var(--gb)', color: 'var(--g2)', fontWeight: 700 }}
+                      onClick={() => setActivePage('emp-leaves')}>
+                      Go to Leave Management →
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="tw">
                   <table className="ltable">
                     <thead>
-                      <tr><th>Type</th><th>From</th><th>To</th><th>Tag</th><th>Status</th></tr>
+                      <tr><th>Type</th><th>From</th><th>To</th><th>Tag</th><th>Status</th><th>EA Remark</th></tr>
                     </thead>
                     <tbody>
                       {leaves.slice(0, 5).map((leave: any) => {
@@ -300,6 +288,7 @@ export function LaxreeEmployeeDashboard() {
                               </span>
                             </td>
                             <td><span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: lsStyle.bg, color: lsStyle.color, fontWeight: 700 }}>{lsStyle.label}</span></td>
+                            <td style={{ fontSize: 10, color: 'var(--t3)', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leave.eaRemark || '—'}</td>
                           </tr>
                         )
                       })}
@@ -475,158 +464,6 @@ export function LaxreeEmployeeDashboard() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* ===================== APPLY LEAVE TAB ===================== */}
-      {empTab === 'leaves' && (
-        <>
-          {/* Leave Application Form */}
-          {showLeaveForm && (
-            <div className="lcard" style={{ marginBottom: 16, borderLeft: '4px solid var(--g2)' }}>
-              <div className="ch"><div className="ct">📝 Apply for Leave</div></div>
-              <div className="cb">
-                <div className="form-row fr-3">
-                  <div className="fg">
-                    <label>Leave Type</label>
-                    <select className="sel" value={leaveType} onChange={e => setLeaveType(e.target.value)}>
-                      <option value="CASUAL">Casual Leave</option>
-                      <option value="SICK">Sick Leave</option>
-                      <option value="EARNED">Earned Leave</option>
-                      <option value="HALF_DAY">Half Day</option>
-                    </select>
-                  </div>
-                  <div className="fg">
-                    <label>From Date</label>
-                    <input className="fi" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                      min={new Date().toISOString().split('T')[0]} />
-                  </div>
-                  <div className="fg">
-                    <label>To Date</label>
-                    <input className="fi" type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                      min={fromDate || new Date().toISOString().split('T')[0]} />
-                  </div>
-                </div>
-                <div className="fg" style={{ marginTop: 10 }}>
-                  <label>Reason</label>
-                  <textarea className="fi" rows={3} placeholder="Enter reason for leave..." value={leaveReason}
-                    onChange={e => setLeaveReason(e.target.value)} style={{ resize: 'vertical' }} />
-                </div>
-
-                {/* AL/LA Preview */}
-                {fromDate && (
-                  <div style={{
-                    marginTop: 10, padding: '8px 12px', borderRadius: 8,
-                    background: (() => {
-                      const now = new Date()
-                      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                      const fromDayStart = new Date(new Date(fromDate).getFullYear(), new Date(fromDate).getMonth(), new Date(fromDate).getDate())
-                      const daysBefore = Math.ceil((fromDayStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
-                      return daysBefore >= 1 ? 'var(--green-l)' : '#FEE2E2'
-                    })(),
-                    border: '1px solid',
-                    borderColor: (() => {
-                      const now = new Date()
-                      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                      const fromDayStart = new Date(new Date(fromDate).getFullYear(), new Date(fromDate).getMonth(), new Date(fromDate).getDate())
-                      const daysBefore = Math.ceil((fromDayStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
-                      return daysBefore >= 1 ? 'rgba(21,128,61,.3)' : 'rgba(220,38,38,.3)'
-                    })(),
-                  }}>
-                    {(() => {
-                      const now = new Date()
-                      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-                      const fromDayStart = new Date(new Date(fromDate).getFullYear(), new Date(fromDate).getMonth(), new Date(fromDate).getDate())
-                      const daysBefore = Math.ceil((fromDayStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24))
-                      return daysBefore >= 1 ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--green)' }}>✓ AL — Applied on time ({daysBefore} day{daysBefore > 1 ? 's' : ''} before leave)</span>
-                      ) : (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)' }}>⚠ LA — Late Application (less than 1 day before leave — will show in red in EA delegation)</span>
-                      )
-                    })()}
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 10 }}>
-                  <button className="btn" style={{ background: 'var(--bg2)', color: 'var(--t2)' }}
-                    onClick={() => setShowLeaveForm(false)}>Cancel</button>
-                  <button className="btn btn-gold" disabled={!fromDate || !toDate || !leaveReason.trim()}
-                    onClick={() => applyLeaveMutation.mutate({
-                      userId: currentUserId,
-                      leaveType,
-                      fromDate,
-                      toDate,
-                      reason: leaveReason.trim(),
-                    })}>
-                    {applyLeaveMutation.isPending ? 'Applying...' : 'Submit Leave'}
-                  </button>
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 8, padding: '6px 10px', background: 'var(--bg2)', borderRadius: 6 }}>
-                  <b>AL</b> = Applied on time (1 day before) · <span style={{ color: 'var(--red)', fontWeight: 700 }}>LA</span> = Late Application (same day/less than 1 day before)
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Show Apply button if form is closed */}
-          {!showLeaveForm && (
-            <div className="lcard" style={{ marginBottom: 16, textAlign: 'center', padding: '24px 16px', cursor: 'pointer', border: '2px dashed var(--b2)', background: 'var(--card2)' }}
-              onClick={() => setShowLeaveForm(true)}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>🏖️</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--g2)' }}>+ Apply for Leave</div>
-              <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 4 }}>Click here to submit a leave application</div>
-            </div>
-          )}
-
-          {/* My Leaves History */}
-          <div className="lcard">
-            <div className="ch">
-              <div className="ct">🏖️ My Leave History</div>
-              <span className="badge b-gold" style={{ fontSize: 10 }}>{leaves.length}</span>
-            </div>
-            <div className="cb" style={{ padding: 0 }}>
-              {leaves.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
-                  <div style={{ fontSize: 28, marginBottom: 6 }}>🏖️</div>
-                  <div style={{ fontWeight: 700 }}>No leaves applied</div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>Click "Apply Leave" above to request time off</div>
-                </div>
-              ) : (
-                <div className="tw">
-                  <table className="ltable">
-                    <thead>
-                      <tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Reason</th><th>Tag</th><th>Status</th><th>EA Remark</th></tr>
-                    </thead>
-                    <tbody>
-                      {leaves.map((leave: any) => {
-                        const lsStyle = leaveStatusStyle[leave.status] || leaveStatusStyle.PENDING
-                        return (
-                          <tr key={leave.id}>
-                            <td style={{ fontWeight: 600, fontSize: 11 }}>{leave.leaveType}</td>
-                            <td style={{ fontSize: 11 }}>{new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                            <td style={{ fontSize: 11 }}>{new Date(leave.toDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
-                            <td style={{ fontSize: 11, fontWeight: 700 }}>{leave.totalDays}</td>
-                            <td style={{ fontSize: 11, maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leave.reason}</td>
-                            <td>
-                              <span className="badge" style={{
-                                fontSize: 10, padding: '2px 8px', fontWeight: 900, letterSpacing: 0.5,
-                                background: leave.applicationTag === 'AL' ? 'var(--green-l)' : '#FEE2E2',
-                                color: leave.applicationTag === 'AL' ? 'var(--green)' : 'var(--red)',
-                              }}>
-                                {leave.applicationTag === 'AL' ? '✓ AL' : '⚠ LA'}
-                              </span>
-                            </td>
-                            <td><span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: lsStyle.bg, color: lsStyle.color, fontWeight: 700 }}>{lsStyle.label}</span></td>
-                            <td style={{ fontSize: 10, color: 'var(--t3)', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{leave.eaRemark || '—'}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
       )}
 
       {/* ===================== MY SCORECARD TAB ===================== */}
