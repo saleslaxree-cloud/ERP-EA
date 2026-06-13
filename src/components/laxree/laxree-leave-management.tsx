@@ -11,12 +11,16 @@ export function LaxreeLeaveManagement() {
   const [eaRemarkMap, setEaRemarkMap] = useState<Record<string, string>>({})
 
   // Fetch all leaves
-  const { data: leavesData = { leaves: [] } } = useQuery({
+  const { data: leavesData = { leaves: [] }, refetch: refetchAllLeaves } = useQuery({
     queryKey: ['all-leaves', filterStatus],
-    queryFn: () => {
+    queryFn: async () => {
       const url = filterStatus === 'ALL' ? '/api/leaves' : `/api/leaves?status=${filterStatus}`
-      return fetch(url).then(r => r.json())
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to fetch leaves')
+      return res.json()
     },
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 
   // Fetch all employees for delegation view
@@ -53,19 +57,26 @@ export function LaxreeLeaveManagement() {
     pendingByEmployee[leave.userId].push(leave)
   }
 
-  // Approve/reject mutation
+  // Approve/reject mutation — with proper HTTP error checking
   const actionMutation = useMutation({
-    mutationFn: ({ leaveId, action, eaRemark }: { leaveId: string; action: string; eaRemark?: string }) =>
-      fetch(`/api/leaves/${leaveId}`, {
+    mutationFn: async ({ leaveId, action, eaRemark }: { leaveId: string; action: string; eaRemark?: string }) => {
+      const res = await fetch(`/api/leaves/${leaveId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, approvedById: currentUserId, eaRemark: eaRemark || null }),
-      }).then(r => r.json()),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to update leave')
+      return json
+    },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
       addToast('ok', `Leave ${variables.action === 'approve' ? 'approved' : 'rejected'}`)
+      refetchAllLeaves()
     },
-    onError: () => addToast('err', 'Failed to update leave'),
+    onError: (err: any) => addToast('err', err.message || 'Failed to update leave'),
   })
 
   // Stats

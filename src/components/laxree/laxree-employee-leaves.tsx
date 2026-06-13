@@ -17,47 +17,72 @@ export function LaxreeEmployeeLeaves() {
   const [filterStatus, setFilterStatus] = useState('ALL')
 
   // Fetch employee's own leaves only
-  const { data: leavesData = { leaves: [] } } = useQuery({
+  const { data: leavesData, isLoading: leavesLoading, refetch: refetchLeaves } = useQuery({
     queryKey: ['emp-leaves', currentUserId, filterStatus],
-    queryFn: () => {
+    queryFn: async () => {
       const url = filterStatus === 'ALL'
         ? `/api/leaves?userId=${currentUserId}`
         : `/api/leaves?userId=${currentUserId}&status=${filterStatus}`
-      return fetch(url).then(r => r.json())
+      const res = await fetch(url)
+      if (!res.ok) throw new Error('Failed to fetch leaves')
+      return res.json()
     },
     enabled: !!currentUserId,
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 
-  const leaves = Array.isArray(leavesData) ? leavesData : (leavesData.leaves || [])
+  const rawLeaves = leavesData?.leaves || []
+  const leaves = Array.isArray(rawLeaves) ? rawLeaves : (Array.isArray(leavesData) ? leavesData : [])
 
-  // Apply leave mutation
+  // Apply leave mutation — with proper HTTP error checking
   const applyLeaveMutation = useMutation({
-    mutationFn: (data: any) => fetch('/api/leaves', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }).then(r => r.json()),
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/leaves', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to apply leave')
+      return json
+    },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ['emp-leaves', currentUserId] })
+      // Invalidate employee leaves
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
+      // Also invalidate EA/admin leaves so they see the new application
+      queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
+      // Invalidate sidebar stats
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
       const tag = data.leave?.applicationTag || 'AL'
       addToast('ok', `Leave applied! Tag: ${tag === 'AL' ? 'AL (On Time)' : 'LA (Late)'}`)
       setFromDate(''); setToDate(''); setLeaveReason(''); setShowLeaveForm(false)
+      // Force refetch
+      refetchLeaves()
     },
-    onError: () => addToast('err', 'Failed to apply leave'),
+    onError: (err: any) => addToast('err', err.message || 'Failed to apply leave'),
   })
 
   // Cancel leave mutation (only for PENDING leaves)
   const cancelMutation = useMutation({
-    mutationFn: (leaveId: string) => fetch(`/api/leaves/${leaveId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'cancel' }),
-    }).then(r => r.json()),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['emp-leaves', currentUserId] })
-      addToast('ok', 'Leave cancelled')
+    mutationFn: async (leaveId: string) => {
+      const res = await fetch(`/api/leaves/${leaveId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to cancel leave')
+      return json
     },
-    onError: () => addToast('err', 'Failed to cancel leave'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
+      queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
+      queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
+      addToast('ok', 'Leave cancelled')
+      refetchLeaves()
+    },
+    onError: (err: any) => addToast('err', err.message || 'Failed to cancel leave'),
   })
 
   // Stats

@@ -27,8 +27,14 @@ export function LaxreeEmployeeDashboard() {
   // Fetch employee's leaves
   const { data: leavesData = { leaves: [] } } = useQuery({
     queryKey: ['emp-leaves', currentUserId],
-    queryFn: () => fetch(`/api/leaves?userId=${currentUserId}`).then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch(`/api/leaves?userId=${currentUserId}`)
+      if (!res.ok) throw new Error('Failed to fetch leaves')
+      return res.json()
+    },
     enabled: !!currentUserId,
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 
   // Fetch employee's weekly score
