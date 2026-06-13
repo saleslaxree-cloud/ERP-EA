@@ -18,22 +18,26 @@ export function LaxreeEmployeeLeaves() {
 
   // Fetch employee's own leaves only
   const { data: leavesData, isLoading: leavesLoading, refetch: refetchLeaves } = useQuery({
-    queryKey: ['emp-leaves', currentUserId, filterStatus],
+    queryKey: ['emp-leaves', currentUserId],
     queryFn: async () => {
-      const url = filterStatus === 'ALL'
-        ? `/api/leaves?userId=${currentUserId}`
-        : `/api/leaves?userId=${currentUserId}&status=${filterStatus}`
-      const res = await fetch(url)
+      const res = await fetch(`/api/leaves?userId=${currentUserId}`)
       if (!res.ok) throw new Error('Failed to fetch leaves')
-      return res.json()
+      const data = await res.json()
+      return data
     },
     enabled: !!currentUserId,
     refetchOnMount: 'always',
     staleTime: 0,
   })
 
+  // Parse leaves from response
   const rawLeaves = leavesData?.leaves || []
-  const leaves = Array.isArray(rawLeaves) ? rawLeaves : (Array.isArray(leavesData) ? leavesData : [])
+  const allLeaves = Array.isArray(rawLeaves) ? rawLeaves : (Array.isArray(leavesData) ? leavesData : [])
+
+  // Filter leaves on client side based on filterStatus
+  const leaves = filterStatus === 'ALL' 
+    ? allLeaves 
+    : allLeaves.filter((l: any) => l.status === filterStatus)
 
   // Apply leave mutation — with proper HTTP error checking
   const applyLeaveMutation = useMutation({
@@ -44,24 +48,51 @@ export function LaxreeEmployeeLeaves() {
         body: JSON.stringify(data),
       })
       const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Failed to apply leave')
+      if (!res.ok) {
+        console.error('Leave API error:', res.status, json)
+        throw new Error(json.error || `Failed to apply leave (HTTP ${res.status})`)
+      }
       return json
     },
     onSuccess: (data: any) => {
-      // Invalidate employee leaves
+      console.log('Leave created successfully:', data)
+      // Invalidate ALL leave-related queries
       queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
-      // Also invalidate EA/admin leaves so they see the new application
       queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
-      // Invalidate sidebar stats
       queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
       const tag = data.leave?.applicationTag || 'AL'
-      addToast('ok', `Leave applied! Tag: ${tag === 'AL' ? 'AL (On Time)' : 'LA (Late)'}`)
-      setFromDate(''); setToDate(''); setLeaveReason(''); setShowLeaveForm(false)
-      // Force refetch
-      refetchLeaves()
+      addToast('ok', `Leave applied successfully! Tag: ${tag === 'AL' ? 'AL (On Time)' : 'LA (Late)'}`)
+      setFromDate('')
+      setToDate('')
+      setLeaveReason('')
+      setShowLeaveForm(false)
+      // Force immediate refetch
+      setTimeout(() => refetchLeaves(), 300)
     },
-    onError: (err: any) => addToast('err', err.message || 'Failed to apply leave'),
+    onError: (err: any) => {
+      console.error('Leave mutation error:', err)
+      addToast('err', err.message || 'Failed to apply leave. Please try again.')
+    },
   })
+
+  // Handle apply leave
+  const handleApplyLeave = () => {
+    if (!currentUserId) {
+      addToast('err', 'You must be logged in to apply for leave')
+      return
+    }
+    if (!fromDate || !toDate || !leaveReason.trim()) {
+      addToast('err', 'Please fill all fields: From Date, To Date, and Reason')
+      return
+    }
+    applyLeaveMutation.mutate({
+      userId: currentUserId,
+      leaveType,
+      fromDate,
+      toDate,
+      reason: leaveReason.trim(),
+    })
+  }
 
   // Cancel leave mutation (only for PENDING leaves)
   const cancelMutation = useMutation({
@@ -80,16 +111,15 @@ export function LaxreeEmployeeLeaves() {
       queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
       queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
       addToast('ok', 'Leave cancelled')
-      refetchLeaves()
+      setTimeout(() => refetchLeaves(), 300)
     },
     onError: (err: any) => addToast('err', err.message || 'Failed to cancel leave'),
   })
 
-  // Stats
-  const pendingLeaves = leaves.filter((l: any) => l.status === 'PENDING')
-  const approvedLeaves = leaves.filter((l: any) => l.status === 'APPROVED')
-  const rejectedLeaves = leaves.filter((l: any) => l.status === 'REJECTED')
-  const cancelledLeaves = leaves.filter((l: any) => l.status === 'CANCELLED')
+  // Stats (from ALL leaves, not filtered)
+  const pendingLeaves = allLeaves.filter((l: any) => l.status === 'PENDING')
+  const approvedLeaves = allLeaves.filter((l: any) => l.status === 'APPROVED')
+  const rejectedLeaves = allLeaves.filter((l: any) => l.status === 'REJECTED')
 
   const leaveStatusStyle: Record<string, { bg: string; color: string; label: string }> = {
     PENDING: { bg: '#FEF3C7', color: '#92400E', label: 'Pending' },
@@ -111,7 +141,7 @@ export function LaxreeEmployeeLeaves() {
   const tagPreview = getTagPreview()
 
   const tabs = [
-    { id: 'ALL', label: 'All', count: leaves.length },
+    { id: 'ALL', label: 'All', count: allLeaves.length },
     { id: 'PENDING', label: 'Pending', count: pendingLeaves.length },
     { id: 'APPROVED', label: 'Approved', count: approvedLeaves.length },
     { id: 'REJECTED', label: 'Rejected', count: rejectedLeaves.length },
@@ -125,12 +155,23 @@ export function LaxreeEmployeeLeaves() {
           <p>Apply for leave and track your leave status</p>
         </div>
         <div className="ph-right">
-          <button className="btn btn-gold" onClick={() => setShowLeaveForm(true)}>
+          <button 
+            className="btn btn-gold" 
+            onClick={() => setShowLeaveForm(true)}
+            disabled={applyLeaveMutation.isPending}
+          >
             + Apply Leave
           </button>
         </div>
       </div>
       <div className="page-accent" />
+
+      {/* Debug info - remove later */}
+      {!currentUserId && (
+        <div style={{ padding: 12, background: '#FEE2E2', color: '#DC2626', borderRadius: 8, marginBottom: 12, fontWeight: 700 }}>
+          ⚠ Not logged in! Please log in first to apply for leave.
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
@@ -148,17 +189,17 @@ export function LaxreeEmployeeLeaves() {
         </div>
         <div className="lcard" style={{ padding: '14px 16px' }}>
           <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Total Leaves</div>
-          <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--t1)' }}>{leaves.length}</div>
+          <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--t1)' }}>{allLeaves.length}</div>
         </div>
       </div>
 
-      {/* Apply Leave Form */}
+      {/* ===================== APPLY LEAVE FORM ===================== */}
       {showLeaveForm && (
         <div className="lcard" style={{ marginBottom: 16, borderLeft: '4px solid var(--g2)' }}>
           <div className="ch">
             <div className="ct">📝 Apply for Leave</div>
             <button className="btn" style={{ fontSize: 11, padding: '4px 12px', background: 'var(--bg2)', color: 'var(--t2)' }}
-              onClick={() => setShowLeaveForm(false)}>
+              onClick={() => { setShowLeaveForm(false); setFromDate(''); setToDate(''); setLeaveReason(''); }}>
               ✕ Close
             </button>
           </div>
@@ -174,20 +215,36 @@ export function LaxreeEmployeeLeaves() {
                 </select>
               </div>
               <div className="fg">
-                <label>From Date</label>
-                <input className="fi" type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]} />
+                <label>From Date *</label>
+                <input 
+                  className="fi" 
+                  type="date" 
+                  value={fromDate} 
+                  onChange={e => setFromDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]} 
+                />
               </div>
               <div className="fg">
-                <label>To Date</label>
-                <input className="fi" type="date" value={toDate} onChange={e => setToDate(e.target.value)}
-                  min={fromDate || new Date().toISOString().split('T')[0]} />
+                <label>To Date *</label>
+                <input 
+                  className="fi" 
+                  type="date" 
+                  value={toDate} 
+                  onChange={e => setToDate(e.target.value)}
+                  min={fromDate || new Date().toISOString().split('T')[0]} 
+                />
               </div>
             </div>
             <div className="fg" style={{ marginTop: 10 }}>
-              <label>Reason</label>
-              <textarea className="fi" rows={3} placeholder="Enter reason for leave..." value={leaveReason}
-                onChange={e => setLeaveReason(e.target.value)} style={{ resize: 'vertical' }} />
+              <label>Reason *</label>
+              <textarea 
+                className="fi" 
+                rows={3} 
+                placeholder="Enter reason for leave..." 
+                value={leaveReason}
+                onChange={e => setLeaveReason(e.target.value)} 
+                style={{ resize: 'vertical' }} 
+              />
             </div>
 
             {/* AL/LA Preview */}
@@ -219,24 +276,34 @@ export function LaxreeEmployeeLeaves() {
               </div>
             )}
 
+            {/* Error display */}
+            {applyLeaveMutation.isError && (
+              <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 6, background: '#FEE2E2', color: '#DC2626', fontSize: 12, fontWeight: 700 }}>
+                Error: {applyLeaveMutation.error?.message || 'Failed to apply leave'}
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
-              <button className="btn" style={{ background: 'var(--bg2)', color: 'var(--t2)' }}
-                onClick={() => setShowLeaveForm(false)}>Cancel</button>
-              <button className="btn btn-gold" disabled={!fromDate || !toDate || !leaveReason.trim()}
-                onClick={() => applyLeaveMutation.mutate({
-                  userId: currentUserId,
-                  leaveType,
-                  fromDate,
-                  toDate,
-                  reason: leaveReason.trim(),
-                })}>
+              <button 
+                className="btn" 
+                style={{ background: 'var(--bg2)', color: 'var(--t2)' }}
+                onClick={() => { setShowLeaveForm(false); setFromDate(''); setToDate(''); setLeaveReason(''); }}
+                disabled={applyLeaveMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-gold" 
+                disabled={!fromDate || !toDate || !leaveReason.trim() || applyLeaveMutation.isPending}
+                onClick={handleApplyLeave}
+              >
                 {applyLeaveMutation.isPending ? 'Applying...' : 'Submit Leave'}
               </button>
             </div>
             <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 10, padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
               <b>AL</b> = Applied on time (1+ day before leave) · <span style={{ color: 'var(--red)', fontWeight: 700 }}>LA</span> = Late Application (same day or less than 1 day before)
               <br />
-              Your leave will be reviewed by Arti Sharma (EA). You will see the status update here.
+              Your leave will be reviewed by Arti Sharma (EA). You will see the status update here once processed.
             </div>
           </div>
         </div>
@@ -265,7 +332,14 @@ export function LaxreeEmployeeLeaves() {
 
       {/* Leave History */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {leaves.length === 0 ? (
+        {leavesLoading && (
+          <div className="lcard">
+            <div className="cb" style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+              <div style={{ fontWeight: 700 }}>Loading leaves...</div>
+            </div>
+          </div>
+        )}
+        {!leavesLoading && leaves.length === 0 && (
           <div className="lcard">
             <div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
               <div style={{ fontSize: 36, marginBottom: 10 }}>🏖️</div>
@@ -273,7 +347,8 @@ export function LaxreeEmployeeLeaves() {
               <div style={{ fontSize: 12, marginTop: 4 }}>Click "Apply Leave" above to request time off</div>
             </div>
           </div>
-        ) : leaves.map((leave: any) => {
+        )}
+        {leaves.map((leave: any) => {
           const lsStyle = leaveStatusStyle[leave.status] || leaveStatusStyle.PENDING
           const isPending = leave.status === 'PENDING'
           const isApproved = leave.status === 'APPROVED'

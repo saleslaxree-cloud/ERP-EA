@@ -32,14 +32,34 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('Leave POST body:', JSON.stringify(body))
     const { userId, leaveType, fromDate, toDate, reason } = body
 
     if (!userId || !fromDate || !toDate || !reason) {
+      console.error('Leave POST missing fields:', { userId, fromDate, toDate, reason: reason ? 'provided' : 'missing' })
       return NextResponse.json({ error: 'userId, fromDate, toDate, and reason are required' }, { status: 400 })
+    }
+
+    // Verify user exists
+    const user = await db.user.findUnique({ where: { id: userId } })
+    if (!user) {
+      console.error('Leave POST user not found:', userId)
+      return NextResponse.json({ error: 'User not found. Please log in again.' }, { status: 400 })
     }
 
     const from = new Date(fromDate)
     const to = new Date(toDate)
+
+    // Validate dates
+    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
+      console.error('Leave POST invalid dates:', { fromDate, toDate })
+      return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
+    }
+
+    if (to < from) {
+      console.error('Leave POST toDate before fromDate:', { fromDate, toDate })
+      return NextResponse.json({ error: 'To Date must be same or after From Date' }, { status: 400 })
+    }
 
     // Calculate total days (inclusive)
     const diffMs = to.getTime() - from.getTime()
@@ -67,9 +87,10 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    console.log('Leave created successfully:', leave.id, 'for user:', userId, 'tag:', applicationTag)
     return NextResponse.json({ leave }, { status: 201 })
   } catch (error) {
     console.error('Leave POST error:', error)
-    return NextResponse.json({ error: 'Failed to apply leave' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to apply leave: ' + (error instanceof Error ? error.message : 'Unknown error') }, { status: 500 })
   }
 }
