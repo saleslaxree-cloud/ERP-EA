@@ -1,13 +1,13 @@
 'use client'
 
 import { CheckCircle2, Circle, Clock, AlertTriangle, Loader2 } from 'lucide-react'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus, WorkflowStatusType } from '@/lib/constants'
 
 interface Step {
   id: string
   name: string
   order: number
-  status: WorkflowStatus
+  status: WorkflowStatusType
   isEscalated?: boolean
   assignee?: { name: string } | null
 }
@@ -16,7 +16,7 @@ interface StepProgressProps {
   steps: Step[]
 }
 
-function getStepIcon(status: WorkflowStatus, isEscalated?: boolean) {
+function getStepIcon(status: WorkflowStatusType, isEscalated?: boolean) {
   if (isEscalated) return <AlertTriangle className="h-5 w-5 text-rose-500" />
   switch (status) {
     case WorkflowStatus.APPROVED:
@@ -39,7 +39,7 @@ function getStepIcon(status: WorkflowStatus, isEscalated?: boolean) {
   }
 }
 
-function getStepColor(status: WorkflowStatus, isEscalated?: boolean) {
+function getStepColor(status: WorkflowStatusType, isEscalated?: boolean) {
   if (isEscalated) return 'border-rose-400 bg-rose-50'
   switch (status) {
     case WorkflowStatus.APPROVED:
@@ -62,7 +62,7 @@ function getStepColor(status: WorkflowStatus, isEscalated?: boolean) {
   }
 }
 
-function getConnectorColor(status: WorkflowStatus) {
+function getConnectorColor(status: WorkflowStatusType) {
   switch (status) {
     case WorkflowStatus.APPROVED:
     case WorkflowStatus.COMPLETED:

@@ -1,9 +1,9 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus, WorkflowStatusType } from '@/lib/constants'
 
-const statusConfig: Record<WorkflowStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
+const statusConfig: Record<WorkflowStatusType, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
   DRAFT: { label: 'Draft', variant: 'outline', className: 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-100' },
   PENDING: { label: 'Pending', variant: 'outline', className: 'bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100' },
   IN_REVIEW: { label: 'In Review', variant: 'outline', className: 'bg-sky-100 text-sky-800 border-sky-300 hover:bg-sky-100' },
@@ -19,7 +19,7 @@ const statusConfig: Record<WorkflowStatus, { label: string; variant: 'default' |
 }
 
 interface StatusBadgeProps {
-  status: WorkflowStatus
+  status: WorkflowStatusType
   className?: string
 }
 

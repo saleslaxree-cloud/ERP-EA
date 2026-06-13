@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus } from '@/lib/constants'
 
 // GET /api/weekly-score?userId=xxx&weekStart=ISO&weekEnd=ISO
 // Returns per-user weekly task statistics for live score auto-calculation

@@ -26,6 +26,14 @@ export function LaxreeSidebar() {
   const activeTasks = (d?.totalTasks || 0) - (d?.completedTasks || 0) - ((d?.statusCounts?.CANCELLED || 0))
   const overdueTasks = d?.overdueTasks || 0
 
+  // Fetch pending leaves count for employee badge
+  const { data: empLeavesData } = useQuery({
+    queryKey: ['emp-leaves-sidebar', currentUserId],
+    queryFn: () => fetch(`/api/leaves?userId=${currentUserId}`).then(r => r.json()),
+    enabled: !!currentUserId && (currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'MANAGER' || currentUser?.role === 'DIRECTOR'),
+  })
+  const empPendingLeaves = (empLeavesData as any)?.leaves?.filter((l: any) => l.status === 'PENDING')?.length || 0
+
   const commandCenter: NavItem[] = [
     {
       id: 'dashboard', label: 'Dashboard',
@@ -90,21 +98,26 @@ export function LaxreeSidebar() {
     },
   ]
 
-  // Show employee dashboard option for EMPLOYEE role
-  const employeeSection: NavItem[] = [
+  // Employee-specific sidebar navigation
+  const employeeDashboard: NavItem[] = [
     {
       id: 'employee-dashboard', label: 'My Dashboard',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
     },
+  ]
+
+  const employeeLeaves: NavItem[] = [
     {
       id: 'leaves', label: 'My Leaves',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
+      badge: empPendingLeaves > 0 ? <span className="nb nb-warn">{empPendingLeaves}</span> : undefined,
     },
   ]
 
   const isEmployee = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'MANAGER' || currentUser?.role === 'DIRECTOR'
   const sections = isEmployee ? [
-    { label: 'My Space', items: employeeSection },
+    { label: 'My Space', items: employeeDashboard },
+    { label: 'Leave', items: employeeLeaves },
     { label: 'Task Management', items: taskMgmt },
   ] : [
     { label: 'Command Center', items: commandCenter },

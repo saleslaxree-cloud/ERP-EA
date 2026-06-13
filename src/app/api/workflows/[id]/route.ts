@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus, WorkflowStatusType } from '@/lib/constants'
 
-const VALID_TRANSITIONS: Record<WorkflowStatus, WorkflowStatus[]> = {
+const VALID_TRANSITIONS: Record<WorkflowStatusType, WorkflowStatusType[]> = {
   DRAFT: [WorkflowStatus.PENDING],
   PENDING: [WorkflowStatus.IN_REVIEW, WorkflowStatus.CANCELLED],
   IN_REVIEW: [WorkflowStatus.APPROVED, WorkflowStatus.REJECTED, WorkflowStatus.ESCALATED, WorkflowStatus.ON_HOLD],
@@ -17,7 +17,7 @@ const VALID_TRANSITIONS: Record<WorkflowStatus, WorkflowStatus[]> = {
   CANCELLED: [],
 }
 
-function validateTransition(from: WorkflowStatus, to: WorkflowStatus): boolean {
+function validateTransition(from: WorkflowStatusType, to: WorkflowStatusType): boolean {
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
 }
 
@@ -89,7 +89,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Workflow not found' }, { status: 404 })
     }
 
-    if (status && !validateTransition(workflow.status, status as WorkflowStatus)) {
+    if (status && !validateTransition(workflow.status as WorkflowStatusType, status as WorkflowStatusType)) {
       return NextResponse.json(
         { error: `Invalid transition from ${workflow.status} to ${status}` },
         { status: 400 }
@@ -99,7 +99,7 @@ export async function PATCH(
     const updatedWorkflow = await db.workflowInstance.update({
       where: { id },
       data: {
-        ...(status ? { status: status as WorkflowStatus } : {}),
+        ...(status ? { status } : {}),
         updatedAt: new Date(),
       },
     })
@@ -110,7 +110,7 @@ export async function PATCH(
         data: {
           workflowId: id,
           fromStatus: workflow.status,
-          toStatus: status as WorkflowStatus,
+          toStatus: status,
           changedBy: changedBy || null,
           reason: reason || null,
         },

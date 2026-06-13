@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus, WorkflowStatusType } from '@/lib/constants'
 
 // POST /api/approval-action - Handle approval actions for workflow steps
 // Complete workflow: Employee Steps → EA Review → Director → EA Final Review → Employee (Final Submit) → Complete
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
 
         // Update task status based on what step we're at
         if (task) {
-          let newTaskStatus: WorkflowStatus = WorkflowStatus.IN_REVIEW
+          let newTaskStatus: WorkflowStatusType = WorkflowStatus.IN_REVIEW
 
           if (nextStep.name.includes('Director')) {
             newTaskStatus = WorkflowStatus.ON_HOLD // Waiting for director

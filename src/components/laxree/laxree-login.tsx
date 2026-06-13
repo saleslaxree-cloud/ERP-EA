@@ -44,13 +44,13 @@ export function LaxreeLogin() {
         </div>
         <div className="lf-g">
           <label className="lf-l">Username</label>
-          <input className="lf-i" type="text" placeholder="admin"
+          <input className="lf-i" type="text" placeholder="Enter your username"
             value={username} onChange={e => setUsername(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()} />
         </div>
         <div className="lf-g">
           <label className="lf-l">Password</label>
-          <input className="lf-i" type="password" placeholder="••••••••"
+          <input className="lf-i" type="password" placeholder="Enter your password"
             value={password} onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()} />
         </div>
@@ -62,7 +62,34 @@ export function LaxreeLogin() {
             fontSize: 12, marginTop: 10,
           }}>{error}</div>
         )}
-        <div className="lf-hint">Admin: admin / Laxree@2025 · EA: ea / EA@Laxree · Directors: ashish / Ashish@2025 · samarth / Samarth@2025 · Employees: aditya / Aditya@2025 · aakash / Aakash@2025</div>
+
+        {/* Credentials Reference */}
+        <div style={{ marginTop: 14, fontSize: 9.5, color: 'var(--t4)', lineHeight: 1.8 }}>
+          <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Admin & EA</div>
+          <div><b>admin</b> / Laxree@2025 &nbsp;·&nbsp; <b>ea</b> / EA@Laxree</div>
+
+          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Directors</div>
+          <div><b>ashish</b> / Ashish@2025 &nbsp;·&nbsp; <b>samarth</b> / Samarth@2025</div>
+
+          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Employees</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+            <div><b>aditya</b> / Aditya@2025</div>
+            <div><b>aakash</b> / Aakash@2025</div>
+            <div><b>anamika</b> / Anamika@2025</div>
+            <div><b>saurabh</b> / Saurabh@2025</div>
+            <div><b>ruchi</b> / Ruchi@2025</div>
+            <div><b>aayush</b> / Aayush@2025</div>
+            <div><b>kamlesh</b> / Kamlesh@2025</div>
+            <div><b>hitesh</b> / Hitesh@2025</div>
+          </div>
+
+          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Managers</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
+            <div><b>khushboo</b> / Khushboo@2025</div>
+            <div><b>radhika</b> / Radhika@2025</div>
+            <div><b>tanuja</b> / Tanuja@2025</div>
+          </div>
+        </div>
       </div>
     </div>
   )

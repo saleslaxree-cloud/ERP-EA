@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       const userTasks = allTasks.filter(t => t.owner?.id === user.id)
       const done = userTasks.filter(t => t.status === WorkflowStatus.COMPLETED).length
       const overdue = userTasks.filter(t =>
-        t.dueDate && new Date(t.dueDate) < now && !([WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] as WorkflowStatus[]).includes(t.status)
+        t.dueDate && new Date(t.dueDate) < now && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
       ).length
       const inProgress = userTasks.filter(t => t.status === WorkflowStatus.IN_PROGRESS).length
       const score = userTasks.length > 0 ? Math.round((done / userTasks.length) * 100 - overdue * 5) : 0
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       if (t.status === WorkflowStatus.COMPLETED) deptMap[dept].done++
       if (t.status === WorkflowStatus.IN_PROGRESS) deptMap[dept].inProgress++
       if (t.status === WorkflowStatus.PENDING) deptMap[dept].pending++
-      if (t.dueDate && new Date(t.dueDate) < now && !([WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] as WorkflowStatus[]).includes(t.status)) deptMap[dept].overdue++
+      if (t.dueDate && new Date(t.dueDate) < now && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED) deptMap[dept].overdue++
     })
 
     // ══ CATEGORY STATS ══
@@ -103,11 +103,11 @@ export async function GET(request: NextRequest) {
     const todayTasksList = allTasks.filter(t => t.dueDate && new Date(t.dueDate) >= todayStart && new Date(t.dueDate) < todayEnd)
     const upcomingTasksList = allTasks.filter(t =>
       t.dueDate && new Date(t.dueDate) >= todayEnd && new Date(t.dueDate) < nextWeekEnd &&
-      !([WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] as WorkflowStatus[]).includes(t.status)
+      t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
     )
     const overdueTasksList = allTasks.filter(t =>
       t.dueDate && new Date(t.dueDate) < now &&
-      !([WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] as WorkflowStatus[]).includes(t.status)
+      t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
     )
 
     // ══ PENDING APPROVALS ══

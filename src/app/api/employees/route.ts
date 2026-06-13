@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { UserRole } from '@prisma/client'
+import { UserRole } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (department) where.department = department
-    if (role) where.role = role as UserRole
+    if (role) where.role = role
     if (status === 'active') where.isActive = true
     else if (status === 'inactive') where.isActive = false
 
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Only Arti Sharma can be ADMIN - prevent others from getting ADMIN role
-    const requestedRole = (role as UserRole) || UserRole.EMPLOYEE
+    const requestedRole = role || UserRole.EMPLOYEE
     if (requestedRole === UserRole.ADMIN) {
       const existingAdmins = await db.user.findMany({ where: { role: UserRole.ADMIN } })
       if (existingAdmins.length > 0) {
@@ -162,7 +162,7 @@ export async function PATCH(request: NextRequest) {
     if (designation !== undefined) updateData.designation = designation
     if (phone !== undefined) updateData.phone = phone
     if (location !== undefined) updateData.location = location
-    if (role !== undefined) updateData.role = role as UserRole
+    if (role !== undefined) updateData.role = role
 
     const updated = await db.user.update({
       where: { id: userId },

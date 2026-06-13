@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus, TaskPriority } from '@prisma/client'
+import { WorkflowStatus, TaskPriority } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
-    if (status) where.status = status as WorkflowStatus
+    if (status) where.status = status
 
     // Only get top-level tasks (no parent)
     const tasks = await db.task.findMany({
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
         title,
         description: description || null,
         status: WorkflowStatus.IN_PROGRESS,
-        priority: (priority as TaskPriority) || TaskPriority.MEDIUM,
+        priority: priority || TaskPriority.MEDIUM,
         ownerId,
         department: department || null,
         category: category || null,

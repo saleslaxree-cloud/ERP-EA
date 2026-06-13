@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {

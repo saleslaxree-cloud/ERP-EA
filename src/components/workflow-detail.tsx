@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { formatDistanceToNow, format } from 'date-fns'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus, WorkflowStatusType } from '@/lib/constants'
 
 interface WorkflowDetailProps {
   workflowId: string
@@ -33,7 +33,7 @@ interface WorkflowDetailData {
   id: string
   title: string
   description: string | null
-  status: WorkflowStatus
+  status: WorkflowStatusType
   priority: string
   currentStepOrder: number
   dueDate: string | null
@@ -44,7 +44,7 @@ interface WorkflowDetailData {
     id: string
     name: string
     order: number
-    status: WorkflowStatus
+    status: WorkflowStatusType
     stepType: string
     isEscalated: boolean
     startedAt: string | null
@@ -54,7 +54,7 @@ interface WorkflowDetailData {
     assignee: { id: string; name: string; email: string; role: string } | null
     approvals: {
       id: string
-      action: WorkflowStatus
+      action: WorkflowStatusType
       comments: string | null
       level: number
       isDelegated: boolean
@@ -64,7 +64,7 @@ interface WorkflowDetailData {
   }[]
   approvals: {
     id: string
-    action: WorkflowStatus
+    action: WorkflowStatusType
     comments: string | null
     level: number
     isDelegated: boolean
@@ -73,8 +73,8 @@ interface WorkflowDetailData {
   }[]
   statusHistory: {
     id: string
-    fromStatus: WorkflowStatus
-    toStatus: WorkflowStatus
+    fromStatus: WorkflowStatusType
+    toStatus: WorkflowStatusType
     changedBy: string | null
     reason: string | null
     createdAt: string

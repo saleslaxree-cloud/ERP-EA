@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { LeaveStatus } from '@prisma/client'
+import { LeaveStatus, LeaveStatusType } from '@/lib/constants'
 
 // PATCH /api/leaves/[id] — approve, reject, or cancel a leave
 export async function PATCH(
@@ -21,7 +21,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Leave not found' }, { status: 404 })
     }
 
-    let status: LeaveStatus
+    let status: LeaveStatusType
     if (action === 'approve') status = LeaveStatus.APPROVED
     else if (action === 'reject') status = LeaveStatus.REJECTED
     else status = LeaveStatus.CANCELLED

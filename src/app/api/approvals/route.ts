@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus } from '@prisma/client'
+import { WorkflowStatus } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     const where: Record<string, unknown> = {
       assigneeId: userId,
-      status: status ? (status as WorkflowStatus) : { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_REVIEW] },
+      status: status ? status : { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_REVIEW] },
     }
 
     const pendingSteps = await db.stepInstance.findMany({
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         stepInstanceId,
         workflowId,
         approverId,
-        action: action as WorkflowStatus,
+        action: action,
         comments: comments || null,
         level: (stepInstance as any).stepTemplate?.approvalLevel ?? 1,
         isDelegated: isDelegated || false,

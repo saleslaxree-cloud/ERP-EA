@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { WorkflowStatus, TaskPriority } from '@prisma/client'
+import { WorkflowStatus, TaskPriority } from '@/lib/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     const userId = request.nextUrl.searchParams.get('userId')
 
     const where: Record<string, unknown> = {}
-    if (status) where.status = status as WorkflowStatus
+    if (status) where.status = status
     if (userId) where.creatorId = userId
 
     const workflows = await db.workflowInstance.findMany({
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         status: WorkflowStatus.PENDING,
-        priority: (priority as TaskPriority) || TaskPriority.MEDIUM,
+        priority: priority || TaskPriority.MEDIUM,
         currentStepOrder: 1,
         creatorId,
         dueDate: dueDate ? new Date(dueDate) : null,
