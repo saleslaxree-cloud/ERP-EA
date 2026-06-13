@@ -88,6 +88,8 @@ model User {
   managedProjects    Project[]           @relation("ProjectManager")
   deptHead           Department[]        @relation("DeptHead")
   mondayMeetings     MondayMeeting[]     @relation("MondayMeetingUser")
+  leaves             Leave[]             @relation("UserLeaves")
+  approvedLeaves     Leave[]             @relation("LeaveApprover")
 }
 
 model Department {
@@ -359,6 +361,42 @@ model Project {
   manager     User?          @relation("ProjectManager", fields: [managerId], references: [id])
   dept        Department?    @relation(fields: [department], references: [name])
   tasks       Task[]
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  EARNED
+  HALF_DAY
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model Leave {
+  id              String       @id @default(cuid())
+  userId          String
+  leaveType       LeaveType    @default(CASUAL)
+  fromDate        DateTime
+  toDate          DateTime
+  reason          String
+  status          LeaveStatus  @default(PENDING)
+  // AL = Applied on time (1 day before), LA = Late Application (same day)
+  applicationTag  String       @default("AL")
+  // EA remark when approving/rejecting
+  eaRemark        String?
+  approvedById    String?
+  approvedAt      DateTime?
+  totalDays       Float        @default(1)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation("UserLeaves", fields: [userId], references: [id])
+  approvedBy      User?        @relation("LeaveApprover", fields: [approvedById], references: [id])
 }
 
 model MondayMeeting {

@@ -14,6 +14,8 @@ import { LaxreeTopbar } from '@/components/laxree/laxree-topbar'
 import { LaxreeCommandPalette } from '@/components/laxree/laxree-command-palette'
 import { LaxreeNotifPanel } from '@/components/laxree/laxree-notif-panel'
 import { LaxreeLogin } from '@/components/laxree/laxree-login'
+import { LaxreeEmployeeDashboard } from '@/components/laxree/laxree-employee-dashboard'
+import { LaxreeLeaveManagement } from '@/components/laxree/laxree-leave-management'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -91,6 +93,10 @@ function ActiveView() {
         return <TeamView />
       case 'categories':
         return <CategoriesView />
+      case 'employee-dashboard':
+        return <LaxreeEmployeeDashboard />
+      case 'leaves':
+        return <LaxreeLeaveManagement />
       // dirDep removed
       case 'exthold':
         return <LaxreeExtHold />

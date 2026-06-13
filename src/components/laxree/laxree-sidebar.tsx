@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves'
 
 interface NavItem {
   id: ActivePage
@@ -83,9 +83,26 @@ export function LaxreeSidebar() {
       id: 'categories', label: 'Categories',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z" /></svg>,
     },
+    {
+      id: 'leaves', label: 'Leaves',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+      badge: <span className="nb nb-warn">EA</span>,
+    },
   ]
 
-  const sections = [
+  // Show employee dashboard option for EMPLOYEE role
+  const employeeSection: NavItem[] = [
+    {
+      id: 'employee-dashboard', label: 'My Dashboard',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
+    },
+  ]
+
+  const isEmployee = currentUser?.role === 'EMPLOYEE'
+  const sections = isEmployee ? [
+    { label: 'My Space', items: employeeSection },
+    { label: 'Task Management', items: taskMgmt },
+  ] : [
     { label: 'Command Center', items: commandCenter },
     { label: 'Weekly Review', items: weeklyReview },
     { label: 'Task Management', items: taskMgmt },
