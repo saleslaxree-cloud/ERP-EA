@@ -112,6 +112,8 @@ export function LaxreeCreateTask() {
         qc.invalidateQueries({ queryKey: ['tasks'] })
         qc.invalidateQueries({ queryKey: ['tasks-list'] })
         qc.invalidateQueries({ queryKey: ['dashboard'] })
+        qc.invalidateQueries({ queryKey: ['emp-tasks'] })
+        qc.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
         setCreateTaskOpen(false)
         setForm({ title: '', description: '', assignTo: '', department: '', category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '', frequency: 'One Time' })
         setSteps([])

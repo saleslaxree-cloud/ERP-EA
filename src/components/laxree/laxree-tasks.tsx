@@ -29,7 +29,13 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
   const { data: tasks = [] } = useQuery({
     queryKey: ['tasks-list'],
-    queryFn: () => fetch('/api/tasks').then(r => r.json()),
+    queryFn: async () => {
+      const res = await fetch('/api/tasks')
+      if (!res.ok) throw new Error('Failed to fetch tasks')
+      return res.json()
+    },
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 
   const { data: users = [] } = useQuery({
