@@ -4,7 +4,7 @@ import { WorkflowStatus, TaskPriority } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = request.nextUrl.searchParams.get('userId')
+    const userId = request.nextUrl.searchParams.get('userId') || request.nextUrl.searchParams.get('ownerId')
     const status = request.nextUrl.searchParams.get('status')
 
     const where: Record<string, unknown> = {}

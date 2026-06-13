@@ -15,10 +15,10 @@ export function LaxreeEmployeeDashboard() {
   const [leaveReason, setLeaveReason] = useState('')
   const [showLeaveForm, setShowLeaveForm] = useState(false)
 
-  // Fetch employee's tasks (read-only)
-  const { data: tasksData = { tasks: [] } } = useQuery({
+  // Fetch employee's tasks (read-only) — ONLY tasks assigned to this employee
+  const { data: tasksData = [] } = useQuery({
     queryKey: ['emp-tasks', currentUserId],
-    queryFn: () => fetch(`/api/tasks?ownerId=${currentUserId}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/tasks?userId=${currentUserId}`).then(r => r.json()),
     enabled: !!currentUserId,
   })
 
@@ -29,8 +29,8 @@ export function LaxreeEmployeeDashboard() {
     enabled: !!currentUserId,
   })
 
-  const tasks = Array.isArray(tasksData) ? tasksData : (tasksData.tasks || [])
-  const leaves = leavesData.leaves || []
+  const tasks = Array.isArray(tasksData) ? tasksData : []
+  const leaves = Array.isArray(leavesData) ? leavesData : (leavesData.leaves || [])
 
   // Apply leave mutation
   const applyLeaveMutation = useMutation({
@@ -69,8 +69,6 @@ export function LaxreeEmployeeDashboard() {
     CANCELLED: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelled' },
   }
 
-  const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?'
-
   return (
     <>
       <div className="ph">
@@ -108,7 +106,7 @@ export function LaxreeEmployeeDashboard() {
 
       {/* Leave Application Form */}
       {showLeaveForm && (
-        <div className="lcard" style={{ marginBottom: 16 }}>
+        <div className="lcard" style={{ marginBottom: 16, borderLeft: '4px solid var(--g2)' }}>
           <div className="ch"><div className="ct">📝 Apply for Leave</div></div>
           <div className="cb">
             <div className="form-row fr-3">
@@ -152,7 +150,7 @@ export function LaxreeEmployeeDashboard() {
               </button>
             </div>
             <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 8, padding: '6px 10px', background: 'var(--bg2)', borderRadius: 6 }}>
-              💡 <b>AL</b> = Applied on time (1 day before) · <span style={{ color: 'var(--red)', fontWeight: 700 }}>LA</span> = Late Application (same day)
+              <b>AL</b> = Applied on time (1 day before) · <span style={{ color: 'var(--red)', fontWeight: 700 }}>LA</span> = Late Application (same day/less than 1 day before)
             </div>
           </div>
         </div>
@@ -161,14 +159,20 @@ export function LaxreeEmployeeDashboard() {
       {/* My Tasks — Read Only */}
       <div className="lcard" style={{ marginBottom: 16 }}>
         <div className="ch">
-          <div className="ct">📋 My Tasks</div>
-          <span className="badge b-blue" style={{ fontSize: 10 }}>{tasks.length}</span>
+          <div className="ct">📋 My Assigned Tasks</div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
+              🔒 Read Only
+            </span>
+            <span className="badge b-blue" style={{ fontSize: 10 }}>{tasks.length}</span>
+          </div>
         </div>
         <div className="cb" style={{ padding: 0 }}>
           {tasks.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
-              <div style={{ fontWeight: 700 }}>No tasks assigned</div>
+              <div style={{ fontWeight: 700 }}>No tasks assigned to you</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Arti Sharma</div>
             </div>
           ) : (
             <div className="tw">
@@ -212,6 +216,10 @@ export function LaxreeEmployeeDashboard() {
               </table>
             </div>
           )}
+          {/* Read-only notice */}
+          <div style={{ padding: '8px 16px', background: 'var(--bg2)', borderTop: '1px solid var(--b1)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>
+            🔒 Only Arti Sharma can mark tasks as Done or Revise. You can view your assigned tasks here.
+          </div>
         </div>
       </div>
 
@@ -226,6 +234,7 @@ export function LaxreeEmployeeDashboard() {
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
               <div style={{ fontSize: 28, marginBottom: 6 }}>🏖️</div>
               <div style={{ fontWeight: 700 }}>No leaves applied</div>
+              <div style={{ fontSize: 11, marginTop: 4 }}>Click "Apply Leave" to request time off</div>
             </div>
           ) : (
             <div className="tw">
