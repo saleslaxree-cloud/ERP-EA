@@ -34,6 +34,15 @@ export function LaxreeSidebar() {
   })
   const empPendingLeaves = (empLeavesData as any)?.leaves?.filter((l: any) => l.status === 'PENDING')?.length || 0
 
+  // Fetch ALL pending leaves count for EA/Admin badge
+  const { data: eaLeavesData } = useQuery({
+    queryKey: ['ea-leaves-sidebar'],
+    queryFn: () => fetch('/api/leaves?status=PENDING').then(r => r.json()),
+    enabled: currentUser?.role === 'ADMIN' || currentUser?.role === 'EA',
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
+  })
+  const eaPendingLeaves = (eaLeavesData as any)?.leaves?.length || 0
+
   const commandCenter: NavItem[] = [
     {
       id: 'dashboard', label: 'Dashboard',
@@ -94,7 +103,9 @@ export function LaxreeSidebar() {
     {
       id: 'leaves', label: 'Leaves',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
-      badge: <span className="nb nb-warn">EA</span>,
+      badge: eaPendingLeaves > 0
+        ? <span className="nb nb-live">{eaPendingLeaves} Pending</span>
+        : <span className="nb nb-warn">EA</span>,
     },
   ]
 

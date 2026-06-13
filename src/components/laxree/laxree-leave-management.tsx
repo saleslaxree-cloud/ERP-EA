@@ -7,10 +7,10 @@ import { useState } from 'react'
 export function LaxreeLeaveManagement() {
   const { currentUserId, addToast } = useWorkflowStore()
   const queryClient = useQueryClient()
-  const [filterStatus, setFilterStatus] = useState('ALL')
+  const [filterStatus, setFilterStatus] = useState('PENDING') // Default to PENDING so EA sees new applications first
   const [eaRemarkMap, setEaRemarkMap] = useState<Record<string, string>>({})
 
-  // Fetch all leaves
+  // Fetch all leaves — auto-refresh every 5 seconds so EA sees new applications instantly
   const { data: leavesData = { leaves: [] }, refetch: refetchAllLeaves } = useQuery({
     queryKey: ['all-leaves', filterStatus],
     queryFn: async () => {
@@ -21,6 +21,7 @@ export function LaxreeLeaveManagement() {
     },
     refetchOnMount: 'always',
     staleTime: 0,
+    refetchInterval: 5000, // Auto-refresh every 5 seconds for real-time EA view
   })
 
   // Fetch all employees for delegation view
@@ -106,7 +107,11 @@ export function LaxreeLeaveManagement() {
       <div className="ph">
         <div className="ph-left">
           <h2>Leave Management</h2>
-          <p>Review and manage employee leave applications</p>
+          <p>Review and manage employee leave applications
+            <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--green)', fontWeight: 700, background: 'var(--green-l)', padding: '2px 8px', borderRadius: 10 }}>
+              Auto-refresh ON
+            </span>
+          </p>
         </div>
         <div className="ph-right">
           <span className="badge" style={{ background: '#FEE2E2', color: 'var(--red)', fontWeight: 800, padding: '4px 12px', fontSize: 11 }}>
@@ -118,6 +123,32 @@ export function LaxreeLeaveManagement() {
         </div>
       </div>
       <div className="page-accent" />
+
+      {/* Pending Leave Alert Banner */}
+      {pendingCount > 0 && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 16, borderRadius: 10,
+          background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+          border: '1.5px solid #F59E0B',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ fontSize: 28 }}>🔔</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#92400E' }}>
+              {pendingCount} Leave Application{pendingCount > 1 ? 's' : ''} Pending
+            </div>
+            <div style={{ fontSize: 12, color: '#A16207', marginTop: 2 }}>
+              Review and approve/reject below. New applications auto-appear every 5 seconds.
+            </div>
+          </div>
+          <button className="btn" style={{
+            fontSize: 11, padding: '6px 14px', fontWeight: 800,
+            background: '#92400E', color: '#fff', borderRadius: 6,
+          }} onClick={() => { setFilterStatus('PENDING'); setActiveTab('applications'); }}>
+            Review Now →
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
