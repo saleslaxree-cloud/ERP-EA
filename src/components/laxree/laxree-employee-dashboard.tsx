@@ -1,21 +1,15 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 
 export function LaxreeEmployeeDashboard() {
   const { currentUserId, currentUserName, currentRole, addToast, setActivePage } = useWorkflowStore()
   const queryClient = useQueryClient()
 
   // Tab navigation for employee dashboard
-  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard' | 'ai'>('overview')
-
-  // AI Assistant
-  const [aiQuestion, setAiQuestion] = useState('')
-  const [aiMessages, setAiMessages] = useState<{ role: 'user' | 'ai'; text: string }[]>([])
-  const [aiLoading, setAiLoading] = useState(false)
-  const aiChatRef = useRef<HTMLDivElement>(null)
+  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
 
   // Fetch employee's tasks (read-only) — ONLY tasks assigned to this employee
   const { data: tasksData = [] } = useQuery({
@@ -66,41 +60,6 @@ export function LaxreeEmployeeDashboard() {
   const leaves = Array.isArray(leavesData) ? leavesData : (leavesData.leaves || [])
   const score = scoreData as any
 
-
-
-  // AI chat mutation
-  const aiMutation = useMutation({
-    mutationFn: (question: string) => fetch('/api/ai-assistant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId, question }),
-    }).then(r => r.json()),
-    onSuccess: (data: any) => {
-      setAiMessages(prev => [...prev, { role: 'ai', text: data.answer || 'No response' }])
-      setAiLoading(false)
-    },
-    onError: () => {
-      setAiMessages(prev => [...prev, { role: 'ai', text: 'Sorry, something went wrong. Please try again.' }])
-      setAiLoading(false)
-    },
-  })
-
-  const handleAiSend = () => {
-    if (!aiQuestion.trim() || aiLoading) return
-    setAiMessages(prev => [...prev, { role: 'user', text: aiQuestion }])
-    const q = aiQuestion
-    setAiQuestion('')
-    setAiLoading(true)
-    aiMutation.mutate(q)
-  }
-
-  // Auto-scroll AI chat
-  useEffect(() => {
-    if (aiChatRef.current) {
-      aiChatRef.current.scrollTop = aiChatRef.current.scrollHeight
-    }
-  }, [aiMessages])
-
   // Stats
   const activeTasks = tasks.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'PENDING' || t.status === 'ON_HOLD')
   const completedTasks = tasks.filter((t: any) => t.status === 'COMPLETED')
@@ -128,7 +87,6 @@ export function LaxreeEmployeeDashboard() {
     { id: 'overview' as const, label: 'Overview', icon: '📊' },
     { id: 'tasks' as const, label: 'My Tasks', icon: '📋' },
     { id: 'scorecard' as const, label: 'My Scorecard', icon: '📈' },
-    { id: 'ai' as const, label: 'AI Assistant', icon: '🤖' },
   ]
 
   return (
@@ -139,6 +97,10 @@ export function LaxreeEmployeeDashboard() {
           <p>Welcome, {currentUserName || 'Employee'}</p>
         </div>
         <div className="ph-right">
+          <button className="btn" style={{ fontSize: 11, padding: '6px 14px', background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800, border: '1px solid rgba(109,40,217,.3)' }}
+            onClick={() => setActivePage('ai-assistant')}>
+            🤖 AI Assistant
+          </button>
           <button className="btn btn-gold" onClick={() => setActivePage('emp-leaves')}>
             🏖️ Leave Management
           </button>
@@ -575,111 +537,6 @@ export function LaxreeEmployeeDashboard() {
         </>
       )}
 
-      {/* ===================== AI ASSISTANT TAB ===================== */}
-      {empTab === 'ai' && (
-        <div className="lcard" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 200px)', minHeight: 400 }}>
-          <div className="ch" style={{ flexShrink: 0 }}>
-            <div className="ct">🤖 AI Assistant</div>
-            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--g2)', background: 'var(--gb)', padding: '2px 8px', borderRadius: 4 }}>
-              Powered by AI
-            </span>
-          </div>
-
-          {/* Chat Messages */}
-          <div ref={aiChatRef} style={{
-            flex: 1, overflowY: 'auto', padding: '12px 16px',
-            display: 'flex', flexDirection: 'column', gap: 10,
-            background: 'var(--card2)',
-          }}>
-            {aiMessages.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--t3)' }}>
-                <div style={{ fontSize: 36, marginBottom: 10 }}>🤖</div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--t1)', marginBottom: 6 }}>Hi, {currentUserName?.split(' ')[0] || 'there'}!</div>
-                <div style={{ fontSize: 12, lineHeight: 1.6, maxWidth: 400, margin: '0 auto' }}>
-                  I&apos;m your AI assistant. I can help you with:
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginTop: 10 }}>
-                  {[
-                    'What are my pending tasks?',
-                    'How am I performing this week?',
-                    'What steps are left in my task?',
-                    'Can I apply for leave tomorrow?',
-                    'Help me prioritize my work',
-                  ].map(suggestion => (
-                    <button key={suggestion} className="btn" style={{
-                      fontSize: 10, padding: '4px 10px', background: 'var(--bg2)', color: 'var(--t2)',
-                      border: '1px solid var(--b1)', borderRadius: 16, cursor: 'pointer',
-                    }}
-                      onClick={() => { setAiQuestion(suggestion) }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {aiMessages.map((msg, idx) => (
-              <div key={idx} style={{
-                display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              }}>
-                <div style={{
-                  maxWidth: '80%', padding: '10px 14px', borderRadius: 12, fontSize: 12, lineHeight: 1.6,
-                  background: msg.role === 'user' ? 'var(--g2)' : 'var(--card)',
-                  color: msg.role === 'user' ? '#fff' : 'var(--t1)',
-                  border: msg.role === 'user' ? 'none' : '1px solid var(--b1)',
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  {msg.role === 'ai' && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: 'var(--g2)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>AI Assistant</div>
-                  )}
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-
-            {aiLoading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div style={{
-                  padding: '10px 14px', borderRadius: 12, background: 'var(--card)',
-                  border: '1px solid var(--b1)', fontSize: 12, color: 'var(--t3)',
-                }}>
-                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                    <span className="dot-pulse" />
-                    <span className="dot-pulse" style={{ animationDelay: '0.2s' }} />
-                    <span className="dot-pulse" style={{ animationDelay: '0.4s' }} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Chat Input */}
-          <div style={{
-            flexShrink: 0, padding: '10px 16px', borderTop: '1px solid var(--b1)',
-            display: 'flex', gap: 8, alignItems: 'center', background: 'var(--card)',
-          }}>
-            <input
-              className="fi"
-              type="text"
-              placeholder="Ask about your tasks, leaves, or workflow..."
-              value={aiQuestion}
-              onChange={e => setAiQuestion(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAiSend()}
-              style={{ flex: 1, fontSize: 12, padding: '8px 12px' }}
-              disabled={aiLoading}
-            />
-            <button
-              className="btn btn-gold"
-              onClick={handleAiSend}
-              disabled={!aiQuestion.trim() || aiLoading}
-              style={{ padding: '8px 16px', fontSize: 12, fontWeight: 800 }}
-            >
-              {aiLoading ? '...' : 'Send →'}
-            </button>
-          </div>
-        </div>
-      )}
     </>
   )
 }

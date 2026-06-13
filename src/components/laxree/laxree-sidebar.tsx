@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'ai-assistant'
 
 interface NavItem {
   id: ActivePage
@@ -114,10 +114,20 @@ export function LaxreeSidebar() {
     },
   ]
 
+  const employeeAI: NavItem[] = [
+    {
+      id: 'ai-assistant', label: 'AI Assistant',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z" /><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="12" r="3" /><path d="M12 9v-1" /><path d="M12 15v1" /></svg>,
+      badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>AI</span>,
+      specialStyle: true,
+    },
+  ]
+
   const isEmployee = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'MANAGER' || currentUser?.role === 'DIRECTOR'
   const sections = isEmployee ? [
     { label: 'My Space', items: employeeDashboard },
     { label: 'Leave Management', items: employeeLeaves },
+    { label: 'AI Assistant', items: employeeAI },
     { label: 'Task Management', items: taskMgmt },
   ] : [
     { label: 'Command Center', items: commandCenter },
