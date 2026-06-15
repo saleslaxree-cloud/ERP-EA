@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
+import { useState, useEffect } from 'react'
 
 interface DashboardData {
   statusCounts: Record<string, number>
@@ -36,6 +37,15 @@ function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length;
 
 export function LaxreeDashboard() {
   const { currentUser, setActivePage, currentUserId } = useWorkflowStore()
+
+  // Fetch pending leaves for EA alert banner
+  const { data: eaLeavesData } = useQuery({
+    queryKey: ['ea-dash-leaves'],
+    queryFn: () => fetch('/api/leaves?status=PENDING').then(r => r.json()),
+    refetchInterval: 5000,
+  })
+  const pendingLeaves = (eaLeavesData as any)?.leaves || []
+  const pendingLeaveCount = pendingLeaves.length
 
   const { data: dash, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard', currentUserId],
@@ -97,6 +107,37 @@ export function LaxreeDashboard() {
             <div className="alert-sub">{overdue} task(s) are past due date — immediate attention needed</div>
           </div>
           <button className="btn btn-red btn-sm" onClick={() => setActivePage('tasks')}>View →</button>
+        </div>
+      )}
+
+      {/* Pending Leave Applications Alert */}
+      {pendingLeaveCount > 0 && (
+        <div style={{
+          padding: '14px 18px', marginBottom: 12, borderRadius: 10,
+          background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+          border: '1.5px solid #F59E0B',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ fontSize: 28 }}>🏖️</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 14, color: '#92400E' }}>
+              {pendingLeaveCount} Leave Application{pendingLeaveCount > 1 ? 's' : ''} Pending Approval
+            </div>
+            <div style={{ fontSize: 12, color: '#A16207', marginTop: 2 }}>
+              {pendingLeaves.slice(0, 3).map((l: any, i: number) => (
+                <span key={l.id}>
+                  {i > 0 && ' · '}{l.user?.name || 'Unknown'} ({l.leaveType}, {l.totalDays}d)
+                </span>
+              ))}
+              {pendingLeaves.length > 3 && ` · +${pendingLeaves.length - 3} more`}
+            </div>
+          </div>
+          <button className="btn" style={{
+            fontSize: 11, padding: '6px 14px', fontWeight: 800,
+            background: '#92400E', color: '#fff', borderRadius: 6, whiteSpace: 'nowrap',
+          }} onClick={() => setActivePage('leaves')}>
+            Review Leaves →
+          </button>
         </div>
       )}
 

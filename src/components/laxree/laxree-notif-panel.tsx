@@ -44,6 +44,9 @@ export function LaxreeNotifPanel() {
     STATUS_CHANGE: '🔄',
     COMMENT: '💬',
     DELEGATION: '👥',
+    LEAVE_APPROVED: '🏖️',
+    LEAVE_REJECTED: '🚫',
+    LEAVE_APPLIED: '📝',
   }
 
   if (!notifPanelOpen) return null

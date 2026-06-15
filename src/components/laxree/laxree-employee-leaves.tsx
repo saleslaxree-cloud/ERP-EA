@@ -29,7 +29,7 @@ export function LaxreeEmployeeLeaves() {
   const [showLeaveForm, setShowLeaveForm] = useState(false)
   const [filterStatus, setFilterStatus] = useState('ALL')
 
-  // Fetch employee's own leaves only
+  // Fetch employee's own leaves only — with auto-refresh for real-time status updates
   const { data: leavesData, isLoading: leavesLoading, refetch: refetchLeaves } = useQuery({
     queryKey: ['emp-leaves', currentUserId],
     queryFn: async () => {
@@ -41,6 +41,7 @@ export function LaxreeEmployeeLeaves() {
     enabled: !!currentUserId,
     refetchOnMount: 'always',
     staleTime: 0,
+    refetchInterval: 10000, // Auto-refresh every 10 seconds so employee sees EA approval/rejection
   })
 
   // Parse leaves from response
@@ -169,7 +170,11 @@ export function LaxreeEmployeeLeaves() {
           </div>
           <div>
             <h2>Leave Management</h2>
-            <p>Apply for leave and track your leave status</p>
+            <p>Apply for leave and track your leave status
+            <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--green)', fontWeight: 700, background: 'var(--green-l)', padding: '2px 8px', borderRadius: 10 }}>
+              Auto-refresh ON
+            </span>
+          </p>
           </div>
         </div>
         <div className="ph-right">

@@ -16,7 +16,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'action must be approve, reject, or cancel' }, { status: 400 })
     }
 
-    const leave = await db.leave.findUnique({ where: { id } })
+    const leave = await db.leave.findUnique({
+      where: { id },
+      include: { user: { select: { id: true, name: true } } },
+    })
     if (!leave) {
       return NextResponse.json({ error: 'Leave not found' }, { status: 404 })
     }
@@ -39,6 +42,49 @@ export async function PATCH(
         approvedBy: { select: { id: true, name: true } },
       },
     })
+
+    // Create notification for the employee when leave is approved/rejected
+    if (action === 'approve' || action === 'reject') {
+      try {
+        const isApproved = action === 'approve'
+        const fromDateStr = new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        const toDateStr = new Date(leave.toDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+
+        await db.notification.create({
+          data: {
+            type: isApproved ? 'APPROVED' : 'REJECTED',
+            title: isApproved ? 'Leave Approved' : 'Leave Rejected',
+            message: `Your ${leave.leaveType} leave (${fromDateStr} → ${toDateStr}, ${leave.totalDays} day${(leave.totalDays || 1) > 1 ? 's' : ''}) has been ${isApproved ? 'approved' : 'rejected'} by ${updated.approvedBy?.name || 'EA'}.${eaRemark ? ` Remark: ${eaRemark}` : ''}`,
+            senderId: approvedById || null,
+            receiverId: leave.userId,
+          },
+        })
+      } catch (notifErr) {
+        console.error('Failed to create leave notification:', notifErr)
+        // Don't fail the main operation if notification fails
+      }
+    }
+
+    // Create notification for EA when an employee cancels their leave
+    if (action === 'cancel') {
+      try {
+        const eaUser = await db.user.findFirst({ where: { role: { in: ['EA', 'ADMIN'] } } })
+        if (eaUser) {
+          const fromDateStr = new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+          await db.notification.create({
+            data: {
+              type: 'STATUS_CHANGE',
+              title: 'Leave Cancelled',
+              message: `${leave.user?.name || 'Employee'} cancelled their ${leave.leaveType} leave starting ${fromDateStr}`,
+              senderId: leave.userId,
+              receiverId: eaUser.id,
+            },
+          })
+        }
+      } catch (notifErr) {
+        console.error('Failed to create cancel notification:', notifErr)
+      }
+    }
 
     return NextResponse.json({ leave: updated })
   } catch (error) {

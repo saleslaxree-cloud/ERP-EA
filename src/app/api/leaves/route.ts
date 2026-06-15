@@ -88,6 +88,26 @@ export async function POST(request: NextRequest) {
     })
 
     console.log('Leave created successfully:', leave.id, 'for user:', userId, 'tag:', applicationTag)
+
+    // Notify EA/Admin about the new leave application
+    try {
+      const eaUser = await db.user.findFirst({ where: { role: { in: ['EA', 'ADMIN'] } } })
+      if (eaUser) {
+        const fromDateStr = from.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        await db.notification.create({
+          data: {
+            type: 'APPROVAL_REQUIRED',
+            title: 'New Leave Application',
+            message: `${user.name} applied for ${leaveType || 'Casual'} leave (${fromDateStr}, ${totalDays} day${totalDays > 1 ? 's' : ''}). Tag: ${applicationTag}`,
+            senderId: userId,
+            receiverId: eaUser.id,
+          },
+        })
+      }
+    } catch (notifErr) {
+      console.error('Failed to create leave application notification:', notifErr)
+    }
+
     return NextResponse.json({ leave }, { status: 201 })
   } catch (error) {
     console.error('Leave POST error:', error)

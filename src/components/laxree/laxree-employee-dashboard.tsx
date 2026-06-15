@@ -31,8 +31,8 @@ export function LaxreeEmployeeDashboard() {
     enabled: !!currentUserId,
   })
 
-  // Fetch employee's leaves
-  const { data: leavesData = { leaves: [] } } = useQuery({
+  // Fetch employee's leaves — with auto-refresh for real-time status updates
+  const { data: leavesData = { leaves: [] }, refetch: refetchLeaves } = useQuery({
     queryKey: ['emp-leaves', currentUserId],
     queryFn: async () => {
       const res = await fetch(`/api/leaves?userId=${currentUserId}`)
@@ -42,6 +42,7 @@ export function LaxreeEmployeeDashboard() {
     enabled: !!currentUserId,
     refetchOnMount: 'always',
     staleTime: 0,
+    refetchInterval: 10000, // Auto-refresh every 10 seconds so employee sees status changes
   })
 
   // Fetch employee's weekly score
@@ -125,6 +126,78 @@ export function LaxreeEmployeeDashboard() {
         </div>
       </div>
       <div className="page-accent" />
+
+      {/* Leave Status Alert Banner for Employee */}
+      {pendingLeaves.length > 0 && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 12, borderRadius: 10,
+          background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',
+          border: '1.5px solid #F59E0B',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ fontSize: 24 }}>⏳</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#92400E' }}>
+              {pendingLeaves.length} Leave Application{pendingLeaves.length > 1 ? 's' : ''} Pending — Awaiting EA Approval
+            </div>
+            <div style={{ fontSize: 11, color: '#A16207', marginTop: 2 }}>
+              {pendingLeaves.slice(0, 2).map((l: any, i: number) => (
+                <span key={l.id}>
+                  {i > 0 && ' · '}{l.leaveType} ({new Date(l.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })})
+                </span>
+              ))}
+              {pendingLeaves.length > 2 && ` · +${pendingLeaves.length - 2} more`}
+              {' · '}Arti Sharma will review shortly
+            </div>
+          </div>
+          <button className="btn" style={{
+            fontSize: 11, padding: '6px 14px', fontWeight: 800,
+            background: '#92400E', color: '#fff', borderRadius: 6, whiteSpace: 'nowrap',
+          }} onClick={() => setActivePage('emp-leaves')}>
+            View Leaves →
+          </button>
+        </div>
+      )}
+
+      {/* Recently Approved/Rejected Leaves Alert */}
+      {leaves.filter((l: any) => {
+        if (!l.approvedAt) return false
+        const approvedTime = new Date(l.approvedAt).getTime()
+        const hoursSinceApproval = (Date.now() - approvedTime) / (1000 * 60 * 60)
+        return hoursSinceApproval < 24 && (l.status === 'APPROVED' || l.status === 'REJECTED')
+      }).length > 0 && (
+        <div style={{
+          padding: '12px 16px', marginBottom: 12, borderRadius: 10,
+          background: 'linear-gradient(135deg, #DCFCE7, #BBF7D0)',
+          border: '1.5px solid #22C55E',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ fontSize: 24 }}>{'✅'}</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: 13, color: '#15803D' }}>
+              Leave Status Update
+            </div>
+            <div style={{ fontSize: 11, color: '#166534', marginTop: 2 }}>
+              {leaves.filter((l: any) => {
+                if (!l.approvedAt) return false
+                const hoursSince = (Date.now() - new Date(l.approvedAt).getTime()) / (1000 * 60 * 60)
+                return hoursSince < 24 && (l.status === 'APPROVED' || l.status === 'REJECTED')
+              }).slice(0, 2).map((l: any, i: number) => (
+                <span key={l.id}>
+                  {i > 0 && ' · '}{l.leaveType} leave {l.status === 'APPROVED' ? 'approved' : 'rejected'}
+                  {l.eaRemark ? ` (${l.eaRemark})` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+          <button className="btn" style={{
+            fontSize: 11, padding: '6px 14px', fontWeight: 800,
+            background: '#15803D', color: '#fff', borderRadius: 6, whiteSpace: 'nowrap',
+          }} onClick={() => setActivePage('emp-leaves')}>
+            View Details →
+          </button>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="tabs" style={{ marginBottom: 16 }}>
