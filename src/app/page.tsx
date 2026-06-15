@@ -155,7 +155,7 @@ function ExecutiveView() {
 
   const d = data as any
   const score = d?.performanceScore || d?.completionRate || 0
-  const userPerf = d?.userPerformance || []
+  const userPerf = Array.isArray(d?.userPerformance) ? d.userPerformance : []
   const deptMap = d?.deptMap || {}
 
   return (
@@ -358,7 +358,7 @@ function PerformanceView() {
     queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
   })
   const d = data as any
-  const userPerf = d?.userPerformance || []
+  const userPerf = Array.isArray(d?.userPerformance) ? d.userPerformance : []
   const getInitials = (name: string) => name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
   const scoreColor = (score: number) => score >= 70 ? 'var(--green)' : score >= 40 ? 'var(--amber)' : 'var(--red)'
 
@@ -397,7 +397,7 @@ function DepartmentsView() {
   })
   const d = data as any
   const deptMap = d?.deptMap || {}
-  const userPerf = d?.userPerformance || []
+  const userPerf = Array.isArray(d?.userPerformance) ? d.userPerformance : []
   const deptColors: Record<string, string> = { 'Sales': 'var(--blue)', 'Back Office': 'var(--amber)', 'Accounts': 'var(--green)' }
 
   return (
@@ -439,10 +439,11 @@ function TeamView() {
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
   const [teamTab, setTeamTab] = useState('active')
 
-  const { data: users = [] } = useQuery({ queryKey: ['users-list'], queryFn: () => fetch('/api/users').then(r => r.json()) })
+  const { data: rawUsers } = useQuery({ queryKey: ['users-list'], queryFn: () => fetch('/api/users').then(r => r.json()) })
+  const users = Array.isArray(rawUsers) ? rawUsers : []
   const { data } = useQuery({ queryKey: ['dashboard', currentUserId], queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()) })
   const d = data as any
-  const userPerf = d?.userPerformance || []
+  const userPerf = Array.isArray(d?.userPerformance) ? d.userPerformance : []
   const getInitials = (name: string) => name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
   const roleBadge: Record<string, string> = { ADMIN: 'b-gold', DIRECTOR: 'b-purple', EA: 'b-blue', MANAGER: 'b-green', EMPLOYEE: 'b-gray' }
 
@@ -451,9 +452,9 @@ function TeamView() {
     queryKey: ['all-users-team'],
     queryFn: () => fetch('/api/employees').then(r => r.json()),
   })
-  const allUsers = (allUsersData as any)?.employees || []
-  const activeUsers = allUsers.filter((u: any) => u.isActive)
-  const inactiveUsers = allUsers.filter((u: any) => !u.isActive)
+  const allUsers = Array.isArray((allUsersData as any)?.employees) ? (allUsersData as any).employees : []
+  const activeUsers = Array.isArray(allUsers) ? allUsers.filter((u: any) => u.isActive) : []
+  const inactiveUsers = Array.isArray(allUsers) ? allUsers.filter((u: any) => !u.isActive) : []
 
   const displayUsers = teamTab === 'active' ? activeUsers : teamTab === 'inactive' ? inactiveUsers : allUsers
 
@@ -757,10 +758,10 @@ function EmployeesView() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['employees'] }) },
   })
 
-  const employees: any[] = (data as any)?.employees || []
+  const employees: any[] = Array.isArray((data as any)?.employees) ? (data as any).employees : []
   const stats = (data as any)?.stats || {}
-  const activeEmps = employees.filter(e => e.isActive)
-  const inactiveEmps = employees.filter(e => !e.isActive)
+  const activeEmps = Array.isArray(employees) ? employees.filter(e => e.isActive) : []
+  const inactiveEmps = Array.isArray(employees) ? employees.filter(e => !e.isActive) : []
   const displayEmps = empTab === 'active' ? activeEmps : empTab === 'inactive' ? inactiveEmps : employees
 
   if (isLoading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>Loading employees…</div>
@@ -925,7 +926,7 @@ function ScorecardsView() {
   const { currentUserId } = useWorkflowStore()
   const { data } = useQuery({ queryKey: ['dashboard', currentUserId], queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()) })
   const d = data as any
-  const userPerf = d?.userPerformance || []
+  const userPerf = Array.isArray(d?.userPerformance) ? d.userPerformance : []
 
   return (
     <div>

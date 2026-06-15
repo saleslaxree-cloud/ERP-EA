@@ -26,6 +26,7 @@ interface DashboardData {
   upcomingTasksList: any[]
   overdueTasksList: any[]
   pendingApprovalsList: any[]
+  recentLeaves?: any[]
 }
 
 interface User {
@@ -44,7 +45,7 @@ export function LaxreeDashboard() {
     queryFn: () => fetch('/api/leaves?status=PENDING').then(r => r.json()),
     refetchInterval: 5000,
   })
-  const pendingLeaves = (eaLeavesData as any)?.leaves || []
+  const pendingLeaves = Array.isArray((eaLeavesData as any)?.leaves) ? (eaLeavesData as any).leaves : []
   const pendingLeaveCount = pendingLeaves.length
 
   const { data: dash, isLoading } = useQuery<DashboardData>({
@@ -53,10 +54,11 @@ export function LaxreeDashboard() {
     enabled: !!currentUserId,
   })
 
-  const { data: users = [] } = useQuery<User[]>({
+  const { data: rawUsers } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => fetch('/api/users').then(r => r.json()),
   })
+  const users = Array.isArray(rawUsers) ? rawUsers : []
 
   if (isLoading) return (
     <div style={{ padding: 40, textAlign: 'center' }}>
@@ -73,10 +75,10 @@ export function LaxreeDashboard() {
   const completionRate = dash?.completionRate || 0
   const effScore = Math.max(0, completionRate - Math.round(overdue / Math.max(total, 1) * 10))
 
-  const userPerf = dash?.userPerformance || []
-  const todayTasks = dash?.todayTasksList || []
-  const upcomingTasks = dash?.upcomingTasksList || []
-  const overdueTasks = dash?.overdueTasksList || []
+  const userPerf = Array.isArray(dash?.userPerformance) ? dash.userPerformance : []
+  const todayTasks = Array.isArray(dash?.todayTasksList) ? dash.todayTasksList : []
+  const upcomingTasks = Array.isArray(dash?.upcomingTasksList) ? dash.upcomingTasksList : []
+  const overdueTasks = Array.isArray(dash?.overdueTasksList) ? dash.overdueTasksList : []
 
   const getInitials = (name: string) => name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
   const scoreColor = (s: number) => s >= 70 ? 'var(--green)' : s >= 40 ? 'var(--amber)' : 'var(--red)'
@@ -121,7 +123,7 @@ export function LaxreeDashboard() {
           <div style={{ fontSize: 28 }}>🏖️</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 14, color: '#92400E' }}>
-              {pendingLeaveCount} Leave Application{pendingLeaveCount > 1 ? 's' : ''} Pending Approval
+              {pendingLeaveCount} New Leave Application{pendingLeaveCount > 1 ? 's' : ''} from Employees
             </div>
             <div style={{ fontSize: 12, color: '#A16207', marginTop: 2 }}>
               {pendingLeaves.slice(0, 3).map((l: any, i: number) => (
@@ -136,7 +138,7 @@ export function LaxreeDashboard() {
             fontSize: 11, padding: '6px 14px', fontWeight: 800,
             background: '#92400E', color: '#fff', borderRadius: 6, whiteSpace: 'nowrap',
           }} onClick={() => setActivePage('leaves')}>
-            Review Leaves →
+            View Leaves →
           </button>
         </div>
       )}
@@ -180,6 +182,67 @@ export function LaxreeDashboard() {
           <div className="sc-bar"><div className="sc-bar-fill" style={{ width: `${effScore}%`, background: 'var(--g2)' }} /></div>
         </div>
       </div>
+
+      {/* Recent Leave Applications — View-only, auto-refresh every 5s */}
+      {(() => {
+        const recentLeaves = Array.isArray(dash?.recentLeaves) ? dash.recentLeaves : []
+        if (recentLeaves.length === 0) return null
+        const leaveStatusStyle: Record<string, { bg: string; color: string; label: string }> = {
+          PENDING: { bg: '#FEF3C7', color: '#92400E', label: 'Pending' },
+          APPROVED: { bg: '#DCFCE7', color: '#15803D', label: 'Approved' },
+          REJECTED: { bg: '#FEE2E2', color: '#DC2626', label: 'Rejected' },
+          CANCELLED: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelled' },
+        }
+        return (
+          <div className="lcard" style={{ marginBottom: 14 }}>
+            <div className="ch">
+              <div className="ct">🏖️ Recent Leave Applications</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <span className="badge b-gold" style={{ fontSize: 10 }}>Live</span>
+                <span style={{ fontSize: 9, color: 'var(--t3)', fontWeight: 700 }}>Auto-refresh 5s</span>
+              </div>
+            </div>
+            <div className="cb" style={{ padding: 0 }}>
+              <div className="tw">
+                <table className="ltable">
+                  <thead>
+                    <tr><th>Employee</th><th>Leave Type</th><th>From</th><th>To</th><th>Days</th><th>Tag</th><th>Status</th><th>Reason</th></tr>
+                  </thead>
+                  <tbody>
+                    {recentLeaves.slice(0, 10).map((l: any) => {
+                      const ls = leaveStatusStyle[l.status] || leaveStatusStyle.PENDING
+                      const isLate = l.applicationTag === 'LA'
+                      return (
+                        <tr key={l.id} style={isLate ? { background: '#FEF2F2' } : undefined}>
+                          <td style={{ fontWeight: 600, fontSize: 12 }}>
+                            {l.user?.name || 'Unknown'}
+                            {l.user?.department && <span className="badge b-gray" style={{ fontSize: 8, padding: '1px 4px', marginLeft: 4 }}>{l.user.department}</span>}
+                          </td>
+                          <td style={{ fontSize: 11, fontWeight: 600 }}>{l.leaveType}</td>
+                          <td style={{ fontSize: 11 }}>{l.fromDate ? new Date(l.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</td>
+                          <td style={{ fontSize: 11 }}>{l.toDate ? new Date(l.toDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '—'}</td>
+                          <td style={{ fontWeight: 700, fontSize: 11 }}>{l.totalDays}</td>
+                          <td>
+                            <span className="badge" style={{ fontSize: 10, padding: '2px 6px', fontWeight: 900, background: isLate ? '#DC2626' : 'var(--green)', color: '#fff', borderRadius: 4 }}>
+                              {isLate ? 'LA' : 'AL'}
+                            </span>
+                          </td>
+                          <td>
+                            <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: ls.bg, color: ls.color, fontWeight: 700 }}>
+                              {ls.label}
+                            </span>
+                          </td>
+                          <td style={{ fontSize: 11, color: 'var(--t3)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.reason}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Performance Score Board */}
       <div className="lcard" style={{ marginBottom: 14 }}>

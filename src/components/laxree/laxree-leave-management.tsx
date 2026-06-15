@@ -1,14 +1,10 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useWorkflowStore } from '@/stores/workflow-store'
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 export function LaxreeLeaveManagement() {
-  const { currentUserId, currentRole, addToast } = useWorkflowStore()
-  const queryClient = useQueryClient()
   const [filterStatus, setFilterStatus] = useState('PENDING') // Default to PENDING so EA sees new applications first
-  const [eaRemarkMap, setEaRemarkMap] = useState<Record<string, string>>({})
 
   // Fetch all leaves — auto-refresh every 5 seconds so EA sees new applications instantly
   const { data: leavesData = { leaves: [] }, refetch: refetchAllLeaves } = useQuery({
@@ -30,8 +26,8 @@ export function LaxreeLeaveManagement() {
     queryFn: () => fetch('/api/employees?status=active').then(r => r.json()),
   })
 
-  const leaves = leavesData.leaves || []
-  const employees = employeesData.employees || []
+  const leaves = Array.isArray(leavesData?.leaves) ? leavesData.leaves : []
+  const employees = Array.isArray(employeesData?.employees) ? employeesData.employees : []
 
   // Get currently-on-leave employees (approved leaves where today falls in range)
   const today = new Date()
@@ -57,43 +53,6 @@ export function LaxreeLeaveManagement() {
     if (!pendingByEmployee[leave.userId]) pendingByEmployee[leave.userId] = []
     pendingByEmployee[leave.userId].push(leave)
   }
-
-  // Approve/reject mutation — with proper HTTP error checking
-  const actionMutation = useMutation({
-    mutationFn: async ({ leaveId, action, eaRemark }: { leaveId: string; action: string; eaRemark?: string }) => {
-      // Use the EA user's ID from the store; fall back to first EA/ADMIN if not set
-      let approverId = currentUserId
-      if (!approverId || (currentRole !== 'EA' && currentRole !== 'ADMIN')) {
-        // Try to find an EA/ADMIN user from the API
-        try {
-          const usersRes = await fetch('/api/users')
-          const users = await usersRes.json()
-          const eaUser = users.find((u: any) => u.role === 'EA' || u.role === 'ADMIN')
-          if (eaUser) approverId = eaUser.id
-        } catch {}
-      }
-      const res = await fetch(`/api/leaves/${leaveId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, approvedById: approverId, eaRemark: eaRemark || null }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Failed to update leave')
-      return json
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
-      queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
-      queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
-      queryClient.invalidateQueries({ queryKey: ['ea-dash-leaves'] })
-      queryClient.invalidateQueries({ queryKey: ['ea-leaves-sidebar'] })
-      queryClient.invalidateQueries({ queryKey: ['topbar-notifs'] })
-      queryClient.invalidateQueries({ queryKey: ['notifications-panel'] })
-      addToast('ok', `Leave ${variables.action === 'approve' ? 'approved' : 'rejected'}`)
-      refetchAllLeaves()
-    },
-    onError: (err: any) => addToast('err', err.message || 'Failed to update leave'),
-  })
 
   // Stats
   const pendingCount = leaves.filter((l: any) => l.status === 'PENDING').length
@@ -122,7 +81,7 @@ export function LaxreeLeaveManagement() {
       <div className="ph">
         <div className="ph-left">
           <h2>Leave Management</h2>
-          <p>Review and manage employee leave applications
+          <p>View employee leave applications
             <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--green)', fontWeight: 700, background: 'var(--green-l)', padding: '2px 8px', borderRadius: 10 }}>
               Auto-refresh ON
             </span>
@@ -153,14 +112,14 @@ export function LaxreeLeaveManagement() {
               {pendingCount} Leave Application{pendingCount > 1 ? 's' : ''} Pending
             </div>
             <div style={{ fontSize: 12, color: '#A16207', marginTop: 2 }}>
-              Review and approve/reject below. New applications auto-appear every 5 seconds.
+              New leave applications from employees. Auto-refresh every 5 seconds.
             </div>
           </div>
           <button className="btn" style={{
             fontSize: 11, padding: '6px 14px', fontWeight: 800,
             background: '#92400E', color: '#fff', borderRadius: 6,
           }} onClick={() => { setFilterStatus('PENDING'); setActiveTab('applications'); }}>
-            Review Now →
+            View Leaves →
           </button>
         </div>
       )}
@@ -409,40 +368,6 @@ export function LaxreeLeaveManagement() {
                           </div>
                         )}
                       </div>
-
-                      {/* Action Buttons */}
-                      {isPending && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0, minWidth: 160 }}>
-                          <input
-                            className="fi"
-                            type="text"
-                            placeholder="EA Remark (optional)"
-                            value={eaRemarkMap[leave.id] || ''}
-                            onChange={e => setEaRemarkMap(prev => ({ ...prev, [leave.id]: e.target.value }))}
-                            style={{ fontSize: 11, padding: '6px 8px' }}
-                          />
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              className="btn btn-xs"
-                              style={{ background: 'var(--green-l)', color: 'var(--green)', border: '1.5px solid var(--green)', fontWeight: 800, flex: 1 }}
-                              onClick={() => actionMutation.mutate({
-                                leaveId: leave.id, action: 'approve', eaRemark: eaRemarkMap[leave.id],
-                              })}
-                            >
-                              ✓ Approve
-                            </button>
-                            <button
-                              className="btn btn-xs"
-                              style={{ background: '#FEE2E2', color: '#DC2626', border: '1.5px solid #DC2626', fontWeight: 700, flex: 1 }}
-                              onClick={() => actionMutation.mutate({
-                                leaveId: leave.id, action: 'reject', eaRemark: eaRemarkMap[leave.id],
-                              })}
-                            >
-                              ✕ Reject
-                            </button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>

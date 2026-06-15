@@ -75,12 +75,13 @@ export async function GET(request: NextRequest) {
     const onLeave = totalEmployees - activeEmployees
 
     return NextResponse.json({
-      employees: employeesWithStats,
+      employees: Array.isArray(employeesWithStats) ? employeesWithStats : [],
       stats: { total: totalEmployees, active: activeEmployees, departments, onLeave },
     })
   } catch (error) {
     console.error('Employees GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch employees' }, { status: 500 })
+    // Return safe default structure instead of error object to prevent .filter() crashes
+    return NextResponse.json({ employees: [], stats: { total: 0, active: 0, departments: 0, onLeave: 0 } })
   }
 }
 

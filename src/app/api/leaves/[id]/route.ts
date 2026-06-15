@@ -68,9 +68,9 @@ export async function PATCH(
     // Create notification for EA when an employee cancels their leave
     if (action === 'cancel') {
       try {
-        const eaUser = await db.user.findFirst({ where: { role: { in: ['EA', 'ADMIN'] } } })
-        if (eaUser) {
-          const fromDateStr = new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        const eaUsers = await db.user.findMany({ where: { role: { in: ['EA', 'ADMIN'] }, isActive: true }, select: { id: true } })
+        const fromDateStr = new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+        for (const eaUser of eaUsers) {
           await db.notification.create({
             data: {
               type: 'STATUS_CHANGE',

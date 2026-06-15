@@ -37,12 +37,13 @@ export function LaxreeUserManagement() {
   const [formPassword, setFormPassword] = useState('')
 
   // Fetch users
-  const { data: users = [], refetch: refetchUsers } = useQuery({
+  const { data: rawUsers, refetch: refetchUsers } = useQuery({
     queryKey: ['users-managed'],
     queryFn: () => fetch('/api/users').then(r => r.json()),
     refetchOnMount: 'always',
     staleTime: 0,
   })
+  const users = Array.isArray(rawUsers) ? rawUsers : []
 
   const filteredUsers = filterRole === 'ALL' ? users : users.filter((u: any) => u.role === filterRole)
 

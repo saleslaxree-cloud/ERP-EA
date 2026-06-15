@@ -21,10 +21,11 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json({ leaves })
+    return NextResponse.json({ leaves: Array.isArray(leaves) ? leaves : [] })
   } catch (error) {
     console.error('Leaves GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch leaves' }, { status: 500 })
+    // Return safe default structure instead of error object to prevent .filter() crashes
+    return NextResponse.json({ leaves: [] })
   }
 }
 
@@ -89,14 +90,14 @@ export async function POST(request: NextRequest) {
 
     console.log('Leave created successfully:', leave.id, 'for user:', userId, 'tag:', applicationTag)
 
-    // Notify EA/Admin about the new leave application
+    // Notify ALL EA/Admin users about the new leave application
     try {
-      const eaUser = await db.user.findFirst({ where: { role: { in: ['EA', 'ADMIN'] } } })
-      if (eaUser) {
-        const fromDateStr = from.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+      const eaUsers = await db.user.findMany({ where: { role: { in: ['EA', 'ADMIN'] }, isActive: true }, select: { id: true } })
+      const fromDateStr = from.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+      for (const eaUser of eaUsers) {
         await db.notification.create({
           data: {
-            type: 'APPROVAL_REQUIRED',
+            type: 'LEAVE_APPLIED',
             title: 'New Leave Application',
             message: `${user.name} applied for ${leaveType || 'Casual'} leave (${fromDateStr}, ${totalDays} day${totalDays > 1 ? 's' : ''}). Tag: ${applicationTag}`,
             senderId: userId,

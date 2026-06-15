@@ -144,7 +144,6 @@ export function LaxreeSidebar() {
     { label: 'My Space', items: employeeDashboard },
     { label: 'Leave Management', items: employeeLeaves },
     { label: 'AI Assistant', items: employeeAI },
-    { label: 'Task Management', items: taskMgmt },
   ] : [
     { label: 'Command Center', items: commandCenter },
     { label: 'Weekly Review', items: weeklyReview },

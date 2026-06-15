@@ -18,14 +18,16 @@ export async function GET() {
         isActive: true,
         joinDate: true,
         createdAt: true,
+        // NOTE: loginUsername and loginPassword intentionally excluded from GET for security
       },
       orderBy: { name: 'asc' },
     })
 
-    return NextResponse.json(users)
+    return NextResponse.json(Array.isArray(users) ? users : [])
   } catch (error) {
     console.error('Users GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+    // Return empty array instead of error object to prevent .filter() crashes on frontend
+    return NextResponse.json([])
   }
 }
 

@@ -52,6 +52,17 @@ export async function GET(request: NextRequest) {
     // ══ ALL USERS ══
     const allUsers = await db.user.findMany({
       select: { id: true, name: true, email: true, role: true, department: true, isActive: true },
+      // NOTE: loginUsername and loginPassword intentionally excluded for security
+    })
+
+    // ══ RECENT LEAVES (all statuses, for dashboard display) ══
+    const recentLeaves = await db.leave.findMany({
+      include: {
+        user: { select: { id: true, name: true, email: true, department: true, designation: true } },
+        approvedBy: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
     })
 
     // ══ USER PERFORMANCE ══
@@ -159,16 +170,19 @@ export async function GET(request: NextRequest) {
     }))
 
     return NextResponse.json({
-      statusCounts,
+      statusCounts: statusCounts || {},
       totalWorkflows: await db.workflowInstance.count(),
       totalTasks, completedTasks, pendingTasks, inProgressTasks, overdueTasks,
       todayTasks, upcomingTasks,
       externalHoldTasks: await db.task.count({ where: { status: WorkflowStatus.EXTERNAL_HOLD } }),
       pendingApprovals, escalationCount,
       completionRate, performanceScore: completionRate,
-      allTasks: [], // Removed for performance - use /api/tasks instead
-      allUsers, userPerformance, deptMap, catMap,
-      recentActivities,
+      allTasks: [],
+      allUsers: Array.isArray(allUsers) ? allUsers : [],
+      userPerformance: Array.isArray(userPerformance) ? userPerformance : [],
+      deptMap: deptMap || {},
+      catMap: catMap || {},
+      recentActivities: Array.isArray(recentActivities) ? recentActivities : [],
       todayTasksList: todayTasksList.map(t => ({
         id: t.id, title: t.title, status: t.status, priority: t.priority,
         department: t.department, category: t.category, dueDate: t.dueDate?.toISOString(), owner: t.owner,
@@ -181,11 +195,39 @@ export async function GET(request: NextRequest) {
         id: t.id, title: t.title, status: t.status, priority: t.priority,
         department: t.department, category: t.category, dueDate: t.dueDate?.toISOString(), owner: t.owner,
       })),
-      pendingApprovalsList,
-      notifications,
+      pendingApprovalsList: Array.isArray(pendingApprovalsList) ? pendingApprovalsList : [],
+      notifications: Array.isArray(notifications) ? notifications : [],
+      recentLeaves: Array.isArray(recentLeaves) ? recentLeaves.map(l => ({
+        id: l.id,
+        userId: l.userId,
+        leaveType: l.leaveType,
+        fromDate: l.fromDate?.toISOString(),
+        toDate: l.toDate?.toISOString(),
+        reason: l.reason,
+        status: l.status,
+        applicationTag: l.applicationTag,
+        totalDays: l.totalDays,
+        eaRemark: l.eaRemark,
+        createdAt: l.createdAt?.toISOString(),
+        user: l.user ? { id: l.user.id, name: l.user.name, department: l.user.department, designation: l.user.designation } : null,
+        approvedBy: l.approvedBy ? { id: l.approvedBy.id, name: l.approvedBy.name } : null,
+      })) : [],
     })
   } catch (error) {
     console.error('Dashboard error:', error)
-    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
+    // Return safe default structure instead of error object to prevent .filter() crashes
+    return NextResponse.json({
+      statusCounts: {}, totalWorkflows: 0,
+      totalTasks: 0, completedTasks: 0, pendingTasks: 0, inProgressTasks: 0, overdueTasks: 0,
+      todayTasks: 0, upcomingTasks: 0, externalHoldTasks: 0,
+      pendingApprovals: 0, escalationCount: 0,
+      completionRate: 0, performanceScore: 0,
+      allTasks: [], allUsers: [], userPerformance: [],
+      deptMap: {}, catMap: {},
+      recentActivities: [],
+      todayTasksList: [], upcomingTasksList: [], overdueTasksList: [],
+      pendingApprovalsList: [], notifications: [],
+      recentLeaves: [],
+    })
   }
 }

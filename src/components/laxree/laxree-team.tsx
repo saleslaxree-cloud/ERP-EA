@@ -12,21 +12,23 @@ export function LaxreeTeam() {
   const [removeConfirm, setRemoveConfirm] = useState<string | null>(null)
   const [teamTab, setTeamTab] = useState('active')
 
-  const { data: users = [] } = useQuery({
+  const { data: rawUsers } = useQuery({
     queryKey: ['users-team'],
     queryFn: () => fetch('/api/users').then(r => r.json()),
   })
+  const users = Array.isArray(rawUsers) ? rawUsers : []
 
   const { data: allUsersData } = useQuery({
     queryKey: ['all-users-team'],
     queryFn: () => fetch('/api/employees').then(r => r.json()),
   })
-  const { data: workflows = [] } = useQuery({
+  const { data: rawWorkflows } = useQuery({
     queryKey: ['workflows-team'],
     queryFn: () => fetch('/api/workflows').then(r => r.json()),
   })
+  const workflows = Array.isArray(rawWorkflows) ? rawWorkflows : []
 
-  const allUsers = (allUsersData as any)?.employees || []
+  const allUsers = Array.isArray((allUsersData as any)?.employees) ? (allUsersData as any).employees : []
   const activeUsers = allUsers.filter((u: any) => u.isActive)
   const inactiveUsers = allUsers.filter((u: any) => !u.isActive)
   const displayUsers = teamTab === 'active' ? activeUsers : teamTab === 'inactive' ? inactiveUsers : allUsers
