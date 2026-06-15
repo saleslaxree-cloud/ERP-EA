@@ -181,21 +181,42 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     t.status === 'ESCALATED' || (t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   )
 
+  // Helper: check if a date is today
+  const isToday = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  }
+
+  // Helper: check if a date is in the future (upcoming)
+  const isUpcoming = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return d > todayStart
+  }
+
   if (!showCancelled && !showExtHold && !showEscalations) {
-    if (taskTab === 'inprogress') filtered = filtered.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'IN_REVIEW' || t.status === 'ON_HOLD')
-    else if (taskTab === 'pending') filtered = filtered.filter((t: any) => t.status === 'PENDING' || t.status === 'DRAFT')
-    else if (taskTab === 'completed') filtered = filtered.filter((t: any) => t.status === 'COMPLETED')
+    if (taskTab === 'today') filtered = filtered.filter((t: any) =>
+      t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+    )
+    else if (taskTab === 'upcoming') filtered = filtered.filter((t: any) =>
+      t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+    )
     else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
       t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
   }
 
+  const allTasks = Array.isArray(tasks) ? tasks : []
+  const todayCount = allTasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  const overdueCount = allTasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+
   const tabs = [
-    { id: 'all', label: 'All', count: Array.isArray(tasks) ? tasks.length : 0 },
-    { id: 'inprogress', label: 'Active', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'IN_REVIEW' || t.status === 'ON_HOLD').length },
-    { id: 'pending', label: 'Pending', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'PENDING' || t.status === 'DRAFT').length },
-    { id: 'completed', label: 'Completed', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.status === 'COMPLETED').length },
-    { id: 'overdue', label: 'Overdue', count: (Array.isArray(tasks) ? tasks : []).filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length },
+    { id: 'today', label: 'Today', count: todayCount },
+    { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
+    { id: 'overdue', label: 'Overdue', count: overdueCount },
   ]
 
   const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?'

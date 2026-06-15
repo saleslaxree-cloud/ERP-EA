@@ -23,7 +23,7 @@ export function LaxreeEmployeeDashboard() {
 
   // Tab navigation for employee dashboard
   const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
-  const [taskFilter, setTaskFilter] = useState<string>('all')
+  const [taskFilter, setTaskFilter] = useState<string>('today')
 
   // When coming from sidebar "My Tasks" link, auto-switch to tasks tab
   useEffect(() => {
@@ -83,6 +83,20 @@ export function LaxreeEmployeeDashboard() {
   const score = scoreData as any
 
   // Stats
+  const isToday = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  }
+  const isUpcoming = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    return d > todayStart
+  }
+  const todayTasks = tasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  const upcomingTasks = tasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  const overdueTasks = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const activeTasks = tasks.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'PENDING' || t.status === 'ON_HOLD')
   const completedTasks = tasks.filter((t: any) => t.status === 'COMPLETED')
   const pendingLeaves = leaves.filter((l: any) => l.status === 'PENDING')
@@ -213,7 +227,7 @@ export function LaxreeEmployeeDashboard() {
           <div key={tab.id} className={`tab${empTab === tab.id ? ' active' : ''}`}
             onClick={() => setEmpTab(tab.id)}>
             <span style={{ marginRight: 4 }}>{tab.icon}</span> {tab.label}
-            {tab.id === 'tasks' && activeTasks.length > 0 && <span className="tab-cnt">{activeTasks.length}</span>}
+            {tab.id === 'tasks' && todayTasks.length > 0 && <span className="tab-cnt">{todayTasks.length}</span>}
           </div>
         ))}
       </div>
@@ -224,16 +238,16 @@ export function LaxreeEmployeeDashboard() {
           {/* Stats Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
             <div className="lcard" style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Active Tasks</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--blue)' }}>{activeTasks.length}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Today</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--g2)' }}>{todayTasks.length}</div>
             </div>
             <div className="lcard" style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Completed</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--green)' }}>{completedTasks.length}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Upcoming</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--blue)' }}>{upcomingTasks.length}</div>
             </div>
             <div className="lcard" style={{ padding: '14px 16px' }}>
-              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Pending Leaves</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--amber)' }}>{pendingLeaves.length}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>Overdue</div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: 'var(--red)' }}>{overdueTasks.length}</div>
             </div>
             <div className="lcard" style={{ padding: '14px 16px' }}>
               <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 4 }}>PR Score</div>
@@ -419,26 +433,21 @@ export function LaxreeEmployeeDashboard() {
       {empTab === 'tasks' && (
         <>
           {/* Task Stats Summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
-            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'all' ? '3px solid var(--g2)' : undefined, background: taskFilter === 'all' ? 'rgba(180,83,9,.04)' : undefined }}
-              onClick={() => setTaskFilter('all')}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>All Tasks</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--g2)' }}>{tasks.length}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'today' ? '3px solid var(--g2)' : undefined, background: taskFilter === 'today' ? 'rgba(180,83,9,.04)' : undefined }}
+              onClick={() => setTaskFilter('today')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Today</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--g2)' }}>{todayTasks.length}</div>
             </div>
-            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'active' ? '3px solid var(--blue)' : undefined, background: taskFilter === 'active' ? 'rgba(29,78,216,.04)' : undefined }}
-              onClick={() => setTaskFilter('active')}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Active</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--blue)' }}>{activeTasks.length}</div>
-            </div>
-            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'completed' ? '3px solid var(--green)' : undefined, background: taskFilter === 'completed' ? 'rgba(21,128,61,.04)' : undefined }}
-              onClick={() => setTaskFilter('completed')}>
-              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Completed</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--green)' }}>{completedTasks.length}</div>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'upcoming' ? '3px solid var(--blue)' : undefined, background: taskFilter === 'upcoming' ? 'rgba(29,78,216,.04)' : undefined }}
+              onClick={() => setTaskFilter('upcoming')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Upcoming</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--blue)' }}>{upcomingTasks.length}</div>
             </div>
             <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'overdue' ? '3px solid var(--red)' : undefined, background: taskFilter === 'overdue' ? 'rgba(220,38,38,.04)' : undefined }}
               onClick={() => setTaskFilter('overdue')}>
               <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Overdue</div>
-              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--red)' }}>{tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length}</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--red)' }}>{overdueTasks.length}</div>
             </div>
           </div>
 
@@ -447,22 +456,21 @@ export function LaxreeEmployeeDashboard() {
               <div className="ct">📋 All My Assigned Tasks</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
-                  {taskFilter === 'all' ? `Showing all ${tasks.length}` : taskFilter === 'active' ? `${activeTasks.length} active` : taskFilter === 'completed' ? `${completedTasks.length} done` : 'Overdue'}
+                  {taskFilter === 'today' ? `${todayTasks.length} today` : taskFilter === 'upcoming' ? `${upcomingTasks.length} upcoming` : `${overdueTasks.length} overdue`}
                 </span>
               </div>
             </div>
             <div className="cb" style={{ padding: 0 }}>
               {(() => {
-                const filteredTasks = taskFilter === 'all' ? tasks
-                  : taskFilter === 'active' ? activeTasks
-                  : taskFilter === 'completed' ? completedTasks
-                  : tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+                const filteredTasks = taskFilter === 'today' ? todayTasks
+                  : taskFilter === 'upcoming' ? upcomingTasks
+                  : overdueTasks
 
                 return filteredTasks.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>
-                      {taskFilter === 'all' ? 'No tasks assigned to you' : `No ${taskFilter} tasks`}
+                      {taskFilter === 'today' ? 'No tasks due today' : taskFilter === 'upcoming' ? 'No upcoming tasks' : 'No overdue tasks'}
                     </div>
                     <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin</div>
                   </div>
