@@ -204,7 +204,6 @@ export function LaxreeSidebar() {
     // ADMIN: Full CEO Command Center with Executive View, Monday Meeting, Scorecard
     sections = [
       { label: 'CEO Command Center', items: adminCEOCommandCenter },
-      { label: 'CEO', items: adminCEOSection },
       { label: 'Weekly Review', items: adminWeeklyReview },
       { label: 'Scorecard', items: adminScorecard },
       { label: 'Task Management', items: taskMgmt },
