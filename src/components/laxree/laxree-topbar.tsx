@@ -52,8 +52,8 @@ export function LaxreeTopbar() {
         <span style={{ fontSize: '11.5px', color: 'var(--t3)', whiteSpace: 'nowrap' }}>{time}</span>
       </div>
       <div className="tb-right">
-        {/* Only ADMIN can create direct tasks */}
-        {currentRole === 'ADMIN' && (
+        {/* ADMIN and EA can create direct tasks */}
+        {(currentRole === 'ADMIN' || currentRole === 'EA') && (
         <button
           onClick={() => setCreateTaskOpen(true)}
           style={{

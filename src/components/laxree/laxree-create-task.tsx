@@ -87,6 +87,7 @@ export function LaxreeCreateTask() {
         .map((s, i) => ({
           title: s.title.trim(),
           order: i + 1,
+          assigneeId: user?.id || currentUserId,  // Assign steps to the selected employee
         }))
 
       const res = await fetch('/api/tasks', {

@@ -139,10 +139,11 @@ export async function POST(request: NextRequest) {
         weekDays: weekDays || null,
         monthDates: monthDates || null,
         taskSteps: {
-          create: taskStepsData.map((step: { title: string; order: number }) => ({
+          create: taskStepsData.map((step: { title: string; order: number; assigneeId?: string }) => ({
             title: step.title,
             status: WorkflowStatus.IN_PROGRESS,
             order: step.order || 0,
+            assigneeId: step.assigneeId || null,
             needsDirectorApproval: false,
             directorName: null,
             directorNote: null,
