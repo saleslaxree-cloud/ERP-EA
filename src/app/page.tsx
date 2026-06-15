@@ -18,6 +18,7 @@ import { LaxreeEmployeeDashboard } from '@/components/laxree/laxree-employee-das
 import { LaxreeLeaveManagement } from '@/components/laxree/laxree-leave-management'
 import { LaxreeEmployeeLeaves } from '@/components/laxree/laxree-employee-leaves'
 import { LaxreeAiAssistant } from '@/components/laxree/laxree-ai-assistant'
+import { LaxreeUserManagement } from '@/components/laxree/laxree-user-management'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -101,6 +102,8 @@ function ActiveView() {
         return <LaxreeLeaveManagement />
       case 'emp-leaves':
         return <LaxreeEmployeeLeaves />
+      case 'user-management':
+        return <LaxreeUserManagement />
       case 'ai-assistant':
         return <LaxreeAiAssistant />
       // dirDep removed

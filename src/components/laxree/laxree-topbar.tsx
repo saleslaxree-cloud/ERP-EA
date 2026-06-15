@@ -5,12 +5,12 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
 export function LaxreeTopbar() {
-  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen, setCreateTaskOpen, currentUserId } = useWorkflowStore()
+  const { currentUser, isDark, toggleDark, toggleNotifPanel, notifPanelOpen, setCmdPaletteOpen, setSidebarOpen, sidebarOpen, setCreateTaskOpen, currentUserId, currentRole } = useWorkflowStore()
   const [time, setTime] = useState('')
   const { data: notifData } = useQuery({
     queryKey: ['topbar-notifs', currentUserId],
     queryFn: () => fetch(`/api/notifications?userId=${currentUserId}`).then(r => r.json()).catch(() => ({ notifications: [], unreadCount: 0 })),
-    refetchInterval: 30000,
+    refetchInterval: 5000, // Faster refresh — 5 seconds for real-time leave notifications
     enabled: !!currentUserId,
   })
   const unreadCount = notifData?.unreadCount || 0
@@ -52,6 +52,8 @@ export function LaxreeTopbar() {
         <span style={{ fontSize: '11.5px', color: 'var(--t3)', whiteSpace: 'nowrap' }}>{time}</span>
       </div>
       <div className="tb-right">
+        {/* Only EA/Admin can create tasks */}
+        {(currentRole === 'EA' || currentRole === 'ADMIN') && (
         <button
           onClick={() => setCreateTaskOpen(true)}
           style={{
@@ -70,6 +72,7 @@ export function LaxreeTopbar() {
           </svg>
           New Task
         </button>
+        )}
         <div className="tb-icon-btn" onClick={toggleNotifPanel} title="Notifications" style={{ position: 'relative' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />

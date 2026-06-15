@@ -63,31 +63,19 @@ export function LaxreeLogin() {
           }}>{error}</div>
         )}
 
-        {/* Credentials Reference */}
-        <div style={{ marginTop: 14, fontSize: 9.5, color: 'var(--t4)', lineHeight: 1.8 }}>
-          <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Admin & EA</div>
-          <div><b>admin</b> / Laxree@2025 &nbsp;·&nbsp; <b>ea</b> / EA@Laxree</div>
-
-          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Directors</div>
-          <div><b>ashish</b> / Ashish@2025 &nbsp;·&nbsp; <b>samarth</b> / Samarth@2025</div>
-
-          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Employees</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-            <div><b>aditya</b> / Aditya@2025</div>
-            <div><b>aakash</b> / Aakash@2025</div>
-            <div><b>anamika</b> / Anamika@2025</div>
-            <div><b>saurabh</b> / Saurabh@2025</div>
-            <div><b>ruchi</b> / Ruchi@2025</div>
-            <div><b>aayush</b> / Aayush@2025</div>
-            <div><b>kamlesh</b> / Kamlesh@2025</div>
-            <div><b>hitesh</b> / Hitesh@2025</div>
+        {/* Security notice - NO CREDENTIALS SHOWN */}
+        <div style={{
+          marginTop: 16, padding: '12px 14px', borderRadius: 8,
+          background: 'rgba(109,40,217,.06)', border: '1px solid rgba(109,40,217,.15)',
+          fontSize: 11, color: 'var(--t3)', lineHeight: 1.6, textAlign: 'center',
+        }}>
+          <div style={{ fontWeight: 800, color: '#6D28D9', marginBottom: 4, fontSize: 12 }}>
+            🔐 Secure Login
           </div>
-
-          <div style={{ fontWeight: 800, marginTop: 8, marginBottom: 4, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Managers</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-            <div><b>khushboo</b> / Khushboo@2025</div>
-            <div><b>radhika</b> / Radhika@2025</div>
-            <div><b>tanuja</b> / Tanuja@2025</div>
+          <div>
+            Contact your administrator for login credentials.
+            <br />
+            Credentials are managed securely by EA only.
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'ai-assistant'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'ai-assistant' | 'user-management'
 
 interface NavItem {
   id: ActivePage
@@ -106,6 +106,11 @@ export function LaxreeSidebar() {
       badge: eaPendingLeaves > 0
         ? <span className="nb nb-live">{eaPendingLeaves} Pending</span>
         : <span className="nb nb-warn">EA</span>,
+    },
+    {
+      id: 'user-management', label: 'User Management',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /><path d="M19 8v6" /></svg>,
+      badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>🔐</span>,
     },
   ]
 
