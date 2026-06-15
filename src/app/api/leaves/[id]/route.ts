@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { LeaveStatus, LeaveStatusType } from '@/lib/constants'
 
 // PATCH /api/leaves/[id] — approve, reject, or cancel a leave
+// ONLY ADMIN can approve/reject. Employees can cancel their own leaves.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -14,6 +15,22 @@ export async function PATCH(
 
     if (!action || !['approve', 'reject', 'cancel'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve, reject, or cancel' }, { status: 400 })
+    }
+
+    // Verify the approver is an ADMIN for approve/reject actions
+    if (action === 'approve' || action === 'reject') {
+      if (!approvedById) {
+        return NextResponse.json({ error: 'approvedById is required for approve/reject actions' }, { status: 400 })
+      }
+
+      const approver = await db.user.findUnique({
+        where: { id: approvedById },
+        select: { id: true, role: true, name: true },
+      })
+
+      if (!approver || approver.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Only ADMIN can approve or reject leaves' }, { status: 403 })
+      }
     }
 
     const leave = await db.leave.findUnique({
@@ -54,18 +71,17 @@ export async function PATCH(
           data: {
             type: isApproved ? 'APPROVED' : 'REJECTED',
             title: isApproved ? 'Leave Approved' : 'Leave Rejected',
-            message: `Your ${leave.leaveType} leave (${fromDateStr} → ${toDateStr}, ${leave.totalDays} day${(leave.totalDays || 1) > 1 ? 's' : ''}) has been ${isApproved ? 'approved' : 'rejected'} by ${updated.approvedBy?.name || 'EA'}.${eaRemark ? ` Remark: ${eaRemark}` : ''}`,
+            message: `Your ${leave.leaveType} leave (${fromDateStr} → ${toDateStr}, ${leave.totalDays} day${(leave.totalDays || 1) > 1 ? 's' : ''}) has been ${isApproved ? 'approved' : 'rejected'} by ${updated.approvedBy?.name || 'Admin'}.${eaRemark ? ` Remark: ${eaRemark}` : ''}`,
             senderId: approvedById || null,
             receiverId: leave.userId,
           },
         })
       } catch (notifErr) {
         console.error('Failed to create leave notification:', notifErr)
-        // Don't fail the main operation if notification fails
       }
     }
 
-    // Create notification for EA when an employee cancels their leave
+    // Create notification for EA/Admin when an employee cancels their leave
     if (action === 'cancel') {
       try {
         const eaUsers = await db.user.findMany({ where: { role: { in: ['EA', 'ADMIN'] }, isActive: true }, select: { id: true } })

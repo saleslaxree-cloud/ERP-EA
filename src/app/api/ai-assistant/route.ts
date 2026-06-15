@@ -91,9 +91,9 @@ LEAVE HISTORY:
 ${leaveSummary || 'No leaves applied'}
 
 IMPORTANT RULES:
-1. Employees CANNOT mark tasks as Done — only Arti Sharma (EA) can do that
+1. Employees CANNOT mark tasks as Done — only Admin can do that
 2. Employees can ONLY view their assigned tasks (read-only)
-3. If an employee asks to complete/mark done a task, tell them only Arti Sharma (EA) can do that
+3. If an employee asks to complete/mark done a task, tell them only Admin can do that
 4. Help them understand their task progress, what steps remain, and prioritize work
 5. Guide them on leave policies: Apply 1 day before for "AL" (Approved Leave), same day = "LA" (Late Arrival, shown in red)
 6. Be concise, friendly, and helpful
@@ -242,7 +242,7 @@ function generateFallbackResponse(
     if (inProgressCount > 0) response += `🔵 **Continue:** ${inProgressCount} task${inProgressCount !== 1 ? 's' : ''} already in progress\n`
     if (pendingCount > 0) response += `🟡 **Then:** ${pendingCount} pending task${pendingCount !== 1 ? 's' : ''}\n`
 
-    response += `\n💡 Tip: Only Arti Sharma (EA) can mark tasks as Done, but you can track your progress here!`
+    response += `\n💡 Tip: Only Admin can mark tasks as Done, but you can track your progress here!`
     return response
   }
 

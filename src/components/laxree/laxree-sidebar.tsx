@@ -14,36 +14,43 @@ interface NavItem {
 }
 
 export function LaxreeSidebar() {
-  const { activePage, setActivePage, currentUser, sidebarOpen, setSidebarOpen, logout, currentUserId } = useWorkflowStore()
+  const { activePage, setActivePage, currentUser, sidebarOpen, setSidebarOpen, logout, currentUserId, currentRole } = useWorkflowStore()
 
+  const isAdmin = currentRole === 'ADMIN'
+  const isEA = currentRole === 'EA'
+  const isEmployee = currentRole === 'EMPLOYEE' || currentRole === 'MANAGER' || currentRole === 'DIRECTOR'
+
+  // Fetch dashboard stats for sidebar badges
   const { data: dashData } = useQuery({
     queryKey: ['sidebar-stats', currentUserId],
     queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
-    enabled: !!currentUserId,
+    enabled: !!currentUserId && !isEmployee,
   })
 
   const d = dashData as any
   const activeTasks = (d?.totalTasks || 0) - (d?.completedTasks || 0) - ((d?.statusCounts?.CANCELLED || 0))
-  const overdueTasks = d?.overdueTasks || 0
 
   // Fetch pending leaves count for employee badge
   const { data: empLeavesData } = useQuery({
     queryKey: ['emp-leaves-sidebar', currentUserId],
     queryFn: () => fetch(`/api/leaves?userId=${currentUserId}`).then(r => r.json()),
-    enabled: !!currentUserId && (currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'MANAGER' || currentUser?.role === 'DIRECTOR'),
+    enabled: !!currentUserId && isEmployee,
   })
   const empPendingLeaves = (empLeavesData as any)?.leaves?.filter((l: any) => l.status === 'PENDING')?.length || 0
 
-  // Fetch ALL pending leaves count for EA/Admin badge
+  // Fetch ALL pending leaves count for Admin/EAs
   const { data: eaLeavesData } = useQuery({
     queryKey: ['ea-leaves-sidebar'],
     queryFn: () => fetch('/api/leaves?status=PENDING').then(r => r.json()),
-    enabled: currentUser?.role === 'ADMIN' || currentUser?.role === 'EA',
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    enabled: isAdmin || isEA,
+    refetchInterval: 5000,
   })
   const eaPendingLeaves = (eaLeavesData as any)?.leaves?.length || 0
 
-  const commandCenter: NavItem[] = [
+  // ═══════════════════════════════════════════════════════════
+  // ADMIN SIDEBAR — Full CEO Command Center
+  // ═══════════════════════════════════════════════════════════
+  const adminCommandCenter: NavItem[] = [
     {
       id: 'dashboard', label: 'Dashboard',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>,
@@ -55,7 +62,7 @@ export function LaxreeSidebar() {
     },
   ]
 
-  const weeklyReview: NavItem[] = [
+  const adminWeeklyReview: NavItem[] = [
     {
       id: 'monday', label: 'Monday Meeting',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
@@ -110,11 +117,23 @@ export function LaxreeSidebar() {
     {
       id: 'user-management', label: 'User Management',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /><path d="M19 8v6" /></svg>,
-      badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>🔐</span>,
+      badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>&#x1F510;</span>,
     },
   ]
 
-  // Employee-specific sidebar navigation
+  // ═══════════════════════════════════════════════════════════
+  // EA SIDEBAR — Task Management + Intelligence + Management
+  // ═══════════════════════════════════════════════════════════
+  const eaDashboard: NavItem[] = [
+    {
+      id: 'dashboard', label: 'Dashboard',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>,
+    },
+  ]
+
+  // ═══════════════════════════════════════════════════════════
+  // EMPLOYEE SIDEBAR
+  // ═══════════════════════════════════════════════════════════
   const employeeDashboard: NavItem[] = [
     {
       id: 'employee-dashboard', label: 'My Dashboard',
@@ -139,18 +158,35 @@ export function LaxreeSidebar() {
     },
   ]
 
-  const isEmployee = currentUser?.role === 'EMPLOYEE' || currentUser?.role === 'MANAGER' || currentUser?.role === 'DIRECTOR'
-  const sections = isEmployee ? [
-    { label: 'My Space', items: employeeDashboard },
-    { label: 'Leave Management', items: employeeLeaves },
-    { label: 'AI Assistant', items: employeeAI },
-  ] : [
-    { label: 'Command Center', items: commandCenter },
-    { label: 'Weekly Review', items: weeklyReview },
-    { label: 'Task Management', items: taskMgmt },
-    { label: 'Intelligence', items: intelligence },
-    { label: 'Management', items: management },
-  ]
+  // ═══════════════════════════════════════════════════════════
+  // BUILD SECTIONS BASED ON ROLE
+  // ═══════════════════════════════════════════════════════════
+  let sections: { label: string; items: NavItem[] }[]
+
+  if (isEmployee) {
+    sections = [
+      { label: 'My Space', items: employeeDashboard },
+      { label: 'Leave Management', items: employeeLeaves },
+      { label: 'AI Assistant', items: employeeAI },
+    ]
+  } else if (isAdmin) {
+    // ADMIN: Full CEO Command Center with Monday Meeting, Scorecard, Executive View
+    sections = [
+      { label: 'CEO Command Center', items: adminCommandCenter },
+      { label: 'Weekly Review', items: adminWeeklyReview },
+      { label: 'Task Management', items: taskMgmt },
+      { label: 'Intelligence', items: intelligence },
+      { label: 'Management', items: management },
+    ]
+  } else {
+    // EA: Dashboard + Task Management + Intelligence + Management (NO Monday Meeting, NO Scorecard, NO Executive View)
+    sections = [
+      { label: 'Dashboard', items: eaDashboard },
+      { label: 'Task Management', items: taskMgmt },
+      { label: 'Intelligence', items: intelligence },
+      { label: 'Management', items: management },
+    ]
+  }
 
   return (
     <>
@@ -182,7 +218,7 @@ export function LaxreeSidebar() {
           </div>
         ))}
         <div className="sb-footer">
-          <button className="logout-btn" onClick={logout}>⏏ Sign Out</button>
+          <button className="logout-btn" onClick={logout}>&#9238; Sign Out</button>
         </div>
       </aside>
     </>

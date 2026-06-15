@@ -326,7 +326,7 @@ export function LaxreeEmployeeLeaves() {
             <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 10, padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
               <b>AL</b> = Applied on time (1+ day before leave) · <span style={{ color: 'var(--red)', fontWeight: 700 }}>LA</span> = Late Application (same day or less than 1 day before)
               <br />
-              Your leave will be reviewed by Arti Sharma (EA). You will see the status update here once processed.
+              Your leave will be reviewed by Admin. You will see the status update here once processed.
             </div>
           </div>
         </div>
@@ -487,10 +487,10 @@ export function LaxreeEmployeeLeaves() {
                         background: '#FEF3C7', border: '1px solid rgba(146,64,14,.2)',
                       }}>
                         <div style={{ fontSize: 13, fontWeight: 800, color: '#92400E', marginBottom: 4 }}>
-                          ⏳ Pending — Awaiting EA Approval
+                          ⏳ Pending — Awaiting Admin Approval
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--t3)' }}>
-                          Your leave application is being reviewed by Arti Sharma (EA). You will see the status update here once it is processed.
+                          Your leave application is being reviewed by Admin. You will see the status update here once it is processed.
                         </div>
                       </div>
                     )}

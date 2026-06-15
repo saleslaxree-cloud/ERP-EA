@@ -43,6 +43,7 @@ interface WorkflowStore {
   setCurrentUserId: (id: string) => void
   setCurrentUserName: (name: string) => void
   setCurrentRole: (role: UserRole) => void
+  setCurrentUser: (user: { username: string; role: string; name: string } | null) => void
   toggleSidebar: () => void
   setSidebarOpen: (open: boolean) => void
   setSelectedWorkflowId: (id: string | null) => void
@@ -92,6 +93,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   setCurrentUserId: (id) => set({ currentUserId: id }),
   setCurrentUserName: (name) => set({ currentUserName: name }),
   setCurrentRole: (role) => set({ currentRole: role }),
+  setCurrentUser: (user) => set({ currentUser: user }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedWorkflowId: (id) => set({ selectedWorkflowId: id }),

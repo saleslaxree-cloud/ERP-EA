@@ -14,8 +14,8 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId, addToast, setCreateTaskOpen, currentRole, currentUserId } = useWorkflowStore()
   const queryClient = useQueryClient()
 
-  // Only ADMIN (Arti Sharma) and EA can mark tasks as Done / Revise / Edit / Delete
-  const canModifyTask = currentRole === 'ADMIN' || currentRole === 'EA'
+  // Only ADMIN can mark tasks as Done / Revise / Edit / Delete
+  const canModifyTask = currentRole === 'ADMIN'
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [editTask, setEditTask] = useState<any>(null)
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: string } | null>(null)
@@ -771,7 +771,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                       fontSize: 12, fontWeight: 600, color: 'var(--t3)',
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}>
-                      🔒 Only Arti Sharma can mark tasks as Done/Revise
+                      🔒 Only Admin can mark tasks as Done/Revise
                     </div>
                   )}
                 </div>

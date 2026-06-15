@@ -1,12 +1,18 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 
 export function LaxreeLeaveManagement() {
-  const [filterStatus, setFilterStatus] = useState('PENDING') // Default to PENDING so EA sees new applications first
+  const { currentRole, currentUserId, addToast } = useWorkflowStore()
+  const queryClient = useQueryClient()
+  const isAdmin = currentRole === 'ADMIN'
 
-  // Fetch all leaves — auto-refresh every 5 seconds so EA sees new applications instantly
+  const [filterStatus, setFilterStatus] = useState('PENDING')
+  const [remarkMap, setRemarkMap] = useState<Record<string, string>>({})
+
+  // Fetch all leaves — auto-refresh every 5 seconds
   const { data: leavesData = { leaves: [] }, refetch: refetchAllLeaves } = useQuery({
     queryKey: ['all-leaves', filterStatus],
     queryFn: async () => {
@@ -17,7 +23,7 @@ export function LaxreeLeaveManagement() {
     },
     refetchOnMount: 'always',
     staleTime: 0,
-    refetchInterval: 5000, // Auto-refresh every 5 seconds for real-time EA view
+    refetchInterval: 5000,
   })
 
   // Fetch all employees for delegation view
@@ -29,7 +35,7 @@ export function LaxreeLeaveManagement() {
   const leaves = Array.isArray(leavesData?.leaves) ? leavesData.leaves : []
   const employees = Array.isArray(employeesData?.employees) ? employeesData.employees : []
 
-  // Get currently-on-leave employees (approved leaves where today falls in range)
+  // Get currently-on-leave employees
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const currentlyOnLeave = leaves.filter((l: any) => {
@@ -41,13 +47,11 @@ export function LaxreeLeaveManagement() {
     return today >= from && today <= to
   })
 
-  // Delegation data: map employee → leave info
   const leaveByEmployee: Record<string, any> = {}
   for (const leave of currentlyOnLeave) {
     leaveByEmployee[leave.userId] = leave
   }
 
-  // Also include pending leave applications
   const pendingByEmployee: Record<string, any> = {}
   for (const leave of leaves.filter((l: any) => l.status === 'PENDING')) {
     if (!pendingByEmployee[leave.userId]) pendingByEmployee[leave.userId] = []
@@ -76,23 +80,48 @@ export function LaxreeLeaveManagement() {
 
   const [activeTab, setActiveTab] = useState<'applications' | 'delegation'>('applications')
 
+  // ADMIN-only: Approve or reject a leave
+  const handleLeaveAction = async (leaveId: string, action: 'approve' | 'reject') => {
+    const remark = remarkMap[leaveId] || ''
+    try {
+      const res = await fetch(`/api/leaves/${leaveId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, approvedById: currentUserId, eaRemark: remark }),
+      })
+      if (!res.ok) throw new Error('Failed to update leave')
+      addToast('ok', `Leave ${action === 'approve' ? 'approved' : 'rejected'} successfully`)
+      refetchAllLeaves()
+      queryClient.invalidateQueries({ queryKey: ['ea-leaves-sidebar'] })
+      queryClient.invalidateQueries({ queryKey: ['ea-dash-leaves'] })
+    } catch (err) {
+      addToast('err', `Failed to ${action} leave`)
+    }
+  }
+
   return (
     <>
       <div className="ph">
         <div className="ph-left">
           <h2>Leave Management</h2>
-          <p>View employee leave applications
+          <p>
+            {isAdmin ? 'Approve or reject employee leave applications' : 'View employee leave applications'}
             <span style={{ marginLeft: 8, fontSize: 9, color: 'var(--green)', fontWeight: 700, background: 'var(--green-l)', padding: '2px 8px', borderRadius: 10 }}>
               Auto-refresh ON
             </span>
+            {!isAdmin && (
+              <span style={{ marginLeft: 6, fontSize: 9, color: '#6D28D9', fontWeight: 700, background: 'rgba(109,40,217,.1)', padding: '2px 8px', borderRadius: 10 }}>
+                View Only — Admin Approves
+              </span>
+            )}
           </p>
         </div>
         <div className="ph-right">
           <span className="badge" style={{ background: '#FEE2E2', color: 'var(--red)', fontWeight: 800, padding: '4px 12px', fontSize: 11 }}>
-            ⚠ LA (Late): {lateCount}
+            LA (Late): {lateCount}
           </span>
           <span className="badge" style={{ background: 'var(--green-l)', color: 'var(--green)', fontWeight: 800, padding: '4px 12px', fontSize: 11 }}>
-            ✓ AL (On Time): {leaves.filter((l: any) => l.applicationTag === 'AL').length}
+            AL (On Time): {leaves.filter((l: any) => l.applicationTag === 'AL').length}
           </span>
         </div>
       </div>
@@ -106,13 +135,15 @@ export function LaxreeLeaveManagement() {
           border: '1.5px solid #F59E0B',
           display: 'flex', alignItems: 'center', gap: 12,
         }}>
-          <div style={{ fontSize: 28 }}>🔔</div>
+          <div style={{ fontSize: 28 }}>{isAdmin ? '🔔' : '👁️'}</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 14, color: '#92400E' }}>
               {pendingCount} Leave Application{pendingCount > 1 ? 's' : ''} Pending
             </div>
             <div style={{ fontSize: 12, color: '#A16207', marginTop: 2 }}>
-              New leave applications from employees. Auto-refresh every 5 seconds.
+              {isAdmin
+                ? 'You can approve or reject these applications. Auto-refresh every 5 seconds.'
+                : 'New leave applications from employees. Only Admin can approve/reject. Auto-refresh every 5 seconds.'}
             </div>
           </div>
           <button className="btn" style={{
@@ -159,10 +190,9 @@ export function LaxreeLeaveManagement() {
       {/* DELEGATION VIEW */}
       {activeTab === 'delegation' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {/* Currently on leave */}
           <div className="lcard">
             <div className="ch">
-              <div className="ct">👥 Currently on Leave Today</div>
+              <div className="ct">Currently on Leave Today</div>
               <span className="badge" style={{ background: currentlyOnLeave.length > 0 ? '#FEE2E2' : 'var(--green-l)', color: currentlyOnLeave.length > 0 ? 'var(--red)' : 'var(--green)', fontWeight: 800, fontSize: 10 }}>
                 {currentlyOnLeave.length} employee{currentlyOnLeave.length !== 1 ? 's' : ''}
               </span>
@@ -181,12 +211,10 @@ export function LaxreeLeaveManagement() {
                     <tbody>
                       {currentlyOnLeave.map((leave: any) => {
                         const isLate = leave.applicationTag === 'LA'
-                        const userName = leave.user?.name || 'Unknown'
-                        const userDept = leave.user?.department || ''
                         return (
                           <tr key={leave.id} style={{ background: isLate ? '#FEF2F2' : undefined }}>
-                            <td style={{ fontWeight: 700 }}>{userName}</td>
-                            <td><span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{userDept || '—'}</span></td>
+                            <td style={{ fontWeight: 700 }}>{leave.user?.name || 'Unknown'}</td>
+                            <td><span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{leave.user?.department || '—'}</span></td>
                             <td style={{ fontSize: 11, fontWeight: 600 }}>{leave.leaveType}</td>
                             <td style={{ fontSize: 11 }}>{new Date(leave.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
                             <td style={{ fontSize: 11 }}>{new Date(leave.toDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</td>
@@ -194,8 +222,7 @@ export function LaxreeLeaveManagement() {
                               <span className="badge" style={{
                                 fontSize: 11, padding: '3px 10px', fontWeight: 900, letterSpacing: 0.5,
                                 background: isLate ? '#DC2626' : 'var(--green)',
-                                color: '#fff',
-                                borderRadius: 4,
+                                color: '#fff', borderRadius: 4,
                               }}>
                                 {isLate ? 'LA' : 'AL'}
                               </span>
@@ -211,10 +238,9 @@ export function LaxreeLeaveManagement() {
             </div>
           </div>
 
-          {/* All active employees with leave status */}
           <div className="lcard">
             <div className="ch">
-              <div className="ct">📋 Team Delegation Overview</div>
+              <div className="ct">Team Delegation Overview</div>
               <span className="badge b-gold" style={{ fontSize: 10 }}>{employees.length} active</span>
             </div>
             <div className="cb" style={{ padding: 0 }}>
@@ -227,7 +253,7 @@ export function LaxreeLeaveManagement() {
                     {employees.map((emp: any) => {
                       const isOnLeave = !!leaveByEmployee[emp.id]
                       const leaveInfo = leaveByEmployee[emp.id]
-                      const pendingLeaves = pendingByEmployee[emp.id] || []
+                      const empPending = pendingByEmployee[emp.id] || []
                       const isLate = leaveInfo?.applicationTag === 'LA'
 
                       return (
@@ -236,36 +262,25 @@ export function LaxreeLeaveManagement() {
                           <td><span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{emp.department || '—'}</span></td>
                           <td>
                             {isOnLeave ? (
-                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: '#FEE2E2', color: 'var(--red)', fontWeight: 700 }}>
-                                On Leave
-                              </span>
-                            ) : pendingLeaves.length > 0 ? (
-                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: '#FEF3C7', color: '#92400E', fontWeight: 700 }}>
-                                Leave Pending
-                              </span>
+                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: '#FEE2E2', color: 'var(--red)', fontWeight: 700 }}>On Leave</span>
+                            ) : empPending.length > 0 ? (
+                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: '#FEF3C7', color: '#92400E', fontWeight: 700 }}>Leave Pending</span>
                             ) : (
-                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: 'var(--green-l)', color: 'var(--green)', fontWeight: 700 }}>
-                                Available
-                              </span>
+                              <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: 'var(--green-l)', color: 'var(--green)', fontWeight: 700 }}>Available</span>
                             )}
                           </td>
                           <td>
                             {isOnLeave && (
                               <span className="badge" style={{
                                 fontSize: 11, padding: '3px 10px', fontWeight: 900, letterSpacing: 0.5,
-                                background: isLate ? '#DC2626' : 'var(--green)',
-                                color: '#fff',
-                                borderRadius: 4,
+                                background: isLate ? '#DC2626' : 'var(--green)', color: '#fff', borderRadius: 4,
                               }}>
                                 {isLate ? 'LA' : 'AL'}
                               </span>
                             )}
-                            {!isOnLeave && pendingLeaves.length > 0 && (
-                              <span className="badge" style={{
-                                fontSize: 9, padding: '2px 6px', fontWeight: 700,
-                                background: '#FEF3C7', color: '#92400E',
-                              }}>
-                                {pendingLeaves.length} pending
+                            {!isOnLeave && empPending.length > 0 && (
+                              <span className="badge" style={{ fontSize: 9, padding: '2px 6px', fontWeight: 700, background: '#FEF3C7', color: '#92400E' }}>
+                                {empPending.length} pending
                               </span>
                             )}
                           </td>
@@ -335,10 +350,9 @@ export function LaxreeLeaveManagement() {
                           <span className="badge" style={{
                             fontSize: 11, padding: '3px 10px', fontWeight: 900, letterSpacing: 0.5,
                             background: isLate ? '#DC2626' : 'var(--green)',
-                            color: '#fff',
-                            borderRadius: 4,
+                            color: '#fff', borderRadius: 4,
                           }}>
-                            {isLate ? '⚠ LA' : '✓ AL'}
+                            {isLate ? 'LA' : 'AL'}
                           </span>
                           <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: lsStyle.bg, color: lsStyle.color, fontWeight: 700 }}>
                             {lsStyle.label}
@@ -357,7 +371,7 @@ export function LaxreeLeaveManagement() {
 
                         {leave.eaRemark && (
                           <div style={{ marginTop: 4, fontSize: 11, color: 'var(--t3)', fontStyle: 'italic' }}>
-                            EA Remark: {leave.eaRemark}
+                            Remark: {leave.eaRemark}
                           </div>
                         )}
 
@@ -365,6 +379,50 @@ export function LaxreeLeaveManagement() {
                           <div style={{ marginTop: 2, fontSize: 10, color: 'var(--t4)' }}>
                             {leave.status === 'APPROVED' ? 'Approved' : 'Rejected'} by {leave.approvedBy.name}
                             {leave.approvedAt && ` on ${new Date(leave.approvedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`}
+                          </div>
+                        )}
+
+                        {/* ADMIN-ONLY: Approve / Reject buttons for PENDING leaves */}
+                        {isAdmin && isPending && (
+                          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                              type="text"
+                              placeholder="Add remark (optional)"
+                              value={remarkMap[leave.id] || ''}
+                              onChange={e => setRemarkMap(prev => ({ ...prev, [leave.id]: e.target.value }))}
+                              style={{
+                                fontSize: 11, padding: '5px 10px', borderRadius: 6,
+                                border: '1px solid var(--b1)', background: 'var(--bg2)',
+                                color: 'var(--t1)', minWidth: 180,
+                              }}
+                            />
+                            <button
+                              onClick={() => handleLeaveAction(leave.id, 'approve')}
+                              style={{
+                                fontSize: 11, padding: '5px 14px', fontWeight: 800,
+                                background: 'var(--green)', color: '#fff', border: 'none',
+                                borderRadius: 6, cursor: 'pointer',
+                              }}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleLeaveAction(leave.id, 'reject')}
+                              style={{
+                                fontSize: 11, padding: '5px 14px', fontWeight: 800,
+                                background: 'var(--red)', color: '#fff', border: 'none',
+                                borderRadius: 6, cursor: 'pointer',
+                              }}
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+
+                        {/* EA sees view-only notice for pending leaves */}
+                        {!isAdmin && isPending && (
+                          <div style={{ marginTop: 8, fontSize: 10, color: '#6D28D9', fontWeight: 700, background: 'rgba(109,40,217,.06)', padding: '4px 10px', borderRadius: 4, display: 'inline-block' }}>
+                            View Only — Only Admin can approve/reject
                           </div>
                         )}
                       </div>

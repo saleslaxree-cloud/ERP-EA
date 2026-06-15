@@ -138,7 +138,7 @@ export function LaxreeEmployeeDashboard() {
           <div style={{ fontSize: 24 }}>⏳</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 800, fontSize: 13, color: '#92400E' }}>
-              {pendingLeaves.length} Leave Application{pendingLeaves.length > 1 ? 's' : ''} Pending — Awaiting EA Approval
+              {pendingLeaves.length} Leave Application{pendingLeaves.length > 1 ? 's' : ''} Pending — Awaiting Admin Approval
             </div>
             <div style={{ fontSize: 11, color: '#A16207', marginTop: 2 }}>
               {pendingLeaves.slice(0, 2).map((l: any, i: number) => (
@@ -147,7 +147,7 @@ export function LaxreeEmployeeDashboard() {
                 </span>
               ))}
               {pendingLeaves.length > 2 && ` · +${pendingLeaves.length - 2} more`}
-              {' · '}Arti Sharma will review shortly
+              {' · '}Admin will review shortly
             </div>
           </div>
           <button className="btn" style={{
@@ -249,7 +249,7 @@ export function LaxreeEmployeeDashboard() {
                 <div style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
                   <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
                   <div style={{ fontWeight: 700 }}>No tasks assigned to you</div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Arti Sharma</div>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin</div>
                 </div>
               ) : (
                 <div className="tw">
@@ -295,7 +295,7 @@ export function LaxreeEmployeeDashboard() {
               )}
               {/* Read-only notice */}
               <div style={{ padding: '8px 16px', background: 'var(--bg2)', borderTop: '1px solid var(--b1)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>
-                🔒 Only Arti Sharma can mark tasks as Done or Revise. You can view your assigned tasks here.
+                🔒 Only Admin can mark tasks as Done or Revise. You can view your assigned tasks here.
               </div>
             </div>
           </div>
@@ -413,7 +413,7 @@ export function LaxreeEmployeeDashboard() {
               <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
                 <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                 <div style={{ fontWeight: 700, fontSize: 14 }}>No tasks assigned to you</div>
-                <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Arti Sharma (EA)</div>
+                <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin (EA)</div>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -519,7 +519,7 @@ export function LaxreeEmployeeDashboard() {
 
             {/* Footer notice */}
             <div style={{ padding: '10px 16px', background: 'var(--bg2)', borderTop: '1px solid var(--b1)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>
-              🔒 You cannot edit, mark Done, or change any task. Only Arti Sharma (EA) can mark tasks as Done or Revise them.
+              🔒 You cannot edit, mark Done, or change any task. Only Admin can mark tasks as Done or Revise them.
             </div>
           </div>
         </div>
@@ -621,7 +621,7 @@ export function LaxreeEmployeeDashboard() {
 
               {/* Read only notice */}
               <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'var(--bg2)', fontSize: 10, color: 'var(--t4)', fontWeight: 600, textAlign: 'center' }}>
-                📊 This scorecard is auto-calculated from your task performance. Only Arti Sharma can update Monday Meeting scores.
+                📊 This scorecard is auto-calculated from your task performance. Only Admin can update Monday Meeting scores.
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 
 export function LaxreeLogin() {
-  const { login, setCurrentUserId, setCurrentUserName, setCurrentRole } = useWorkflowStore()
+  const { login, setCurrentUserId, setCurrentUserName, setCurrentRole, setCurrentUser } = useWorkflowStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -29,12 +29,11 @@ export function LaxreeLogin() {
       const data = await res.json()
 
       if (res.ok) {
-        // API auth successful — set user from database
+        // API auth successful — set user from database (DO NOT call login() which overwrites currentUserId)
         setCurrentUserId(data.id)
         setCurrentUserName(data.name)
         setCurrentRole(data.role as any)
-        // Also set the currentUser object
-        login(username, password) // This sets the full currentUser object
+        setCurrentUser({ username, role: data.role, name: data.name })
         return
       }
     } catch (err) {
