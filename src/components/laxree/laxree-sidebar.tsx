@@ -50,7 +50,7 @@ export function LaxreeSidebar() {
   // ═══════════════════════════════════════════════════════════
   // ADMIN SIDEBAR — Full CEO Command Center
   // ═══════════════════════════════════════════════════════════
-  const adminCommandCenter: NavItem[] = [
+  const adminCEOCommandCenter: NavItem[] = [
     {
       id: 'dashboard', label: 'Dashboard',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>,
@@ -62,11 +62,27 @@ export function LaxreeSidebar() {
     },
   ]
 
+  const adminCEOSection: NavItem[] = [
+    {
+      id: 'executive', label: 'CEO',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>,
+      badge: <span className="nb nb-new">CEO</span>,
+    },
+  ]
+
   const adminWeeklyReview: NavItem[] = [
     {
       id: 'monday', label: 'Monday Meeting',
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
       badge: <span className="nb" style={{ background: 'var(--gb)', color: 'var(--g2)' }}>Score</span>,
+    },
+  ]
+
+  const adminScorecard: NavItem[] = [
+    {
+      id: 'performance', label: 'Scorecard',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20V10" /><path d="M18 20V4" /><path d="M6 20v-4" /></svg>,
+      badge: <span className="nb" style={{ background: '#FEF3C7', color: '#92400E', fontWeight: 800 }}>KPI</span>,
     },
   ]
 
@@ -123,6 +139,7 @@ export function LaxreeSidebar() {
 
   // ═══════════════════════════════════════════════════════════
   // EA SIDEBAR — Task Management + Intelligence + Management
+  // (NO Executive View, NO Monday Meeting, NO Scorecard)
   // ═══════════════════════════════════════════════════════════
   const eaDashboard: NavItem[] = [
     {
@@ -192,21 +209,31 @@ export function LaxreeSidebar() {
       { label: 'AI Assistant', items: employeeAI },
     ]
   } else if (isAdmin) {
-    // ADMIN: Full CEO Command Center with Monday Meeting, Scorecard, Executive View
+    // ADMIN: Full CEO Command Center with Executive View, Monday Meeting, Scorecard
     sections = [
-      { label: 'CEO Command Center', items: adminCommandCenter },
+      { label: 'CEO Command Center', items: adminCEOCommandCenter },
+      { label: 'CEO', items: adminCEOSection },
       { label: 'Weekly Review', items: adminWeeklyReview },
+      { label: 'Scorecard', items: adminScorecard },
       { label: 'Task Management', items: taskMgmt },
       { label: 'Intelligence', items: intelligence },
+      { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
       { label: 'Management', items: management },
+      { label: 'EA', items: [{ id: 'leaves' as ActivePage, label: 'EA Leaves', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, badge: eaPendingLeaves > 0 ? <span className="nb nb-live">{eaPendingLeaves}</span> : undefined }] },
+      { label: 'User Management', items: [{ id: 'user-management' as ActivePage, label: 'Users', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /><path d="M19 8v6" /></svg>, badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>&#x1F510;</span> }] },
     ]
   } else {
-    // EA: Dashboard + Task Management + Intelligence + Management (NO Monday Meeting, NO Scorecard, NO Executive View)
+    // EA: Dashboard + Task Management + Intelligence + Departments + Management + Leaves + EA + User Management
+    // (NO Executive View, NO Monday Meeting, NO Scorecard, NO CEO sections)
     sections = [
       { label: 'Dashboard', items: eaDashboard },
       { label: 'Task Management', items: taskMgmt },
       { label: 'Intelligence', items: intelligence },
-      { label: 'Management', items: management },
+      { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
+      { label: 'Management', items: [{ id: 'team' as ActivePage, label: 'Team Members', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg> }, { id: 'categories' as ActivePage, label: 'Categories', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z" /></svg> }] },
+      { label: 'Leaves', items: [{ id: 'leaves' as ActivePage, label: 'Leave Management', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, badge: eaPendingLeaves > 0 ? <span className="nb nb-live">{eaPendingLeaves} Pending</span> : undefined }] },
+      { label: 'EA', items: [{ id: 'leaves' as ActivePage, label: 'EA Overview', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>, badge: <span className="nb nb-warn">EA</span> }] },
+      { label: 'User Management', items: [{ id: 'user-management' as ActivePage, label: 'Users', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 11h-6" /><path d="M19 8v6" /></svg>, badge: <span className="nb" style={{ background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800 }}>&#x1F510;</span> }] },
     ]
   }
 

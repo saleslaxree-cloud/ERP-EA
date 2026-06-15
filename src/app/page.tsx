@@ -73,13 +73,18 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 function ActiveView() {
-  const { activePage } = useWorkflowStore()
+  const { activePage, currentRole } = useWorkflowStore()
+
+  const isAdmin = currentRole === 'ADMIN'
+  const isEA = currentRole === 'EA'
 
   const renderView = () => {
     switch (activePage) {
       case 'dashboard':
         return <LaxreeDashboard />
       case 'executive':
+        // Executive View is ADMIN-only — EA gets redirected to dashboard
+        if (!isAdmin) return <LaxreeDashboard />
         return <ExecutiveView />
       // approvals removed
       case 'tasks':
@@ -115,6 +120,8 @@ function ActiveView() {
         return <LaxreeEscalations />
       case 'monday':
       case 'workflows':
+        // Monday Meeting is ADMIN-only — EA gets redirected to dashboard
+        if (!isAdmin) return <LaxreeDashboard />
         return <LaxreeMonday />
       case 'notifications':
         return <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>Notifications coming soon</div>
