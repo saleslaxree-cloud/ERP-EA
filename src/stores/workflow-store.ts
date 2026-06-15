@@ -138,7 +138,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     // We'll use a separate login function that calls the API
     // For now, keep the fallback client-side check
     const users: Record<string, { password: string; role: UserRole; name: string; userId: string }> = {
-      admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
+      admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Samarth Sir', userId: 'user-admin' },
       ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
       ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
       samarth: { password: 'Samarth@2025', role: 'DIRECTOR', name: 'Samarth Sir', userId: 'user-dir4' },

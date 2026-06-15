@@ -17,7 +17,7 @@ export async function POST() {
 
     // Create users with SPECIFIC IDs matching the client-side login credentials
     const members = [
-      { id: 'user-admin', email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.ADMIN, department: 'Back Office', designation: 'Admin & EA', phone: '9982286662', location: 'Ajmer', isActive: true },
+      { id: 'user-admin', email: 'admin@laxree.com', name: 'Samarth Sir', role: UserRole.ADMIN, department: 'Management', designation: 'Owner & CEO', phone: '9982286662', location: 'Ajmer', isActive: true },
       { id: 'user-ea1', email: 'ea@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Back Office', designation: 'Executive Assistant', phone: '9982286662', location: 'Ajmer', isActive: true },
       { id: 'user-dir3', email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', isActive: true },
       { id: 'user-dir4', email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', isActive: true },

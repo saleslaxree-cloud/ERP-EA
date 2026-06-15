@@ -100,12 +100,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'An employee with this email already exists' }, { status: 400 })
     }
 
-    // Only Arti Sharma can be ADMIN - prevent others from getting ADMIN role
+    // Only the owner can be ADMIN - prevent others from getting ADMIN role
     const requestedRole = role || UserRole.EMPLOYEE
     if (requestedRole === UserRole.ADMIN) {
       const existingAdmins = await db.user.findMany({ where: { role: UserRole.ADMIN } })
       if (existingAdmins.length > 0) {
-        return NextResponse.json({ error: 'Admin role is reserved. Only Arti Sharma can be admin.' }, { status: 403 })
+        return NextResponse.json({ error: 'Admin role is reserved for the owner only.' }, { status: 403 })
       }
     }
 

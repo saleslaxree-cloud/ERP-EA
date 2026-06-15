@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 
 // Fallback credentials for when database credentials are not set yet (first-time setup)
 const FALLBACK_CREDENTIALS: Record<string, { password: string; role: string; name: string; userId: string }> = {
-  admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
+  admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Samarth Sir', userId: 'user-admin' },
   ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
   ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
   samarth: { password: 'Samarth@2025', role: 'DIRECTOR', name: 'Samarth Sir', userId: 'user-dir4' },

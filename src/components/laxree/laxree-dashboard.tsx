@@ -37,7 +37,10 @@ const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#
 function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length] }
 
 export function LaxreeDashboard() {
-  const { currentUser, setActivePage, currentUserId } = useWorkflowStore()
+  const { currentUser, setActivePage, currentUserId, currentRole } = useWorkflowStore()
+
+  // Determine welcome title based on role
+  const welcomeTitle = currentRole === 'ADMIN' ? 'Owner' : currentUser?.name || 'Admin'
 
   // Fetch pending leaves for EA alert banner
   const { data: eaLeavesData } = useQuery({
@@ -93,7 +96,7 @@ export function LaxreeDashboard() {
     <>
       <div className="ph">
         <div className="ph-left">
-          <h2>Welcome back, <span style={{ color: 'var(--g2)' }}>{currentUser?.name || 'Admin'}</span></h2>
+          <h2>Welcome back, <span style={{ color: 'var(--g2)' }}>{welcomeTitle}</span></h2>
           <p>Live operations overview · <span style={{ color: 'var(--g2)', fontWeight: 700 }}>
             {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
           </span></p>
