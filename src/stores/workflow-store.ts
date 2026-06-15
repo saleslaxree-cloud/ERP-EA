@@ -132,12 +132,14 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
   },
   removeToast: (id) => set((state) => ({ toasts: state.toasts.filter(t => t.id !== id) })),
   login: (username: string, password: string) => {
+    // This is now async but zustand doesn't support async actions easily
+    // We'll use a separate login function that calls the API
+    // For now, keep the fallback client-side check
     const users: Record<string, { password: string; role: UserRole; name: string; userId: string }> = {
       admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
       ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
       ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
       samarth: { password: 'Samarth@2025', role: 'DIRECTOR', name: 'Samarth Sir', userId: 'user-dir4' },
-      // Employee logins — username = first name lowercase, password = Name@2025
       aditya: { password: 'Aditya@2025', role: 'EMPLOYEE', name: 'Aditya Sharma', userId: 'user-emp1' },
       aakash: { password: 'Aakash@2025', role: 'EMPLOYEE', name: 'Aakash', userId: 'user-emp2' },
       anamika: { password: 'Anamika@2025', role: 'EMPLOYEE', name: 'Anamika', userId: 'user-emp3' },

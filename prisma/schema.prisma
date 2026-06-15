@@ -18,6 +18,8 @@ model User {
   phone         String?
   location      String?
   avatar        String?
+  loginUsername  String?  @unique
+  loginPassword  String?
   isActive      Boolean  @default(true)
   joinDate      DateTime?
   createdAt     DateTime @default(now())

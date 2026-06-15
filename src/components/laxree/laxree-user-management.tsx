@@ -11,33 +11,10 @@ function getInitials(name: string) { return name.split(' ').map(n => n[0]).join(
 const ROLES = ['ADMIN', 'EA', 'DIRECTOR', 'MANAGER', 'EMPLOYEE']
 const DEPARTMENTS = ['Sales', 'Back Office', 'Accounts', 'Management']
 
-// Login credentials managed in workflow-store (client-side)
-const CREDENTIALS: Record<string, { password: string; role: string; name: string; userId: string }> = {
-  'user-admin': { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
-  'user-ea1': { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
-  'user-dir3': { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
-  'user-dir4': { password: 'Samarth@2025', role: 'DIRECTOR', name: 'Samarth Sir', userId: 'user-dir4' },
-  'user-emp1': { password: 'Aditya@2025', role: 'EMPLOYEE', name: 'Aditya Sharma', userId: 'user-emp1' },
-  'user-emp2': { password: 'Aakash@2025', role: 'EMPLOYEE', name: 'Aakash', userId: 'user-emp2' },
-  'user-emp3': { password: 'Anamika@2025', role: 'EMPLOYEE', name: 'Anamika', userId: 'user-emp3' },
-  'user-emp4': { password: 'Saurabh@2025', role: 'EMPLOYEE', name: 'Saurabh', userId: 'user-emp4' },
-  'user-emp5': { password: 'Ruchi@2025', role: 'EMPLOYEE', name: 'Ruchi', userId: 'user-emp5' },
-  'user-emp6': { password: 'Aayush@2025', role: 'EMPLOYEE', name: 'Aayush', userId: 'user-emp6' },
-  'user-emp7': { password: 'Kamlesh@2025', role: 'EMPLOYEE', name: 'Kamlesh', userId: 'user-emp7' },
-  'user-emp8': { password: 'Hitesh@2025', role: 'EMPLOYEE', name: 'Hitesh Tak', userId: 'user-emp8' },
-  'user-mgr1': { password: 'Khushboo@2025', role: 'MANAGER', name: 'Khushboo Manglani', userId: 'user-mgr1' },
-  'user-mgr2': { password: 'Radhika@2025', role: 'MANAGER', name: 'Radhika', userId: 'user-mgr2' },
-  'user-mgr3': { password: 'Tanuja@2025', role: 'MANAGER', name: 'Tanuja Tigaya', userId: 'user-mgr3' },
-}
-
 function getLoginUsername(user: any): string {
   if (user.role === 'ADMIN') return 'admin'
   if (user.role === 'EA') return 'ea'
   return (user.name || '').split(' ')[0].toLowerCase()
-}
-
-function getStoredPassword(userId: string): string {
-  return CREDENTIALS[userId]?.password || '—'
 }
 
 export function LaxreeUserManagement() {
@@ -45,8 +22,9 @@ export function LaxreeUserManagement() {
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
-  const [showPasswords, setShowPasswords] = useState(false)
   const [filterRole, setFilterRole] = useState('ALL')
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
 
   // Form state
   const [formName, setFormName] = useState('')
@@ -121,13 +99,33 @@ export function LaxreeUserManagement() {
       if (!res.ok) throw new Error(json.error || 'Failed to delete user')
       return json
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users-managed'] })
       queryClient.invalidateQueries({ queryKey: ['users'] })
       addToast('ok', `User deactivated successfully`)
       refetchUsers()
     },
     onError: (err: any) => addToast('err', err.message || 'Failed to delete user'),
+  })
+
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: userId, loginPassword: password }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to reset password')
+      return json
+    },
+    onSuccess: () => {
+      addToast('ok', 'Password reset successfully')
+      setResetPasswordUserId(null)
+      setNewPassword('')
+    },
+    onError: (err: any) => addToast('err', err.message || 'Failed to reset password'),
   })
 
   const resetForm = () => {
@@ -174,7 +172,7 @@ export function LaxreeUserManagement() {
 
   const handleUpdate = () => {
     if (!editingUser) return
-    updateMutation.mutate({
+    const updateData: any = {
       id: editingUser.id,
       name: formName.trim(),
       email: formEmail.trim(),
@@ -183,7 +181,12 @@ export function LaxreeUserManagement() {
       designation: formDesig || null,
       phone: formPhone || null,
       location: formLocation || null,
-    })
+    }
+    // Include password reset if provided
+    if (formPassword.trim()) {
+      updateData.loginPassword = formPassword.trim()
+    }
+    updateMutation.mutate(updateData)
   }
 
   const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
@@ -205,18 +208,9 @@ export function LaxreeUserManagement() {
       <div className="ph">
         <div className="ph-left">
           <h2>User Management</h2>
-          <p>Create, edit, and manage user accounts & credentials</p>
+          <p>Create, edit, and manage user accounts securely</p>
         </div>
         <div className="ph-right">
-          <button className="btn" style={{
-            fontSize: 11, padding: '6px 14px', fontWeight: 800,
-            background: showPasswords ? '#FEE2E2' : 'var(--green-l)',
-            color: showPasswords ? '#DC2626' : 'var(--green)',
-            border: `1.5px solid ${showPasswords ? '#DC2626' : 'var(--green)'}`,
-            borderRadius: 6,
-          }} onClick={() => setShowPasswords(!showPasswords)}>
-            {showPasswords ? '🔒 Hide Passwords' : '👁 Show Passwords'}
-          </button>
           <button className="btn btn-gold" onClick={() => { resetForm(); setShowAddForm(true) }}>
             + Add User
           </button>
@@ -236,7 +230,7 @@ export function LaxreeUserManagement() {
             Secure Credential Management
           </div>
           <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
-            Login credentials are only visible to EA/Admin. Passwords are hidden by default — click "Show Passwords" to view.
+            Passwords are never displayed. Use "Reset Password" to set a new password for any user. Only EA/Admin can access this section.
           </div>
         </div>
       </div>
@@ -308,15 +302,20 @@ export function LaxreeUserManagement() {
                 <label>Location</label>
                 <input className="fi" type="text" placeholder="e.g. Ajmer" value={formLocation} onChange={e => setFormLocation(e.target.value)} />
               </div>
-              {!editingUser && (
-                <div className="fg">
-                  <label>Login Password *</label>
-                  <input className="fi" type="text" placeholder="e.g. John@2025" value={formPassword} onChange={e => setFormPassword(e.target.value)} />
+              <div className="fg">
+                <label>{editingUser ? 'Reset Password (leave blank to keep current)' : 'Login Password *'}</label>
+                <input className="fi" type="password" placeholder={editingUser ? 'Enter new password to reset' : 'e.g. John@2025'} value={formPassword} onChange={e => setFormPassword(e.target.value)} />
+                {!editingUser && (
                   <div style={{ fontSize: 9, color: 'var(--t4)', marginTop: 2 }}>
                     Login username will be: <b>{formName ? formName.split(' ')[0].toLowerCase() : 'firstname'}</b>
                   </div>
-                </div>
-              )}
+                )}
+                {editingUser && (
+                  <div style={{ fontSize: 9, color: 'var(--t4)', marginTop: 2 }}>
+                    Current login: <b>{getLoginUsername(editingUser)}</b>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 12 }}>
@@ -330,6 +329,32 @@ export function LaxreeUserManagement() {
                   {createMutation.isPending ? 'Creating...' : 'Create User'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Dialog */}
+      {resetPasswordUserId && (
+        <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) { setResetPasswordUserId(null); setNewPassword('') } }}>
+          <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+            <button className="mx" onClick={() => { setResetPasswordUserId(null); setNewPassword('') }}>✕</button>
+            <div className="mt">🔑 Reset Password</div>
+            <div className="ms">Set a new login password for this user</div>
+            <div className="gold-divider" />
+            <div className="fg" style={{ marginTop: 16 }}>
+              <label>New Password *</label>
+              <input className="fi" type="password" placeholder="Enter new password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+              <div style={{ fontSize: 9, color: 'var(--t4)', marginTop: 2 }}>
+                The user will need to use this new password on their next login.
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button className="btn" style={{ background: 'var(--bg2)', color: 'var(--t2)' }} onClick={() => { setResetPasswordUserId(null); setNewPassword('') }}>Cancel</button>
+              <button className="btn btn-gold" disabled={!newPassword.trim() || resetPasswordMutation.isPending}
+                onClick={() => resetPasswordMutation.mutate({ userId: resetPasswordUserId, password: newPassword.trim() })}>
+                {resetPasswordMutation.isPending ? 'Resetting...' : 'Reset Password'}
+              </button>
             </div>
           </div>
         </div>
@@ -353,7 +378,7 @@ export function LaxreeUserManagement() {
       {/* Users Table */}
       <div className="lcard">
         <div className="ch">
-          <div className="ct">👥 All Users & Credentials</div>
+          <div className="ct">👥 All Users</div>
           <span className="badge b-gold" style={{ fontSize: 10 }}>{filteredUsers.length} users</span>
         </div>
         <div className="cb" style={{ padding: 0 }}>
@@ -365,7 +390,6 @@ export function LaxreeUserManagement() {
                   <th>Role</th>
                   <th>Department</th>
                   <th>Login ID</th>
-                  {showPasswords && <th>Password</th>}
                   <th>Phone</th>
                   <th>Actions</th>
                 </tr>
@@ -374,7 +398,6 @@ export function LaxreeUserManagement() {
                 {filteredUsers.map((user: any) => {
                   const rs = roleBadgeStyle[user.role] || roleBadgeStyle.EMPLOYEE
                   const loginId = getLoginUsername(user)
-                  const password = getStoredPassword(user.id)
                   return (
                     <tr key={user.id}>
                       <td>
@@ -403,31 +426,22 @@ export function LaxreeUserManagement() {
                           {loginId}
                         </code>
                       </td>
-                      {showPasswords && (
-                        <td>
-                          <code style={{
-                            fontSize: 10, padding: '2px 8px', background: '#FEF3C7',
-                            borderRadius: 4, fontWeight: 700, color: '#92400E',
-                            border: '1px solid #F59E0B',
-                          }}>
-                            {password}
-                          </code>
-                        </td>
-                      )}
-                      {!showPasswords && (
-                        <td>
-                          <span style={{ fontSize: 9, color: 'var(--t4)', fontWeight: 600 }}>•••••••</span>
-                        </td>
-                      )}
                       <td style={{ fontSize: 11, color: 'var(--t3)' }}>{user.phone || '—'}</td>
                       <td>
-                        <div style={{ display: 'flex', gap: 4 }}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                           <button className="btn" style={{
                             fontSize: 10, padding: '3px 8px',
                             background: 'var(--blue-l)', color: 'var(--blue)',
                             border: '1px solid var(--blue)', fontWeight: 700, borderRadius: 4,
                           }} onClick={() => handleEdit(user)}>
                             ✏️ Edit
+                          </button>
+                          <button className="btn" style={{
+                            fontSize: 10, padding: '3px 8px',
+                            background: '#EDE9FE', color: '#6D28D9',
+                            border: '1px solid #6D28D9', fontWeight: 700, borderRadius: 4,
+                          }} onClick={() => { setResetPasswordUserId(user.id); setNewPassword('') }}>
+                            🔑 Reset Pwd
                           </button>
                           <button className="btn" style={{
                             fontSize: 10, padding: '3px 8px',

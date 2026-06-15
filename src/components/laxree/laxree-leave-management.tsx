@@ -5,7 +5,7 @@ import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 
 export function LaxreeLeaveManagement() {
-  const { currentUserId, addToast } = useWorkflowStore()
+  const { currentUserId, currentRole, addToast } = useWorkflowStore()
   const queryClient = useQueryClient()
   const [filterStatus, setFilterStatus] = useState('PENDING') // Default to PENDING so EA sees new applications first
   const [eaRemarkMap, setEaRemarkMap] = useState<Record<string, string>>({})
@@ -61,10 +61,21 @@ export function LaxreeLeaveManagement() {
   // Approve/reject mutation — with proper HTTP error checking
   const actionMutation = useMutation({
     mutationFn: async ({ leaveId, action, eaRemark }: { leaveId: string; action: string; eaRemark?: string }) => {
+      // Use the EA user's ID from the store; fall back to first EA/ADMIN if not set
+      let approverId = currentUserId
+      if (!approverId || (currentRole !== 'EA' && currentRole !== 'ADMIN')) {
+        // Try to find an EA/ADMIN user from the API
+        try {
+          const usersRes = await fetch('/api/users')
+          const users = await usersRes.json()
+          const eaUser = users.find((u: any) => u.role === 'EA' || u.role === 'ADMIN')
+          if (eaUser) approverId = eaUser.id
+        } catch {}
+      }
       const res = await fetch(`/api/leaves/${leaveId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, approvedById: currentUserId, eaRemark: eaRemark || null }),
+        body: JSON.stringify({ action, approvedById: approverId, eaRemark: eaRemark || null }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Failed to update leave')
@@ -74,6 +85,10 @@ export function LaxreeLeaveManagement() {
       queryClient.invalidateQueries({ queryKey: ['all-leaves'] })
       queryClient.invalidateQueries({ queryKey: ['emp-leaves'] })
       queryClient.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
+      queryClient.invalidateQueries({ queryKey: ['ea-dash-leaves'] })
+      queryClient.invalidateQueries({ queryKey: ['ea-leaves-sidebar'] })
+      queryClient.invalidateQueries({ queryKey: ['topbar-notifs'] })
+      queryClient.invalidateQueries({ queryKey: ['notifications-panel'] })
       addToast('ok', `Leave ${variables.action === 'approve' ? 'approved' : 'rejected'}`)
       refetchAllLeaves()
     },

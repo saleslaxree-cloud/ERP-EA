@@ -4,23 +4,51 @@ import { useState } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 
 export function LaxreeLogin() {
-  const { login } = useWorkflowStore()
+  const { login, setCurrentUserId, setCurrentUserName, setCurrentRole } = useWorkflowStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [attempts, setAttempts] = useState(0)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (attempts >= 5) {
       setError('Too many failed attempts. Please refresh the page.')
       return
     }
+    setLoading(true)
+    setError('')
+
+    try {
+      // Try API auth first (supports database-stored credentials and password resets)
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      })
+      const data = await res.json()
+
+      if (res.ok) {
+        // API auth successful — set user from database
+        setCurrentUserId(data.id)
+        setCurrentUserName(data.name)
+        setCurrentRole(data.role as any)
+        // Also set the currentUser object
+        login(username, password) // This sets the full currentUser object
+        return
+      }
+    } catch (err) {
+      console.error('API auth failed, falling back to client auth:', err)
+    }
+
+    // Fall back to client-side auth
     const success = login(username, password)
     if (!success) {
       const remaining = 5 - attempts - 1
       setAttempts(a => a + 1)
       setError(remaining > 0 ? `Invalid credentials. ${remaining} attempt(s) remaining.` : 'Account locked — please refresh.')
     }
+    setLoading(false)
   }
 
   return (
@@ -54,7 +82,9 @@ export function LaxreeLogin() {
             value={password} onChange={e => setPassword(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleLogin()} />
         </div>
-        <button className="lf-btn" onClick={handleLogin}>Sign In to LOS</button>
+        <button className="lf-btn" onClick={handleLogin} disabled={loading}>
+          {loading ? 'Signing in...' : 'Sign In to LOS'}
+        </button>
         {error && (
           <div style={{
             background: 'var(--red-l)', border: '1px solid rgba(200,21,26,.3)',

@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
         designation: designation || null,
         phone: phone || null,
         location: location || null,
+        loginUsername: loginUsername || null,
+        loginPassword: loginPassword || null,
         isActive: true,
         joinDate: new Date(),
       },
@@ -70,7 +72,7 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, name, email, role, department, designation, phone, location, isActive } = body
+    const { id, name, email, role, department, designation, phone, location, isActive, loginPassword } = body
 
     if (!id) {
       return NextResponse.json({ error: 'User id is required' }, { status: 400 })
@@ -90,6 +92,7 @@ export async function PATCH(request: NextRequest) {
     if (phone !== undefined) updateData.phone = phone
     if (location !== undefined) updateData.location = location
     if (isActive !== undefined) updateData.isActive = isActive
+    if (loginPassword !== undefined) updateData.loginPassword = loginPassword
 
     const user = await db.user.update({
       where: { id },

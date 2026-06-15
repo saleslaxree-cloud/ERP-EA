@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// All credentials matching the client-side store
-const CREDENTIALS: Record<string, { password: string; role: string; name: string; userId: string }> = {
+// Fallback credentials for when database credentials are not set yet (first-time setup)
+const FALLBACK_CREDENTIALS: Record<string, { password: string; role: string; name: string; userId: string }> = {
   admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Arti Sharma', userId: 'user-admin' },
   ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
   ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
@@ -21,6 +21,7 @@ const CREDENTIALS: Record<string, { password: string; role: string; name: string
 }
 
 // POST /api/auth - Login endpoint
+// First checks database for loginUsername/loginPassword, then falls back to hardcoded credentials
 export async function POST(request: NextRequest) {
   try {
     const { username, password } = await request.json()
@@ -29,13 +30,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
     }
 
-    const cred = CREDENTIALS[username.toLowerCase()]
+    // Step 1: Try to authenticate using database credentials (loginUsername/loginPassword)
+    const dbUser = await db.user.findFirst({
+      where: {
+        loginUsername: username.toLowerCase(),
+        isActive: true,
+      },
+    })
+
+    if (dbUser && dbUser.loginPassword && dbUser.loginPassword === password) {
+      // Database auth successful
+      return NextResponse.json({
+        id: dbUser.id,
+        name: dbUser.name,
+        role: dbUser.role,
+        department: dbUser.department || null,
+        email: dbUser.email,
+      })
+    }
+
+    // Step 2: Fall back to hardcoded credentials for users not yet migrated to DB auth
+    const cred = FALLBACK_CREDENTIALS[username.toLowerCase()]
     if (!cred || cred.password !== password) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
     }
 
     // Find the user in the database
-    let dbUser = await db.user.findFirst({
+    let dbMatch = await db.user.findFirst({
       where: {
         OR: [
           { id: cred.userId },
@@ -46,18 +67,18 @@ export async function POST(request: NextRequest) {
     })
 
     // If not found by ID/name, try role match
-    if (!dbUser) {
-      dbUser = await db.user.findFirst({
+    if (!dbMatch) {
+      dbMatch = await db.user.findFirst({
         where: { role: cred.role as any, isActive: true },
       })
     }
 
     return NextResponse.json({
-      id: dbUser?.id || cred.userId,
+      id: dbMatch?.id || cred.userId,
       name: cred.name,
       role: cred.role,
-      department: dbUser?.department || null,
-      email: dbUser?.email || `${username}@laxree.com`,
+      department: dbMatch?.department || null,
+      email: dbMatch?.email || `${username}@laxree.com`,
     })
   } catch (error) {
     console.error('Auth error:', error)

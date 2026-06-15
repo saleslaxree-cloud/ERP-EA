@@ -60,7 +60,7 @@ async function main() {
   // ══ USERS — AJMER STAFF (LAXREE Organization) ══
   // Admin & Leadership
   const admin = await prisma.user.create({
-    data: { id: 'user-admin', email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.ADMIN, department: 'Back Office', designation: 'Admin & EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400) }
+    data: { id: 'user-admin', email: 'arti@laxree.com', name: 'Arti Sharma', role: UserRole.ADMIN, department: 'Back Office', designation: 'Admin & EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400), loginUsername: 'admin', loginPassword: 'Laxree@2025' }
   })
   const director1 = await prisma.user.create({
     data: { id: 'user-dir1', email: 'sandeep@laxree.com', name: 'Sandeep', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683662', location: 'Ajmer', isActive: true, joinDate: daysAgo(730) }
@@ -69,52 +69,52 @@ async function main() {
     data: { id: 'user-dir2', email: 'ronak@laxree.com', name: 'Ronak Jain', role: UserRole.DIRECTOR, department: 'Sales', designation: 'Sales Manager', phone: '9251683659', location: 'Ajmer', isActive: true, joinDate: daysAgo(500) }
   })
   const director3 = await prisma.user.create({
-    data: { id: 'user-dir3', email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683601', location: 'Ajmer', isActive: true, joinDate: daysAgo(800) }
+    data: { id: 'user-dir3', email: 'ashish@laxree.com', name: 'Ashish Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683601', location: 'Ajmer', isActive: true, joinDate: daysAgo(800), loginUsername: 'ashish', loginPassword: 'Ashish@2025' }
   })
   const director4 = await prisma.user.create({
-    data: { id: 'user-dir4', email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683602', location: 'Ajmer', isActive: true, joinDate: daysAgo(750) }
+    data: { id: 'user-dir4', email: 'samarth@laxree.com', name: 'Samarth Sir', role: UserRole.DIRECTOR, department: 'Management', designation: 'Director', phone: '9251683602', location: 'Ajmer', isActive: true, joinDate: daysAgo(750), loginUsername: 'samarth', loginPassword: 'Samarth@2025' }
   })
 
   // EA
   const ea1 = await prisma.user.create({
-    data: { id: 'user-ea1', email: 'ea@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Back Office', designation: 'EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400) }
+    data: { id: 'user-ea1', email: 'ea@laxree.com', name: 'Arti Sharma', role: UserRole.EA, department: 'Back Office', designation: 'EA', phone: '9982286662', location: 'Ajmer', isActive: true, joinDate: daysAgo(400), loginUsername: 'ea', loginPassword: 'EA@Laxree' }
   })
 
   // Managers
   const manager1 = await prisma.user.create({
-    data: { id: 'user-mgr1', email: 'khushboo@laxree.com', name: 'Khushboo Manglani', role: UserRole.MANAGER, department: 'Sales', designation: 'Team Lead Roofing', phone: '9251683656', location: 'Ajmer', isActive: true, joinDate: daysAgo(300) }
+    data: { id: 'user-mgr1', email: 'khushboo@laxree.com', name: 'Khushboo Manglani', role: UserRole.MANAGER, department: 'Sales', designation: 'Team Lead Roofing', phone: '9251683656', location: 'Ajmer', isActive: true, joinDate: daysAgo(300), loginUsername: 'khushboo', loginPassword: 'Khushboo@2025' }
   })
   const manager2 = await prisma.user.create({
-    data: { id: 'user-mgr2', email: 'hr@laxree.com', name: 'Radhika', role: UserRole.MANAGER, department: 'Back Office', designation: 'HR', phone: '9251683663', location: 'Ajmer', isActive: true, joinDate: daysAgo(250) }
+    data: { id: 'user-mgr2', email: 'hr@laxree.com', name: 'Radhika', role: UserRole.MANAGER, department: 'Back Office', designation: 'HR', phone: '9251683663', location: 'Ajmer', isActive: true, joinDate: daysAgo(250), loginUsername: 'radhika', loginPassword: 'Radhika@2025' }
   })
   const manager3 = await prisma.user.create({
-    data: { id: 'user-mgr3', email: 'tanuja@laxree.com', name: 'Tanuja Tigaya', role: UserRole.MANAGER, department: 'Back Office', designation: 'Customer Relationship Manager', phone: '9982286667', location: 'Ajmer', isActive: true, joinDate: daysAgo(200) }
+    data: { id: 'user-mgr3', email: 'tanuja@laxree.com', name: 'Tanuja Tigaya', role: UserRole.MANAGER, department: 'Back Office', designation: 'Customer Relationship Manager', phone: '9982286667', location: 'Ajmer', isActive: true, joinDate: daysAgo(200), loginUsername: 'tanuja', loginPassword: 'Tanuja@2025' }
   })
 
   // Employees — Ajmer Staff
   const emp1 = await prisma.user.create({
-    data: { id: 'user-emp1', email: 'aditya@laxree.com', name: 'Aditya Sharma', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982281768', location: 'Ajmer', isActive: true, joinDate: daysAgo(180) }
+    data: { id: 'user-emp1', email: 'aditya@laxree.com', name: 'Aditya Sharma', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982281768', location: 'Ajmer', isActive: true, joinDate: daysAgo(180), loginUsername: 'aditya', loginPassword: 'Aditya@2025' }
   })
   const emp2 = await prisma.user.create({
-    data: { id: 'user-emp2', email: 'aakash@laxree.com', name: 'Aakash', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982220833', location: 'Ajmer', isActive: true, joinDate: daysAgo(150) }
+    data: { id: 'user-emp2', email: 'aakash@laxree.com', name: 'Aakash', role: UserRole.EMPLOYEE, department: 'Sales', designation: 'Sales Executive', phone: '9982220833', location: 'Ajmer', isActive: true, joinDate: daysAgo(150), loginUsername: 'aakash', loginPassword: 'Aakash@2025' }
   })
   const emp3 = await prisma.user.create({
-    data: { id: 'user-emp3', email: 'anamika@laxree.com', name: 'Anamika', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982261222', location: 'Ajmer', isActive: true, joinDate: daysAgo(120) }
+    data: { id: 'user-emp3', email: 'anamika@laxree.com', name: 'Anamika', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982261222', location: 'Ajmer', isActive: true, joinDate: daysAgo(120), loginUsername: 'anamika', loginPassword: 'Anamika@2025' }
   })
   const emp4 = await prisma.user.create({
-    data: { id: 'user-emp4', email: 'saurabh@laxree.com', name: 'Saurabh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Designer', phone: '9351000183', location: 'Ajmer', isActive: true, joinDate: daysAgo(100) }
+    data: { id: 'user-emp4', email: 'saurabh@laxree.com', name: 'Saurabh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Designer', phone: '9351000183', location: 'Ajmer', isActive: true, joinDate: daysAgo(100), loginUsername: 'saurabh', loginPassword: 'Saurabh@2025' }
   })
   const emp5 = await prisma.user.create({
-    data: { id: 'user-emp5', email: 'ruchi@laxree.com', name: 'Ruchi', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9251683664', location: 'Ajmer', isActive: true, joinDate: daysAgo(90) }
+    data: { id: 'user-emp5', email: 'ruchi@laxree.com', name: 'Ruchi', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9251683664', location: 'Ajmer', isActive: true, joinDate: daysAgo(90), loginUsername: 'ruchi', loginPassword: 'Ruchi@2025' }
   })
   const emp6 = await prisma.user.create({
-    data: { id: 'user-emp6', email: 'aayush@laxree.com', name: 'Aayush', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982286668', location: 'Ajmer', isActive: true, joinDate: daysAgo(60) }
+    data: { id: 'user-emp6', email: 'aayush@laxree.com', name: 'Aayush', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'Coordinator', phone: '9982286668', location: 'Ajmer', isActive: true, joinDate: daysAgo(60), loginUsername: 'aayush', loginPassword: 'Aayush@2025' }
   })
   const emp7 = await prisma.user.create({
-    data: { id: 'user-emp7', email: 'kamlesh@laxree.com', name: 'Kamlesh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'MIS', phone: '9251683660', location: 'Ajmer', isActive: true, joinDate: daysAgo(200) }
+    data: { id: 'user-emp7', email: 'kamlesh@laxree.com', name: 'Kamlesh', role: UserRole.EMPLOYEE, department: 'Back Office', designation: 'MIS', phone: '9251683660', location: 'Ajmer', isActive: true, joinDate: daysAgo(200), loginUsername: 'kamlesh', loginPassword: 'Kamlesh@2025' }
   })
   const emp8 = await prisma.user.create({
-    data: { id: 'user-emp8', email: 'accounts@laxree.com', name: 'Hitesh Tak', role: UserRole.EMPLOYEE, department: 'Accounts', designation: 'Accountant', phone: '9982214555', location: 'Ajmer', isActive: true, joinDate: daysAgo(365) }
+    data: { id: 'user-emp8', email: 'accounts@laxree.com', name: 'Hitesh Tak', role: UserRole.EMPLOYEE, department: 'Accounts', designation: 'Accountant', phone: '9982214555', location: 'Ajmer', isActive: true, joinDate: daysAgo(365), loginUsername: 'hitesh', loginPassword: 'Hitesh@2025' }
   })
 
   // ══ UPDATE DEPARTMENT HEADS ══

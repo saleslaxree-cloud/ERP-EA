@@ -22,7 +22,8 @@ const COMMANDS: Array<{ id: string; label: string; section: string; icon: string
 ]
 
 export function LaxreeCommandPalette() {
-  const { cmdPaletteOpen, setCmdPaletteOpen, setActivePage, setCreateTaskOpen } = useWorkflowStore()
+  const { cmdPaletteOpen, setCmdPaletteOpen, setActivePage, setCreateTaskOpen, currentRole } = useWorkflowStore()
+  const isEA = currentRole === 'EA' || currentRole === 'ADMIN'
   const [search, setSearch] = useState('')
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -32,9 +33,9 @@ export function LaxreeCommandPalette() {
     c.section.toLowerCase().includes(search.toLowerCase())
   )
 
-  // Add Create Task as first item if search matches
+  // Add Create Task as first item if search matches — ONLY for EA/Admin
   const allItems = [
-    ...(!search || 'create task'.includes(search.toLowerCase()) ? [{ id: 'tasks', label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true, shortcut: undefined as string | undefined }] : []),
+    ...(isEA && (!search || 'create task'.includes(search.toLowerCase())) ? [{ id: 'tasks', label: 'Create New Task', section: 'Actions', icon: '➕', isCreateTask: true, shortcut: undefined as string | undefined }] : []),
     ...filtered,
   ]
 
