@@ -6,10 +6,54 @@ export async function GET(request: NextRequest) {
   try {
     const userId = request.nextUrl.searchParams.get('userId') || request.nextUrl.searchParams.get('ownerId')
     const status = request.nextUrl.searchParams.get('status')
+    const assignedTo = request.nextUrl.searchParams.get('assignedTo')
 
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
     if (status) where.status = status
+
+    // If assignedTo is provided, also find tasks where the user is a task step assignee
+    let assignedStepTasks: any[] = []
+    if (assignedTo) {
+      const stepTasks = await db.taskStep.findMany({
+        where: { assigneeId: assignedTo },
+        select: { taskId: true },
+      })
+      const taskIdsFromSteps = [...new Set(stepTasks.map(s => s.taskId))]
+      if (taskIdsFromSteps.length > 0) {
+        assignedStepTasks = await db.task.findMany({
+          where: { id: { in: taskIdsFromSteps }, parentTaskId: null, ...(status ? { status } : {}) },
+          include: {
+            owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+            workflow: {
+              include: {
+                steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
+              },
+            },
+            taskSteps: {
+              orderBy: { order: 'asc' },
+              include: { assignee: { select: { id: true, name: true, role: true } } },
+            },
+            subTasks: {
+              include: {
+                owner: { select: { id: true, name: true, email: true, role: true } },
+              },
+            },
+            dependencies: {
+              include: {
+                dependsOnTask: { select: { id: true, title: true, status: true } },
+              },
+            },
+            dependents: {
+              include: {
+                task: { select: { id: true, title: true, status: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+      }
+    }
 
     // Only get top-level tasks (no parent)
     const tasks = await db.task.findMany({
@@ -43,6 +87,16 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: 'desc' },
     })
+
+    // Merge and deduplicate: tasks owned by user + tasks where user is step assignee
+    if (assignedTo && assignedStepTasks.length > 0) {
+      const existingIds = new Set(tasks.map(t => t.id))
+      const newTasks = assignedStepTasks.filter(t => !existingIds.has(t.id))
+      const allTasks = [...tasks, ...newTasks]
+      // Sort by createdAt desc
+      allTasks.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      return NextResponse.json(allTasks)
+    }
 
     return NextResponse.json(tasks)
   } catch (error) {

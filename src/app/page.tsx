@@ -98,6 +98,8 @@ function ActiveView() {
         return <CategoriesView />
       case 'employee-dashboard':
         return <LaxreeEmployeeDashboard />
+      case 'emp-tasks':
+        return <LaxreeEmployeeDashboard />  // Employee tasks shown via dashboard with tasks tab
       case 'leaves':
         return <LaxreeLeaveManagement />
       case 'emp-leaves':

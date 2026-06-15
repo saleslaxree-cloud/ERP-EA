@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'ai-assistant' | 'user-management'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ai-assistant' | 'user-management'
 
 interface NavItem {
   id: ActivePage
@@ -141,6 +141,27 @@ export function LaxreeSidebar() {
     },
   ]
 
+  // Fetch employee tasks count for badge
+  const { data: empTasksData } = useQuery({
+    queryKey: ['emp-tasks-sidebar', currentUserId],
+    queryFn: () => fetch(`/api/tasks?ownerId=${currentUserId}&assignedTo=${currentUserId}`).then(r => {
+      if (Array.isArray(r)) return r
+      return []
+    }).catch(() => []),
+    enabled: !!currentUserId && isEmployee,
+  })
+  const empActiveTasks = Array.isArray(empTasksData)
+    ? empTasksData.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+    : 0
+
+  const employeeTasks: NavItem[] = [
+    {
+      id: 'emp-tasks', label: 'My Tasks',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
+      badge: empActiveTasks > 0 ? <span className="nb nb-live">{empActiveTasks}</span> : undefined,
+    },
+  ]
+
   const employeeLeaves: NavItem[] = [
     {
       id: 'emp-leaves', label: 'Leave Management',
@@ -166,6 +187,7 @@ export function LaxreeSidebar() {
   if (isEmployee) {
     sections = [
       { label: 'My Space', items: employeeDashboard },
+      { label: 'My Tasks', items: employeeTasks },
       { label: 'Leave Management', items: employeeLeaves },
       { label: 'AI Assistant', items: employeeAI },
     ]

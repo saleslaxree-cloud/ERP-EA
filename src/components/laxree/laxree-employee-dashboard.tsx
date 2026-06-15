@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Avatar colors
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
@@ -16,18 +16,26 @@ function getInitials(name: string) {
 }
 
 export function LaxreeEmployeeDashboard() {
-  const { currentUserId, currentUserName, currentRole, addToast, setActivePage } = useWorkflowStore()
+  const { currentUserId, currentUserName, currentRole, addToast, setActivePage, activePage } = useWorkflowStore()
   const queryClient = useQueryClient()
   const userInitials = getInitials(currentUserName || 'E')
   const userAvatarBg = avatarColor(currentUserName || 'Employee')
 
   // Tab navigation for employee dashboard
   const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
+  const [taskFilter, setTaskFilter] = useState<string>('all')
 
-  // Fetch employee's tasks (read-only) — ONLY tasks assigned to this employee
+  // When coming from sidebar "My Tasks" link, auto-switch to tasks tab
+  useEffect(() => {
+    if (activePage === 'emp-tasks') {
+      setEmpTab('tasks')
+    }
+  }, [activePage])
+
+  // Fetch employee's tasks (read-only) — tasks where employee is owner OR step assignee
   const { data: tasksData = [] } = useQuery({
     queryKey: ['emp-tasks', currentUserId],
-    queryFn: () => fetch(`/api/tasks?ownerId=${currentUserId}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/tasks?ownerId=${currentUserId}&assignedTo=${currentUserId}`).then(r => r.json()),
     enabled: !!currentUserId,
   })
 
@@ -236,12 +244,16 @@ export function LaxreeEmployeeDashboard() {
           {/* Quick Overview: Recent Tasks */}
           <div className="lcard" style={{ marginBottom: 16 }}>
             <div className="ch">
-              <div className="ct">📋 Recent Assigned Tasks</div>
+              <div className="ct">📋 All My Assigned Tasks</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
                   🔒 Read Only
                 </span>
                 <span className="badge b-blue" style={{ fontSize: 10 }}>{tasks.length}</span>
+                <button className="btn" style={{ fontSize: 10, padding: '3px 10px', background: 'var(--gb)', color: 'var(--g2)', fontWeight: 700 }}
+                  onClick={() => setEmpTab('tasks')}>
+                  View All →
+                </button>
               </div>
             </div>
             <div className="cb" style={{ padding: 0 }}>
@@ -255,16 +267,23 @@ export function LaxreeEmployeeDashboard() {
                 <div className="tw">
                   <table className="ltable">
                     <thead>
-                      <tr><th>Task</th><th>Priority</th><th>Status</th><th>Due</th><th>Steps</th></tr>
+                      <tr><th>Task</th><th>Assigned By</th><th>Priority</th><th>Status</th><th>Due</th><th>Steps</th></tr>
                     </thead>
                     <tbody>
-                      {tasks.slice(0, 5).map((task: any) => {
+                      {tasks.slice(0, 10).map((task: any) => {
                         const sStyle = statusStyle[task.status] || statusStyle.PENDING
                         const stepsTotal = task.taskSteps?.length || 0
                         const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+                        const isStepAssignee = task.ownerId !== currentUserId
                         return (
                           <tr key={task.id}>
-                            <td style={{ fontWeight: 600 }}>{task.title}</td>
+                            <td style={{ fontWeight: 600 }}>
+                              {task.title}
+                              {isStepAssignee && <span style={{ fontSize: 8, color: '#6D28D9', fontWeight: 700, marginLeft: 6, background: 'rgba(109,40,217,.1)', padding: '1px 4px', borderRadius: 2 }}>STEP</span>}
+                            </td>
+                            <td style={{ fontSize: 11, color: 'var(--t3)' }}>
+                              {task.owner?.name && isStepAssignee ? task.owner.name : '—'}
+                            </td>
                             <td>
                               <span className="badge" style={{
                                 fontSize: 9, padding: '2px 8px',
@@ -398,131 +417,185 @@ export function LaxreeEmployeeDashboard() {
 
       {/* ===================== MY TASKS TAB (READ ONLY) ===================== */}
       {empTab === 'tasks' && (
-        <div className="lcard">
-          <div className="ch">
-            <div className="ct">📋 My Assigned Tasks</div>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
-                🔒 Read Only — Cannot Edit or Mark Done
-              </span>
-              <span className="badge b-blue" style={{ fontSize: 10 }}>{tasks.length}</span>
+        <>
+          {/* Task Stats Summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'all' ? '3px solid var(--g2)' : undefined, background: taskFilter === 'all' ? 'rgba(180,83,9,.04)' : undefined }}
+              onClick={() => setTaskFilter('all')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>All Tasks</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--g2)' }}>{tasks.length}</div>
+            </div>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'active' ? '3px solid var(--blue)' : undefined, background: taskFilter === 'active' ? 'rgba(29,78,216,.04)' : undefined }}
+              onClick={() => setTaskFilter('active')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Active</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--blue)' }}>{activeTasks.length}</div>
+            </div>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'completed' ? '3px solid var(--green)' : undefined, background: taskFilter === 'completed' ? 'rgba(21,128,61,.04)' : undefined }}
+              onClick={() => setTaskFilter('completed')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Completed</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--green)' }}>{completedTasks.length}</div>
+            </div>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'overdue' ? '3px solid var(--red)' : undefined, background: taskFilter === 'overdue' ? 'rgba(220,38,38,.04)' : undefined }}
+              onClick={() => setTaskFilter('overdue')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Overdue</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--red)' }}>{tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length}</div>
             </div>
           </div>
-          <div className="cb" style={{ padding: 0 }}>
-            {tasks.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>No tasks assigned to you</div>
-                <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin (EA)</div>
+
+          <div className="lcard">
+            <div className="ch">
+              <div className="ct">📋 All My Assigned Tasks</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
+                  {taskFilter === 'all' ? `Showing all ${tasks.length}` : taskFilter === 'active' ? `${activeTasks.length} active` : taskFilter === 'completed' ? `${completedTasks.length} done` : 'Overdue'}
+                </span>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {tasks.map((task: any) => {
-                  const sStyle = statusStyle[task.status] || statusStyle.PENDING
-                  const stepsTotal = task.taskSteps?.length || 0
-                  const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
-                  const stepsAllDone = stepsTotal > 0 && stepsDone === stepsTotal
-                  const isCompleted = task.status === 'COMPLETED'
-                  const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !isCompleted
+            </div>
+            <div className="cb" style={{ padding: 0 }}>
+              {(() => {
+                const filteredTasks = taskFilter === 'all' ? tasks
+                  : taskFilter === 'active' ? activeTasks
+                  : taskFilter === 'completed' ? completedTasks
+                  : tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
 
-                  return (
-                    <div key={task.id} style={{
-                      padding: '14px 16px',
-                      borderBottom: '1px solid var(--b1)',
-                      background: isCompleted ? 'rgba(22,163,74,.03)' : isOverdue ? 'rgba(220,38,38,.03)' : undefined,
-                    }}>
-                      {/* Task header row */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        {/* Status dot */}
-                        <div style={{
-                          width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-                          background: isCompleted ? 'var(--green)' : isOverdue ? 'var(--red)' : task.status === 'IN_PROGRESS' ? 'var(--blue)' : 'var(--amber)',
-                        }} />
-
-                        {/* Title */}
-                        <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>
-                          {isCompleted && '✅ '}{task.title}
-                        </div>
-
-                        {/* Priority badge */}
-                        <span className="badge" style={{
-                          fontSize: 9, padding: '2px 8px',
-                          background: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? '#FEF2F2' : task.priority === 'MEDIUM' ? '#FFFBEB' : '#EFF6FF',
-                          color: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? '#DC2626' : task.priority === 'MEDIUM' ? '#D97706' : '#2563EB',
-                          fontWeight: 700,
-                        }}>
-                          {task.priority || 'MEDIUM'}
-                        </span>
-
-                        {/* Status badge */}
-                        <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: sStyle.bg, color: sStyle.color, fontWeight: 700 }}>
-                          {sStyle.label}
-                        </span>
-                      </div>
-
-                      {/* Task meta */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--t3)', marginLeft: 18, flexWrap: 'wrap' }}>
-                        {task.department && (
-                          <span><span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{task.department}</span></span>
-                        )}
-                        {task.dueDate && (
-                          <span style={isOverdue ? { color: 'var(--red)', fontWeight: 700 } : {}}>
-                            Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                            {isOverdue && ' (Overdue)'}
-                          </span>
-                        )}
-                        {task.category && <span>Category: {task.category}</span>}
-                      </div>
-
-                      {/* Steps progress */}
-                      {stepsTotal > 0 && (
-                        <div style={{ marginTop: 8, marginLeft: 18 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)' }}>
-                              Steps: {stepsDone}/{stepsTotal}
-                            </span>
-                            <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--bg2)' }}>
-                              <div style={{
-                                height: '100%', borderRadius: 2,
-                                width: `${stepsTotal > 0 ? (stepsDone / stepsTotal) * 100 : 0}%`,
-                                background: stepsAllDone ? 'var(--green)' : 'var(--blue)',
-                                transition: 'width 0.3s ease',
-                              }} />
-                            </div>
-                          </div>
-                          {/* Step items */}
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                            {task.taskSteps?.map((step: any) => (
-                              <div key={step.id} style={{
-                                display: 'flex', alignItems: 'center', gap: 6,
-                                fontSize: 10, color: step.status === 'COMPLETED' ? 'var(--green)' : 'var(--t3)',
-                              }}>
-                                <span style={{ fontWeight: 700 }}>{step.status === 'COMPLETED' ? '✓' : '○'}</span>
-                                <span style={step.status === 'COMPLETED' ? { textDecoration: 'line-through' } : {}}>{step.title}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* No edit notice per task */}
-                      {isCompleted && (
-                        <div style={{ marginTop: 6, marginLeft: 18, fontSize: 10, color: 'var(--green)', fontWeight: 600 }}>
-                          ✅ Completed task
-                        </div>
-                      )}
+                return filteredTasks.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>
+                      {taskFilter === 'all' ? 'No tasks assigned to you' : `No ${taskFilter} tasks`}
                     </div>
-                  )
-                })}
-              </div>
-            )}
+                    <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {filteredTasks.map((task: any) => {
+                      const sStyle = statusStyle[task.status] || statusStyle.PENDING
+                      const stepsTotal = task.taskSteps?.length || 0
+                      const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+                      const stepsAllDone = stepsTotal > 0 && stepsDone === stepsTotal
+                      const isCompleted = task.status === 'COMPLETED'
+                      const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && !isCompleted && task.status !== 'CANCELLED'
+                      // Check if this is a task where employee is a step assignee (not owner)
+                      const isStepAssignee = task.ownerId !== currentUserId && task.taskSteps?.some((s: any) => s.assigneeId === currentUserId)
 
-            {/* Footer notice */}
-            <div style={{ padding: '10px 16px', background: 'var(--bg2)', borderTop: '1px solid var(--b1)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>
-              🔒 You cannot edit, mark Done, or change any task. Only Admin can mark tasks as Done or Revise them.
+                      return (
+                        <div key={task.id} style={{
+                          padding: '14px 16px',
+                          borderBottom: '1px solid var(--b1)',
+                          background: isCompleted ? 'rgba(22,163,74,.03)' : isOverdue ? 'rgba(220,38,38,.03)' : undefined,
+                        }}>
+                          {/* Task header row */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                            {/* Status dot */}
+                            <div style={{
+                              width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                              background: isCompleted ? 'var(--green)' : isOverdue ? 'var(--red)' : task.status === 'IN_PROGRESS' ? 'var(--blue)' : 'var(--amber)',
+                            }} />
+
+                            {/* Title */}
+                            <div style={{ flex: 1, fontWeight: 700, fontSize: 13, color: 'var(--t1)' }}>
+                              {isCompleted && '✅ '}{task.title}
+                            </div>
+
+                            {/* Step assignee indicator */}
+                            {isStepAssignee && (
+                              <span className="badge" style={{ fontSize: 8, padding: '1px 6px', background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 700 }}>
+                                ASSIGNED STEP
+                              </span>
+                            )}
+
+                            {/* Priority badge */}
+                            <span className="badge" style={{
+                              fontSize: 9, padding: '2px 8px',
+                              background: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? '#FEF2F2' : task.priority === 'MEDIUM' ? '#FFFBEB' : '#EFF6FF',
+                              color: task.priority === 'HIGH' || task.priority === 'CRITICAL' ? '#DC2626' : task.priority === 'MEDIUM' ? '#D97706' : '#2563EB',
+                              fontWeight: 700,
+                            }}>
+                              {task.priority || 'MEDIUM'}
+                            </span>
+
+                            {/* Status badge */}
+                            <span className="badge" style={{ fontSize: 9, padding: '2px 8px', background: sStyle.bg, color: sStyle.color, fontWeight: 700 }}>
+                              {sStyle.label}
+                            </span>
+                          </div>
+
+                          {/* Task meta */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--t3)', marginLeft: 18, flexWrap: 'wrap' }}>
+                            {task.owner?.name && task.ownerId !== currentUserId && (
+                              <span>Assigned by: <b>{task.owner.name}</b></span>
+                            )}
+                            {task.department && (
+                              <span><span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{task.department}</span></span>
+                            )}
+                            {task.dueDate && (
+                              <span style={isOverdue ? { color: 'var(--red)', fontWeight: 700 } : {}}>
+                                Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                                {isOverdue && ' (Overdue)'}
+                              </span>
+                            )}
+                            {task.category && <span>Category: {task.category}</span>}
+                          </div>
+
+                          {/* Steps progress */}
+                          {stepsTotal > 0 && (
+                            <div style={{ marginTop: 8, marginLeft: 18 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)' }}>
+                                  Steps: {stepsDone}/{stepsTotal}
+                                </span>
+                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--bg2)' }}>
+                                  <div style={{
+                                    height: '100%', borderRadius: 2,
+                                    width: `${stepsTotal > 0 ? (stepsDone / stepsTotal) * 100 : 0}%`,
+                                    background: stepsAllDone ? 'var(--green)' : 'var(--blue)',
+                                    transition: 'width 0.3s ease',
+                                  }} />
+                                </div>
+                              </div>
+                              {/* Step items — highlight employee's assigned steps */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                                {task.taskSteps?.map((step: any) => {
+                                  const isMyStep = step.assigneeId === currentUserId
+                                  return (
+                                    <div key={step.id} style={{
+                                      display: 'flex', alignItems: 'center', gap: 6,
+                                      fontSize: 10, color: step.status === 'COMPLETED' ? 'var(--green)' : isMyStep ? 'var(--blue)' : 'var(--t3)',
+                                      fontWeight: isMyStep ? 700 : 400,
+                                      background: isMyStep ? 'rgba(29,78,216,.04)' : 'transparent',
+                                      padding: isMyStep ? '2px 6px' : undefined,
+                                      borderRadius: isMyStep ? 3 : undefined,
+                                    }}>
+                                      <span style={{ fontWeight: 700 }}>{step.status === 'COMPLETED' ? '✓' : '○'}</span>
+                                      <span style={step.status === 'COMPLETED' ? { textDecoration: 'line-through' } : {}}>{step.title}</span>
+                                      {isMyStep && <span style={{ fontSize: 8, color: 'var(--blue)', fontWeight: 800, marginLeft: 4 }}>(YOU)</span>}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Completed notice */}
+                          {isCompleted && (
+                            <div style={{ marginTop: 6, marginLeft: 18, fontSize: 10, color: 'var(--green)', fontWeight: 600 }}>
+                              ✅ Completed task
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+
+              {/* Footer notice */}
+              <div style={{ padding: '10px 16px', background: 'var(--bg2)', borderTop: '1px solid var(--b1)', fontSize: 10, color: 'var(--t4)', fontWeight: 600 }}>
+                🔒 Read only — Only Admin can mark tasks as Done or Revise them. Click the stat cards above to filter tasks.
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* ===================== MY SCORECARD TAB ===================== */}

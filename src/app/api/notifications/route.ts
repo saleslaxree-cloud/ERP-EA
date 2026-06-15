@@ -10,11 +10,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
-    // ══ CLEANUP: Delete notifications older than 30 days ══
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    // ══ CLEANUP: Aggressively clean old notifications to keep count accurate ══
     try {
+      // Delete read notifications older than 1 day
+      const oneDayAgo = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
       await db.notification.deleteMany({
-        where: { createdAt: { lt: thirtyDaysAgo } },
+        where: { isRead: true, createdAt: { lt: oneDayAgo } },
+      })
+      // Delete unread STATUS_CHANGE notifications older than 2 days (task assignments pile up)
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      await db.notification.deleteMany({
+        where: { isRead: false, type: 'STATUS_CHANGE', createdAt: { lt: twoDaysAgo } },
+      })
+      // Delete all other unread notifications older than 7 days
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      await db.notification.deleteMany({
+        where: { isRead: false, createdAt: { lt: sevenDaysAgo } },
       })
     } catch (cleanupErr) {
       console.error('Notification cleanup error (non-fatal):', cleanupErr)
@@ -54,7 +65,12 @@ export async function GET(request: NextRequest) {
     })
 
     const unreadCount = await db.notification.count({
-      where: { receiverId: userId, isRead: false },
+      where: {
+        receiverId: userId,
+        isRead: false,
+        // Only count notifications from the last 48 hours for relevance
+        createdAt: { gte: new Date(Date.now() - 48 * 60 * 60 * 1000) },
+      },
     })
 
     return NextResponse.json({ notifications, unreadCount })
