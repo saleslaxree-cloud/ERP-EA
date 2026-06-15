@@ -104,10 +104,6 @@ export function LaxreeSidebar() {
       icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>,
       badge: <span className="nb nb-warn">Live</span>,
     },
-    {
-      id: 'departments', label: 'Departments',
-      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg>,
-    },
   ]
 
   const management: NavItem[] = [
