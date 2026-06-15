@@ -11,35 +11,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'userId and question are required' }, { status: 400 })
     }
 
-    // Fetch employee's tasks with steps
-    const tasks = await db.task.findMany({
-      where: { ownerId: userId, status: { notIn: [WorkflowStatus.CANCELLED] } },
-      include: {
-        taskSteps: { orderBy: { order: 'asc' } },
-        owner: { select: { name: true, department: true, designation: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 30,
-    })
+    // Fetch employee data with individual error handling
+    let tasks: any[] = []
+    let leaves: any[] = []
+    let user: any = null
 
-    // Fetch employee's leaves
-    const leaves = await db.leave.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    })
+    try {
+      tasks = await db.task.findMany({
+        where: { ownerId: userId, status: { notIn: [WorkflowStatus.CANCELLED] } },
+        include: {
+          taskSteps: { orderBy: { order: 'asc' } },
+          owner: { select: { name: true, department: true, designation: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      })
+    } catch (dbErr: any) {
+      console.error('AI Assistant: Failed to fetch tasks:', dbErr.message)
+    }
 
-    // Fetch employee's user info
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: { name: true, department: true, designation: true, role: true },
-    })
+    try {
+      leaves = await db.leave.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      })
+    } catch (dbErr: any) {
+      console.error('AI Assistant: Failed to fetch leaves:', dbErr.message)
+    }
+
+    try {
+      user = await db.user.findUnique({
+        where: { id: userId },
+        select: { name: true, department: true, designation: true, role: true },
+      })
+    } catch (dbErr: any) {
+      console.error('AI Assistant: Failed to fetch user:', dbErr.message)
+    }
 
     // Build rich task context with step details
     const taskSummary = tasks.map(t => {
-      const stepsDone = t.taskSteps.filter(s => s.status === 'COMPLETED').length
-      const stepsTotal = t.taskSteps.length
-      const stepDetails = t.taskSteps.map((s, i) =>
+      const stepsDone = t.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+      const stepsTotal = t.taskSteps?.length || 0
+      const stepDetails = (t.taskSteps || []).map((s: any, i: number) =>
         `    Step ${i + 1}: "${s.title}" — ${s.status}${s.assigneeId ? '' : ' (unassigned)'}${s.dueDate ? ` | Due: ${new Date(s.dueDate).toLocaleDateString()}` : ''}`
       ).join('\n')
       return `- "${t.title}" | Status: ${t.status} | Priority: ${t.priority} | Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString() : 'No date'} | Category: ${t.category || 'N/A'} | Department: ${t.department || 'N/A'} | Steps: ${stepsDone}/${stepsTotal}\n${stepsTotal > 0 ? stepDetails : '    (No steps defined)'}`
@@ -113,19 +127,205 @@ CURRENT DATE: ${new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 
       { role: 'user', content: question },
     ]
 
-    // Use ZAI SDK for AI chat
-    const zai = await ZAI.create()
-    const completion = await zai.chat.completions.create({
-      messages,
-      temperature: 0.7,
-      max_tokens: 800,
-    })
+    // Use ZAI SDK for AI chat with retry logic
+    let answer = ''
+    let lastError: any = null
 
-    const answer = completion.choices?.[0]?.message?.content || 'Sorry, I could not generate a response. Please try again.'
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const zai = await ZAI.create()
+        const completion = await zai.chat.completions.create({
+          messages,
+          temperature: 0.7,
+          max_tokens: 800,
+        })
+        answer = completion.choices?.[0]?.message?.content || ''
+        if (answer) break
+      } catch (sdkErr: any) {
+        console.error(`AI Assistant SDK attempt ${attempt + 1} failed:`, sdkErr.message)
+        lastError = sdkErr
+      }
+    }
+
+    // If ZAI SDK failed, generate a helpful fallback response
+    if (!answer) {
+      console.error('AI Assistant: All SDK attempts failed, generating fallback response')
+      answer = generateFallbackResponse(question, tasks, leaves, user, pendingTasks.length, inProgressTasks.length, highPriorityTasks.length, overdueTasks.length)
+    }
 
     return NextResponse.json({ answer })
   } catch (error: any) {
-    console.error('AI Assistant error:', error)
-    return NextResponse.json({ error: 'AI assistant failed', details: error.message }, { status: 500 })
+    console.error('AI Assistant fatal error:', error)
+    // Even on fatal error, return a helpful response instead of an error
+    const fallbackAnswer = generateEmergencyFallback(error.message)
+    return NextResponse.json({ answer: fallbackAnswer })
   }
+}
+
+// Generate a structured fallback response when AI SDK is unavailable
+function generateFallbackResponse(
+  question: string,
+  tasks: any[],
+  leaves: any[],
+  user: any,
+  pendingCount: number,
+  inProgressCount: number,
+  highPriorityCount: number,
+  overdueCount: number
+): string {
+  const name = user?.name || 'Employee'
+  const totalTasks = tasks.length
+
+  const q = question.toLowerCase()
+
+  // Task workflow division
+  if (q.includes('divide') || q.includes('workflow') || q.includes('steps') || q.includes('organize')) {
+    let response = `📋 **Workflow Division for ${name}**\n\n`
+    response += `Here's how you can organize your ${totalTasks} task${totalTasks !== 1 ? 's' : ''}:\n\n`
+
+    if (overdueCount > 0) {
+      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED')
+      response += `⚠️ **URGENT — Overdue Tasks (${overdueCount}):**\n`
+      overdueTasks.forEach(t => {
+        response += `  ${t.priority === 'HIGH' || t.priority === 'CRITICAL' ? '🔴' : '🟡'} ${t.title} — Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'N/A'}\n`
+      })
+      response += '\n'
+    }
+
+    if (highPriorityCount > 0) {
+      const hpTasks = tasks.filter(t => ['HIGH', 'CRITICAL'].includes(t.priority) && t.status !== 'COMPLETED')
+      response += `🔴 **High Priority (${highPriorityCount}):**\n`
+      hpTasks.forEach(t => {
+        const stepsDone = t.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+        const stepsTotal = t.taskSteps?.length || 0
+        response += `  ${t.title} — ${stepsDone}/${stepsTotal} steps done\n`
+      })
+      response += '\n'
+    }
+
+    const inProgress = tasks.filter(t => t.status === 'IN_PROGRESS')
+    if (inProgress.length > 0) {
+      response += `🔵 **In Progress (${inProgress.length}):**\n`
+      inProgress.forEach(t => {
+        const stepsDone = t.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+        const stepsTotal = t.taskSteps?.length || 0
+        response += `  ${t.title} — ${stepsDone}/${stepsTotal} steps\n`
+      })
+      response += '\n'
+    }
+
+    const pending = tasks.filter(t => t.status === 'PENDING')
+    if (pending.length > 0) {
+      response += `🟡 **Pending (${pending.length}):**\n`
+      pending.forEach(t => {
+        response += `  ${t.title}\n`
+      })
+      response += '\n'
+    }
+
+    response += `💡 **Suggested approach:**\n`
+    response += `1. Complete overdue tasks first\n`
+    response += `2. Focus on high-priority tasks during your peak hours\n`
+    response += `3. Batch similar tasks together for efficiency\n`
+    response += `4. Use quick action buttons below for more specific guidance!`
+
+    return response
+  }
+
+  // Task prioritization
+  if (q.includes('prioritize') || q.includes('first') || q.includes('important')) {
+    let response = `⏰ **Task Prioritization for ${name}**\n\n`
+    response += `You have ${totalTasks} task${totalTasks !== 1 ? 's' : ''} (${pendingCount} pending, ${inProgressCount} in progress)\n\n`
+
+    if (overdueCount > 0) response += `🔴 **Do FIRST:** ${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''} — these are past deadline!\n`
+    if (highPriorityCount > 0) response += `🟠 **Do NEXT:** ${highPriorityCount} high/critical priority task${highPriorityCount !== 1 ? 's' : ''}\n`
+    if (inProgressCount > 0) response += `🔵 **Continue:** ${inProgressCount} task${inProgressCount !== 1 ? 's' : ''} already in progress\n`
+    if (pendingCount > 0) response += `🟡 **Then:** ${pendingCount} pending task${pendingCount !== 1 ? 's' : ''}\n`
+
+    response += `\n💡 Tip: Only Arti Sharma (EA) can mark tasks as Done, but you can track your progress here!`
+    return response
+  }
+
+  // Task progress
+  if (q.includes('progress') || q.includes('status') || q.includes('remaining')) {
+    let response = `📊 **Task Progress Summary for ${name}**\n\n`
+    tasks.forEach(t => {
+      const stepsDone = t.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
+      const stepsTotal = t.taskSteps?.length || 0
+      const statusEmoji = t.status === 'COMPLETED' ? '✅' : t.status === 'IN_PROGRESS' ? '🔵' : t.status === 'PENDING' ? '🟡' : '⏸️'
+      response += `${statusEmoji} **${t.title}** — ${t.status} (${stepsDone}/${stepsTotal} steps)\n`
+    })
+    response += `\n💡 Need more details? Click on any quick action below!`
+    return response
+  }
+
+  // Week planning
+  if (q.includes('week') || q.includes('plan') || q.includes('schedule')) {
+    let response = `🗓️ **Week Plan for ${name}**\n\n`
+    const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const activeTasks = tasks.filter(t => t.status !== 'COMPLETED')
+
+    days.forEach((day, i) => {
+      if (i < activeTasks.length) {
+        const t = activeTasks[i]
+        response += `**${day}:** ${t.title} (${t.priority} priority)\n`
+      } else {
+        response += `**${day}:** Buffer day / Follow up on previous tasks\n`
+      }
+    })
+
+    if (overdueCount > 0) response += `\n⚠️ Note: You have ${overdueCount} overdue task${overdueCount !== 1 ? 's' : ''} that should be addressed immediately!`
+    response += `\n💡 Adjust this plan based on your actual workload and meetings.`
+    return response
+  }
+
+  // Leave related
+  if (q.includes('leave') || q.includes('time off') || q.includes('holiday')) {
+    let response = `🏖️ **Leave Information for ${name}**\n\n`
+    if (leaves.length > 0) {
+      response += `Your recent leaves:\n`
+      leaves.slice(0, 5).forEach(l => {
+        const statusEmoji = l.status === 'APPROVED' ? '✅' : l.status === 'REJECTED' ? '❌' : '⏳'
+        response += `${statusEmoji} ${l.leaveType}: ${new Date(l.fromDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} to ${new Date(l.toDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} (${l.applicationTag})\n`
+      })
+    } else {
+      response += `You haven't applied for any leaves yet.\n`
+    }
+    response += `\n📝 **Leave Policy:** Apply 1+ day before = AL (Approved Leave, shown in green). Same day = LA (Late Application, shown in red).\n`
+    response += `Go to **Leave Management** to apply for leave.`
+    return response
+  }
+
+  // Overdue/risk
+  if (q.includes('overdue') || q.includes('risk') || q.includes('late')) {
+    let response = `⚠️ **Risk Assessment for ${name}**\n\n`
+    if (overdueCount > 0) {
+      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED')
+      response += `**Overdue Tasks (${overdueCount}):**\n`
+      overdueTasks.forEach(t => {
+        const daysOverdue = Math.ceil((Date.now() - new Date(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24))
+        response += `  🔴 ${t.title} — ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} overdue\n`
+      })
+    } else {
+      response += `✅ No overdue tasks! You're on track.\n`
+    }
+    if (highPriorityCount > 0) response += `\n🟠 ${highPriorityCount} high-priority task${highPriorityCount !== 1 ? 's' : ''} need attention.\n`
+    response += `\n💡 Focus on overdue items first, then high-priority tasks.`
+    return response
+  }
+
+  // Default/generic response
+  let response = `Hi ${name}! 👋\n\n`
+  response += `Here's a quick overview of your work:\n\n`
+  response += `📋 **Tasks:** ${totalTasks} total (${pendingCount} pending, ${inProgressCount} in progress)\n`
+  if (overdueCount > 0) response += `⚠️ **Overdue:** ${overdueCount} task${overdueCount !== 1 ? 's' : ''}\n`
+  if (highPriorityCount > 0) response += `🔴 **High Priority:** ${highPriorityCount} task${highPriorityCount !== 1 ? 's' : ''}\n`
+  response += `🏖️ **Leaves:** ${leaves.length} applied\n\n`
+  response += `💡 Try the quick action buttons below for specific help with your tasks!`
+  return response
+}
+
+// Emergency fallback when even the fallback generator can't run properly
+function generateEmergencyFallback(errorMessage: string): string {
+  return `I'm having trouble connecting to my brain right now, but I'm still here to help! 🤖\n\nHere's what you can do:\n1. **Try again** — Click a quick action button or retype your question\n2. **Check your dashboard** — Go to "My Dashboard" for task overview\n3. **Apply for leave** — Use the Leave Management section\n\nIf this keeps happening, please let your admin know. (Error: ${errorMessage || 'Connection issue'})`
 }

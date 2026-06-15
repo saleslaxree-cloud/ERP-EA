@@ -86,11 +86,21 @@ export function LaxreeTopbar() {
           )}
         </div>
         <button className={`dark-toggle${isDark ? ' on' : ''}`} onClick={toggleDark} title="Toggle dark mode" />
-        <div style={{
-          fontSize: '11.5px', fontWeight: 700, color: 'var(--g2)',
-          padding: '6px 12px', background: 'var(--g5)',
-          border: '1px solid var(--gbr)', borderRadius: 20,
-        }}>{currentUser?.name || '—'}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED'][
+              (() => { let h = 0; const n = currentUser?.name || ''; for (let i = 0; i < n.length; i++) h = n.charCodeAt(i) + ((h << 5) - h); return Math.abs(h) })() % 8
+            ],
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 800, color: '#fff', fontFamily: "'DM Sans', sans-serif",
+          }}>
+            {(currentUser?.name || '—').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+          </div>
+          <span style={{
+            fontSize: '11.5px', fontWeight: 700, color: 'var(--g2)',
+          }}>{currentUser?.name || '—'}</span>
+        </div>
       </div>
     </header>
   )

@@ -4,9 +4,22 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 
+// Avatar colors
+const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
+function avatarColor(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export function LaxreeEmployeeDashboard() {
   const { currentUserId, currentUserName, currentRole, addToast, setActivePage } = useWorkflowStore()
   const queryClient = useQueryClient()
+  const userInitials = getInitials(currentUserName || 'E')
+  const userAvatarBg = avatarColor(currentUserName || 'Employee')
 
   // Tab navigation for employee dashboard
   const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
@@ -92,9 +105,14 @@ export function LaxreeEmployeeDashboard() {
   return (
     <>
       <div className="ph">
-        <div className="ph-left">
-          <h2>My Dashboard</h2>
-          <p>Welcome, {currentUserName || 'Employee'}</p>
+        <div className="ph-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="av" style={{ width: 42, height: 42, fontSize: 16, background: userAvatarBg }}>
+            {userInitials}
+          </div>
+          <div>
+            <h2>My Dashboard</h2>
+            <p>Welcome, {currentUserName || 'Employee'}</p>
+          </div>
         </div>
         <div className="ph-right">
           <button className="btn" style={{ fontSize: 11, padding: '6px 14px', background: 'rgba(109,40,217,.1)', color: '#6D28D9', fontWeight: 800, border: '1px solid rgba(109,40,217,.3)' }}

@@ -8,6 +8,19 @@ export function LaxreeEmployeeLeaves() {
   const { currentUserId, currentUserName, addToast } = useWorkflowStore()
   const queryClient = useQueryClient()
 
+  // Avatar
+  const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
+  function avatarColor(name: string) {
+    let h = 0
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+  }
+  function getInitials(name: string) {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
+  const userInitials = getInitials(currentUserName || 'E')
+  const userAvatarBg = avatarColor(currentUserName || 'Employee')
+
   // Leave apply form
   const [leaveType, setLeaveType] = useState('CASUAL')
   const [fromDate, setFromDate] = useState('')
@@ -150,9 +163,14 @@ export function LaxreeEmployeeLeaves() {
   return (
     <>
       <div className="ph">
-        <div className="ph-left">
-          <h2>Leave Management</h2>
-          <p>Apply for leave and track your leave status</p>
+        <div className="ph-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="av" style={{ width: 38, height: 38, fontSize: 14, background: userAvatarBg }}>
+            {userInitials}
+          </div>
+          <div>
+            <h2>Leave Management</h2>
+            <p>Apply for leave and track your leave status</p>
+          </div>
         </div>
         <div className="ph-right">
           <button 

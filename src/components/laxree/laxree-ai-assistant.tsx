@@ -2,12 +2,14 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 
 interface ChatMessage {
   role: 'user' | 'ai'
   text: string
   timestamp: Date
+  isError?: boolean
+  retryQuestion?: string
 }
 
 // Quick action presets that employees can click
@@ -54,6 +56,36 @@ const QUICK_ACTIONS = [
   },
 ]
 
+// Simple markdown-like renderer for AI responses
+function renderAIText(text: string) {
+  // Split by lines and process each
+  const lines = text.split('\n')
+  return lines.map((line, i) => {
+    // Bold text: **text**
+    let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // Italic text: *text* (but not inside **)
+    processed = processed.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
+    
+    return (
+      <span key={i} dangerouslySetInnerHTML={{ __html: processed || '&nbsp;' }} />
+    )
+  }).reduce<React.ReactNode[]>((acc, elem, i) => {
+    if (i > 0) acc.push(<br key={`br-${i}`} />)
+    acc.push(elem)
+    return acc
+  }, [])
+}
+
+const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
+function avatarColor(name: string) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export function LaxreeAiAssistant() {
   const { currentUserId, currentUserName, addToast } = useWorkflowStore()
 
@@ -74,53 +106,65 @@ export function LaxreeAiAssistant() {
     inputRef.current?.focus()
   }, [])
 
-  // AI chat mutation with proper error handling
-  const aiMutation = useMutation({
-    mutationFn: async (question: string) => {
-      const res = await fetch('/api/ai-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: currentUserId,
-          question,
-          history: messages.slice(-10), // Send last 10 messages for context
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json.error || `Failed to get AI response (HTTP ${res.status})`)
-      }
-      return json
-    },
-    onSuccess: (data: any) => {
-      setMessages(prev => [...prev, {
-        role: 'ai',
-        text: data.answer || 'No response from AI. Please try again.',
-        timestamp: new Date(),
-      }])
-      setIsLoading(false)
-    },
-    onError: (err: any) => {
-      setMessages(prev => [...prev, {
-        role: 'ai',
-        text: 'Sorry, I encountered an error. Please try again. Error: ' + (err.message || 'Unknown error'),
-        timestamp: new Date(),
-      }])
-      setIsLoading(false)
-      addToast('err', 'AI assistant error — please try again')
-    },
-  })
-
-  const handleSend = (text?: string) => {
-    const question = text || inputText.trim()
-    if (!question || isLoading || !currentUserId) return
+  const sendQuestion = useCallback((question: string) => {
+    if (!question || !currentUserId) return
 
     setMessages(prev => [...prev, { role: 'user', text: question, timestamp: new Date() }])
     setInputText('')
     setIsLoading(true)
     setShowQuickActions(false)
-    aiMutation.mutate(question)
-  }
+
+    fetch('/api/ai-assistant', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUserId,
+        question,
+        history: messages.slice(-10),
+      }),
+    })
+    .then(res => res.json())
+    .then(data => {
+      // The API now always returns an `answer` field (even on fallback)
+      const answer = data.answer || data.error || 'I couldn\'t generate a response. Please try again.'
+      const isError = !!data.error && !data.answer
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        text: answer,
+        timestamp: new Date(),
+        isError,
+        retryQuestion: isError ? question : undefined,
+      }])
+      setIsLoading(false)
+      if (isError) {
+        addToast('err', 'AI assistant encountered an issue — see response below')
+      }
+    })
+    .catch(err => {
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        text: 'I\'m having trouble connecting right now. Please check your internet connection and try again.',
+        timestamp: new Date(),
+        isError: true,
+        retryQuestion: question,
+      }])
+      setIsLoading(false)
+      addToast('err', 'Connection error — please try again')
+    })
+  }, [currentUserId, messages, addToast])
+
+  const handleSend = useCallback((text?: string) => {
+    const question = text || inputText.trim()
+    if (!question || isLoading) return
+    sendQuestion(question)
+  }, [inputText, isLoading, sendQuestion])
+
+  const handleRetry = useCallback((retryQuestion: string) => {
+    // Remove the error message
+    setMessages(prev => prev.slice(0, -1))
+    // Re-send the question
+    sendQuestion(retryQuestion)
+  }, [sendQuestion])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -136,13 +180,20 @@ export function LaxreeAiAssistant() {
   }
 
   const firstName = currentUserName?.split(' ')[0] || 'there'
+  const userInitials = getInitials(currentUserName || 'E')
+  const userAvatarColor = avatarColor(currentUserName || 'Employee')
 
   return (
     <>
       <div className="ph">
-        <div className="ph-left">
-          <h2>AI Workflow Assistant</h2>
-          <p>Get help organizing your tasks, dividing work into steps, and managing your workflow</p>
+        <div className="ph-left" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="av" style={{ width: 36, height: 36, fontSize: 14, background: 'linear-gradient(135deg, #6D28D9, #7C3AED)' }}>
+            🤖
+          </div>
+          <div>
+            <h2>AI Workflow Assistant</h2>
+            <p>Get help organizing your tasks, dividing work into steps, and managing your workflow</p>
+          </div>
         </div>
         <div className="ph-right">
           {messages.length > 0 && (
@@ -177,8 +228,9 @@ export function LaxreeAiAssistant() {
             </div>
             <div>
               <div className="ct" style={{ fontSize: 14 }}>AI Workflow Assistant</div>
-              <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1 }}>
-                {isLoading ? '✨ Thinking...' : '🟢 Online — Ready to help'}
+              <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: isLoading ? '#F59E0B' : '#22C55E', display: 'inline-block' }} />
+                {isLoading ? 'Thinking...' : 'Online — Ready to help'}
               </div>
             </div>
           </div>
@@ -272,37 +324,56 @@ export function LaxreeAiAssistant() {
                     🤖
                   </div>
                 )}
-                <div style={{
-                  padding: '12px 16px', borderRadius: 14, fontSize: 13, lineHeight: 1.7,
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, var(--g2), #B8860B)'
-                    : 'var(--card)',
-                  color: msg.role === 'user' ? '#fff' : 'var(--t1)',
-                  border: msg.role === 'user' ? 'none' : '1px solid var(--b1)',
-                  whiteSpace: 'pre-wrap',
-                  borderBottomRightRadius: msg.role === 'user' ? 4 : 14,
-                  borderBottomLeftRadius: msg.role === 'ai' ? 4 : 14,
-                }}>
-                  {msg.role === 'ai' && (
-                    <div style={{ fontSize: 9, fontWeight: 800, color: '#6D28D9', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      AI Assistant
-                    </div>
-                  )}
-                  {msg.text}
+                <div>
                   <div style={{
-                    fontSize: 8, color: msg.role === 'user' ? 'rgba(255,255,255,.6)' : 'var(--t4)',
-                    marginTop: 6, textAlign: 'right',
+                    padding: '12px 16px', borderRadius: 14, fontSize: 13, lineHeight: 1.7,
+                    background: msg.role === 'user'
+                      ? 'linear-gradient(135deg, var(--g2), #B8860B)'
+                      : msg.isError
+                        ? '#FEF2F2'
+                        : 'var(--card)',
+                    color: msg.role === 'user' ? '#fff' : msg.isError ? '#991B1B' : 'var(--t1)',
+                    border: msg.role === 'user' ? 'none' : msg.isError ? '1px solid rgba(220,38,38,.3)' : '1px solid var(--b1)',
+                    whiteSpace: 'pre-wrap',
+                    borderBottomRightRadius: msg.role === 'user' ? 4 : 14,
+                    borderBottomLeftRadius: msg.role === 'ai' ? 4 : 14,
                   }}>
-                    {msg.timestamp.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {msg.role === 'ai' && (
+                      <div style={{ fontSize: 9, fontWeight: 800, color: msg.isError ? '#DC2626' : '#6D28D9', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {msg.isError ? '⚠️ Error' : 'AI Assistant'}
+                      </div>
+                    )}
+                    {msg.role === 'ai' ? renderAIText(msg.text) : msg.text}
+                    <div style={{
+                      fontSize: 8, color: msg.role === 'user' ? 'rgba(255,255,255,.6)' : 'var(--t4)',
+                      marginTop: 6, textAlign: 'right',
+                    }}>
+                      {msg.timestamp.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
+                  {/* Retry button for error messages */}
+                  {msg.isError && msg.retryQuestion && (
+                    <button
+                      className="btn"
+                      style={{
+                        marginTop: 6, fontSize: 10, padding: '4px 12px',
+                        background: '#DC2626', color: '#fff', fontWeight: 700,
+                        border: 'none', borderRadius: 6, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                      onClick={() => handleRetry(msg.retryQuestion!)}
+                      disabled={isLoading}
+                    >
+                      🔄 Retry
+                    </button>
+                  )}
                 </div>
                 {msg.role === 'user' && (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: 8, flexShrink: 0,
-                    background: 'var(--g2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, color: '#fff', fontWeight: 800,
+                  <div className="av" style={{
+                    width: 28, height: 28, fontSize: 11, flexShrink: 0,
+                    background: userAvatarColor,
                   }}>
-                    {firstName.charAt(0)}
+                    {userInitials}
                   </div>
                 )}
               </div>
