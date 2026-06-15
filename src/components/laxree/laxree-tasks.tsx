@@ -153,12 +153,15 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     },
   })
 
+  // Only ADMIN and EA can see ALL tasks; EMPLOYEE/MANAGER/DIRECTOR only see tasks assigned to them
+  const canSeeAllTasks = currentRole === 'ADMIN' || currentRole === 'EA'
+
   // Filtering
   let filtered = Array.isArray(tasks) ? [...tasks] : []
 
   // EMPLOYEE/MANAGER/DIRECTOR: Only see tasks assigned to them
-  if (!canModifyTask && currentUserId) {
-    filtered = filtered.filter((t: any) => t.ownerId === currentUserId)
+  if (!canSeeAllTasks && currentUserId) {
+    filtered = filtered.filter((t: any) => t.ownerId === currentUserId || t.taskSteps?.some((s: any) => s.assigneeId === currentUserId))
   }
 
   // Search filter
