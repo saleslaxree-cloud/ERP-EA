@@ -91,12 +91,19 @@ export function LaxreeEmployeeDashboard() {
   const isUpcoming = (dateStr: string) => {
     const d = new Date(dateStr)
     const now = new Date()
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    return d >= tomorrowStart
+  }
+  const isOverdue = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    return d > todayStart
+    const dueDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    return dueDayStart < todayStart
   }
   const todayTasks = tasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const upcomingTasks = tasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
-  const overdueTasks = tasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  const overdueTasks = tasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const activeTasks = tasks.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'PENDING' || t.status === 'ON_HOLD')
   const completedTasks = tasks.filter((t: any) => t.status === 'COMPLETED')
   const pendingLeaves = leaves.filter((l: any) => l.status === 'PENDING')

@@ -188,12 +188,21 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
   }
 
-  // Helper: check if a date is in the future (upcoming)
+  // Helper: check if a date is in the future (tomorrow and beyond — NOT today)
   const isUpcoming = (dateStr: string) => {
     const d = new Date(dateStr)
     const now = new Date()
+    const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+    return d >= tomorrowStart
+  }
+
+  // Helper: check if a date is before today (yesterday or earlier — overdue)
+  const isOverdue = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    return d > todayStart
+    const dueDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    return dueDayStart < todayStart
   }
 
   if (!showCancelled && !showExtHold && !showEscalations) {
@@ -204,14 +213,14 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
       t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
     else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
-      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+      t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
   }
 
   const allTasks = Array.isArray(tasks) ? tasks : []
   const todayCount = allTasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
-  const overdueCount = allTasks.filter((t: any) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  const overdueCount = allTasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
 
   const tabs = [
     { id: 'today', label: 'Today', count: todayCount },
