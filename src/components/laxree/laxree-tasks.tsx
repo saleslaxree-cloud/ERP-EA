@@ -1,5 +1,7 @@
 'use client'
 
+// Build: 2026-06-16-v3 - Fix Today/Overdue overlap with date-only comparison
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState, useRef, useEffect } from 'react'
