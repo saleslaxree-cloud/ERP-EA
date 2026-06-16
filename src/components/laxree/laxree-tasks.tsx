@@ -959,7 +959,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
             </div>
             <div className="form-row fr-1">
               <div className="fg">
-                <label>Next Target Date</label>
+                <label>Next Target Date <span style={{ color: 'var(--red)' }}>*</span></label>
                 <input
                   className="fi"
                   type="date"
@@ -974,7 +974,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               <button
                 className="btn btn-gold"
                 onClick={() => reviseMutation.mutate({ id: reviseTask.id, reason: reviseReason, nextDate: reviseNextDate })}
-                disabled={reviseMutation.isPending || !reviseReason.trim()}
+                disabled={reviseMutation.isPending || !reviseReason.trim() || !reviseNextDate}
               >
                 {reviseMutation.isPending ? 'Reopening...' : '↩ Revise Task'}
               </button>

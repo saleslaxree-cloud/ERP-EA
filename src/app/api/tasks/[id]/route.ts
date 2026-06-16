@@ -99,13 +99,19 @@ export async function PATCH(
       } else if (status === WorkflowStatus.IN_PROGRESS) {
         // Allow transitioning to IN_PROGRESS from any status (for "Revise" functionality)
         updateData.status = WorkflowStatus.IN_PROGRESS
-        // Clear completedAt if reopening
+        // Clear completedAt if reopening from completed
         if (task.status === WorkflowStatus.COMPLETED) {
           updateData.completedAt = null
-          // Record revise metadata
-          updateData.revisedAt = now
-          if (reviseReason !== undefined) updateData.reviseReason = reviseReason
-          if (reviseNextDate !== undefined) updateData.reviseNextDate = reviseNextDate ? new Date(reviseNextDate) : null
+        }
+        // Record revise metadata and update dueDate for ALL revise scenarios
+        updateData.revisedAt = now
+        if (reviseReason !== undefined) updateData.reviseReason = reviseReason
+        if (reviseNextDate !== undefined) {
+          updateData.reviseNextDate = reviseNextDate ? new Date(reviseNextDate) : null
+          // Also update dueDate to the new next date so the task moves out of Today/Overdue
+          if (reviseNextDate) {
+            updateData.dueDate = new Date(reviseNextDate)
+          }
         }
       } else if (status === WorkflowStatus.CANCELLED) {
         updateData.status = WorkflowStatus.CANCELLED
