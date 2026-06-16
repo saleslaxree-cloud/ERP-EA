@@ -31,6 +31,10 @@ export const metadata: Metadata = {
   description: "Comprehensive enterprise workflow and approval management system",
 };
 
+// Force no-cache for HTML pages to prevent stale JS from being served
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,6 +42,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+        <meta name="app-version" content="2026-06-16-v4-overdue-fix" />
+      </head>
       <body
         className={`${cormorant.variable} ${dmSans.variable} ${dmMono.variable} antialiased`}
         style={{ fontFamily: "'DM Sans', sans-serif" }}
