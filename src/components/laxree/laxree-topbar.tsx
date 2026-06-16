@@ -37,10 +37,14 @@ export function LaxreeTopbar() {
             <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <div style={{
-          fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700,
-          letterSpacing: 3, textTransform: 'uppercase', color: 'var(--g2)',
-        }}>LAXREE</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{
+            fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700,
+            letterSpacing: 3, textTransform: 'uppercase', color: 'var(--g2)',
+          }}>LAXREE</div>
+          {/* Build version indicator — confirms the user is seeing the latest deployment */}
+          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v5·0616</span>
+        </div>
       </div>
       <div className="tb-center">
         <div className="tb-search" onClick={() => setCmdPaletteOpen(true)} style={{ cursor: 'pointer' }}>

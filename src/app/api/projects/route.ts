@@ -23,11 +23,13 @@ export async function GET(request: NextRequest) {
     })
 
     const now = new Date()
+    // Use start-of-day for overdue comparison so today's tasks are NOT counted as overdue.
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const projectsWithStats = projects.map(p => {
       const totalTasks = p.tasks.length
       const completedTasks = p.tasks.filter(t => t.status === 'COMPLETED').length
       const overdueTasks = p.tasks.filter(t =>
-        t.dueDate && new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status)
+        t.dueDate && new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status)
       ).length
       const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 

@@ -38,12 +38,14 @@ export async function GET(request: NextRequest) {
     })
 
     const now = new Date()
+    // Use start-of-day for overdue comparison so today's tasks are NOT counted as overdue.
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const employeesWithStats = employees.map(emp => {
       const totalTasks = emp.tasks.length
       const completedTasks = emp.tasks.filter(t => t.status === 'COMPLETED').length
       const inProgressTasks = emp.tasks.filter(t => t.status === 'IN_PROGRESS').length
       const overdueTasks = emp.tasks.filter(t =>
-        t.dueDate && new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status)
+        t.dueDate && new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status)
       ).length
       const performanceScore = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100 - overdueTasks * 5) : 0
 

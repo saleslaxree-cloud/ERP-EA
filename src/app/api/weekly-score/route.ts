@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
     })
 
     const now = new Date()
+    // Use start-of-day for overdue comparison so today's tasks are NOT counted as overdue.
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     let completedOnTime = 0      // Completed before or on due date
     let completedLate = 0        // Completed after due date
     let inProgressOnTrack = 0    // In progress / in review, not yet overdue
@@ -57,7 +59,7 @@ export async function GET(req: NextRequest) {
 
     for (const task of tasks) {
       const isOverdue = task.dueDate
-        ? new Date(task.dueDate) < now && task.status !== WorkflowStatus.COMPLETED && task.status !== WorkflowStatus.CANCELLED
+        ? new Date(task.dueDate) < todayStart && task.status !== WorkflowStatus.COMPLETED && task.status !== WorkflowStatus.CANCELLED
         : false
 
       switch (task.status) {

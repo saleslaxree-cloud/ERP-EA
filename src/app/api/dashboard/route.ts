@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
   try {
     const userId = request.nextUrl.searchParams.get('userId')
     const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
     // ══ TASK STATS (lightweight counts) ══
     const totalTasks = await db.task.count()
@@ -13,15 +15,14 @@ export async function GET(request: NextRequest) {
     const pendingTasks = await db.task.count({ where: { status: WorkflowStatus.PENDING } })
     const inProgressTasks = await db.task.count({ where: { status: WorkflowStatus.IN_PROGRESS } })
 
+    // OVERDUE = due date strictly before TODAY (start of day), NOT before current timestamp.
+    // Using `lt: now` caused today's tasks (midnight UTC) to be counted as overdue.
     const overdueTasks = await db.task.count({
       where: {
         status: { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_PROGRESS] },
-        dueDate: { lt: now },
+        dueDate: { lt: todayStart },
       },
     })
-
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
     const todayTasks = await db.task.count({
       where: { dueDate: { gte: todayStart, lt: todayEnd } },
     })
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
       const userTasks = allTasks.filter(t => t.owner?.id === user.id)
       const done = userTasks.filter(t => t.status === WorkflowStatus.COMPLETED).length
       const overdue = userTasks.filter(t =>
-        t.dueDate && new Date(t.dueDate) < now && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
+        t.dueDate && new Date(t.dueDate) < todayStart && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
       ).length
       const inProgress = userTasks.filter(t => t.status === WorkflowStatus.IN_PROGRESS).length
       const score = userTasks.length > 0 ? Math.round((done / userTasks.length) * 100 - overdue * 5) : 0
@@ -91,7 +92,7 @@ export async function GET(request: NextRequest) {
       if (t.status === WorkflowStatus.COMPLETED) deptMap[dept].done++
       if (t.status === WorkflowStatus.IN_PROGRESS) deptMap[dept].inProgress++
       if (t.status === WorkflowStatus.PENDING) deptMap[dept].pending++
-      if (t.dueDate && new Date(t.dueDate) < now && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED) deptMap[dept].overdue++
+      if (t.dueDate && new Date(t.dueDate) < todayStart && t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED) deptMap[dept].overdue++
     })
 
     // ══ CATEGORY STATS ══
@@ -116,8 +117,10 @@ export async function GET(request: NextRequest) {
       t.dueDate && new Date(t.dueDate) >= todayEnd && new Date(t.dueDate) < nextWeekEnd &&
       t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
     )
+    // OVERDUE LIST = due date strictly before TODAY (start of day).
+    // This prevents overlap with todayTasksList.
     const overdueTasksList = allTasks.filter(t =>
-      t.dueDate && new Date(t.dueDate) < now &&
+      t.dueDate && new Date(t.dueDate) < todayStart &&
       t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED
     )
 

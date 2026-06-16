@@ -1,6 +1,6 @@
 'use client'
 
-// Build: 2026-06-16-v3 - Fix Today/Overdue overlap with date-only comparison
+// Build: 2026-06-16-v5 — Fix Today/Overdue overlap at the API level (dashboard/employees/projects/reports/weekly-score/ai-assistant)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
@@ -179,9 +179,14 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
   if (showCancelled) filtered = filtered.filter((t: any) => t.status === 'CANCELLED')
   if (showExtHold) filtered = filtered.filter((t: any) => t.status === 'EXTERNAL_HOLD')
-  if (showEscalations) filtered = filtered.filter((t: any) =>
-    t.status === 'ESCALATED' || (t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
-  )
+  if (showEscalations) {
+    // Overdue escalations: use start-of-day comparison so today's tasks are NOT flagged as overdue.
+    const _now = new Date()
+    const _todayStart = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate())
+    filtered = filtered.filter((t: any) =>
+      t.status === 'ESCALATED' || (t.dueDate && new Date(t.dueDate) < _todayStart && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+    )
+  }
 
   // Helper: check if a date is today
   const isToday = (dateStr: string) => {

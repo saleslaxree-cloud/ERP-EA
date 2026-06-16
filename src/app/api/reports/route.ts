@@ -7,6 +7,8 @@ export async function GET(request: NextRequest) {
     const type = request.nextUrl.searchParams.get('type') || 'employee'
 
     const now = new Date()
+    // Use start-of-day for overdue comparison so today's tasks are NOT counted as overdue.
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const allUsers = await db.user.findMany({
       where: { isActive: true },
       select: {
@@ -37,7 +39,7 @@ export async function GET(request: NextRequest) {
         const completed = u.tasks.filter(t => t.status === 'COMPLETED').length
         const inProgress = u.tasks.filter(t => t.status === 'IN_PROGRESS').length
         const overdue = u.tasks.filter(t =>
-          t.dueDate && new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status)
+          t.dueDate && new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status)
         ).length
         const score = totalTasks > 0 ? Math.round((completed / totalTasks) * 100 - overdue * 5) : 0
 
@@ -62,7 +64,7 @@ export async function GET(request: NextRequest) {
         dueDate: t.dueDate?.toISOString().split('T')[0],
         completedAt: t.completedAt?.toISOString().split('T')[0],
         createdAt: t.createdAt.toISOString().split('T')[0],
-        isOverdue: t.dueDate ? new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status) : false,
+        isOverdue: t.dueDate ? new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status) : false,
       }))
       return NextResponse.json({ type: 'task', data: report, generatedAt: now.toISOString() })
     }
@@ -76,7 +78,7 @@ export async function GET(request: NextRequest) {
         deptMap[dept].total++
         if (t.status === 'COMPLETED') deptMap[dept].completed++
         if (t.status === 'IN_PROGRESS') deptMap[dept].inProgress++
-        if (t.dueDate && new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status)) deptMap[dept].overdue++
+        if (t.dueDate && new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status)) deptMap[dept].overdue++
       })
       allUsers.forEach(u => {
         const dept = u.department || 'Unassigned'
@@ -115,7 +117,7 @@ export async function GET(request: NextRequest) {
         const totalTasks = u.tasks.length
         const completed = u.tasks.filter(t => t.status === 'COMPLETED').length
         const overdue = u.tasks.filter(t =>
-          t.dueDate && new Date(t.dueDate) < now && !['COMPLETED', 'CANCELLED'].includes(t.status)
+          t.dueDate && new Date(t.dueDate) < todayStart && !['COMPLETED', 'CANCELLED'].includes(t.status)
         ).length
         const score = totalTasks > 0 ? Math.round((completed / totalTasks) * 100 - overdue * 5) : 0
         const categories: Record<string, number> = {}

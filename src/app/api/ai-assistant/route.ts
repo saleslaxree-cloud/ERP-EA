@@ -67,7 +67,10 @@ export async function POST(request: NextRequest) {
     const pendingTasks = tasks.filter(t => t.status === 'PENDING')
     const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS')
     const highPriorityTasks = tasks.filter(t => ['HIGH', 'CRITICAL'].includes(t.priority))
-    const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED')
+    // Overdue = due date strictly before TODAY (start of day). Prevents today's tasks from being flagged as overdue.
+    const _now1 = new Date()
+    const _todayStart1 = new Date(_now1.getFullYear(), _now1.getMonth(), _now1.getDate())
+    const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < _todayStart1 && t.status !== 'COMPLETED')
 
     const systemPrompt = `You are an AI Workflow Assistant for Laxree Enterprise Operating System (EOS). You are designed to help employees organize, divide, and manage their work effectively.
 
@@ -184,7 +187,9 @@ function generateFallbackResponse(
     response += `Here's how you can organize your ${totalTasks} task${totalTasks !== 1 ? 's' : ''}:\n\n`
 
     if (overdueCount > 0) {
-      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED')
+      const _now2 = new Date()
+      const _todayStart2 = new Date(_now2.getFullYear(), _now2.getMonth(), _now2.getDate())
+      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < _todayStart2 && t.status !== 'COMPLETED')
       response += `⚠️ **URGENT — Overdue Tasks (${overdueCount}):**\n`
       overdueTasks.forEach(t => {
         response += `  ${t.priority === 'HIGH' || t.priority === 'CRITICAL' ? '🔴' : '🟡'} ${t.title} — Due: ${t.dueDate ? new Date(t.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'N/A'}\n`
@@ -300,7 +305,9 @@ function generateFallbackResponse(
   if (q.includes('overdue') || q.includes('risk') || q.includes('late')) {
     let response = `⚠️ **Risk Assessment for ${name}**\n\n`
     if (overdueCount > 0) {
-      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'COMPLETED')
+      const _now3 = new Date()
+      const _todayStart3 = new Date(_now3.getFullYear(), _now3.getMonth(), _now3.getDate())
+      const overdueTasks = tasks.filter(t => t.dueDate && new Date(t.dueDate) < _todayStart3 && t.status !== 'COMPLETED')
       response += `**Overdue Tasks (${overdueCount}):**\n`
       overdueTasks.forEach(t => {
         const daysOverdue = Math.ceil((Date.now() - new Date(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24))
