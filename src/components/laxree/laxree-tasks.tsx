@@ -18,10 +18,15 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
   // ADMIN and EA can mark tasks as Done / Revise / Edit / Delete
   const canModifyTask = currentRole === 'ADMIN' || currentRole === 'EA'
+  // ADMIN and EA can see ALL tasks (and filter by employee). Employees only see their own.
+  const canSeeAllTasks = currentRole === 'ADMIN' || currentRole === 'EA'
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [editTask, setEditTask] = useState<any>(null)
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: string } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  // Filter dropdowns — priority (everyone) + employee (ADMIN/EA only)
+  const [priorityFilter, setPriorityFilter] = useState<string>('')
+  const [employeeFilter, setEmployeeFilter] = useState<string>('')
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Revise modal state
@@ -155,9 +160,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     },
   })
 
-  // Only ADMIN and EA can see ALL tasks; EMPLOYEE/MANAGER/DIRECTOR only see tasks assigned to them
-  const canSeeAllTasks = currentRole === 'ADMIN' || currentRole === 'EA'
-
   // Filtering
   let filtered = Array.isArray(tasks) ? [...tasks] : []
 
@@ -174,6 +176,18 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
       t.department?.toLowerCase().includes(q) ||
       t.category?.toLowerCase().includes(q) ||
       t.owner?.name?.toLowerCase().includes(q)
+    )
+  }
+
+  // Priority filter dropdown
+  if (priorityFilter) {
+    filtered = filtered.filter((t: any) => t.priority === priorityFilter)
+  }
+
+  // Employee filter dropdown (ADMIN/EA only) — filter by ownerId OR step assignee
+  if (employeeFilter && canSeeAllTasks) {
+    filtered = filtered.filter((t: any) =>
+      t.ownerId === employeeFilter || t.taskSteps?.some((s: any) => s.assigneeId === employeeFilter)
     )
   }
 
@@ -299,10 +313,10 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
       <div className="page-accent" />
 
-      {/* Search Bar */}
+      {/* Search Bar + Filter Dropdowns */}
       {!showCancelled && !showExtHold && !showEscalations && (
-        <div style={{ marginBottom: 14 }}>
-          <div className="search" style={{ maxWidth: 400 }}>
+        <div style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search" style={{ maxWidth: 400, flex: '1 1 280px', minWidth: 220 }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--t4)', flexShrink: 0 }}>
               <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
@@ -314,6 +328,74 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               style={{ border: 'none', outline: 'none', background: 'transparent', fontFamily: "'DM Sans', sans-serif", fontSize: 12.5, color: 'var(--t1)', width: '100%' }}
             />
           </div>
+
+          {/* Priority filter dropdown — visible to all roles */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <label style={{ fontSize: 10, fontWeight: 800, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Priority</label>
+            <select
+              value={priorityFilter}
+              onChange={e => setPriorityFilter(e.target.value)}
+              style={{
+                padding: '6px 10px', borderRadius: 6, border: '1px solid var(--b1)',
+                background: 'var(--bg)', color: 'var(--t1)',
+                fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', outline: 'none',
+              }}
+            >
+              <option value="">All Priorities</option>
+              <option value="CRITICAL">🔴 Critical</option>
+              <option value="HIGH">🟠 High</option>
+              <option value="MEDIUM">🟡 Medium</option>
+              <option value="LOW">🔵 Low</option>
+            </select>
+          </div>
+
+          {/* Employee filter dropdown — ADMIN/EA only */}
+          {canSeeAllTasks && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <label style={{ fontSize: 10, fontWeight: 800, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Employee</label>
+              <select
+                value={employeeFilter}
+                onChange={e => setEmployeeFilter(e.target.value)}
+                style={{
+                  padding: '6px 10px', borderRadius: 6, border: '1px solid var(--b1)',
+                  background: 'var(--bg)', color: 'var(--t1)',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer', outline: 'none', minWidth: 180,
+                }}
+              >
+                <option value="">All Employees</option>
+                {Array.isArray(users) && users.map((u: any) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} {u.department ? `· ${u.department}` : ''} ({u.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Clear filters button */}
+          {(priorityFilter || employeeFilter) && (
+            <button
+              onClick={() => { setPriorityFilter(''); setEmployeeFilter('') }}
+              style={{
+                padding: '6px 10px', borderRadius: 6, border: '1px solid var(--b1)',
+                background: 'var(--bg2)', color: 'var(--t2)',
+                fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700,
+                cursor: 'pointer',
+              }}
+              title="Clear filters"
+            >
+              ✕ Clear
+            </button>
+          )}
+
+          {/* Result count when filtered */}
+          {(priorityFilter || employeeFilter) && (
+            <span style={{ fontSize: 11, color: 'var(--t3)', fontWeight: 600, marginLeft: 'auto' }}>
+              Showing {filtered.length} of {Array.isArray(tasks) ? tasks.length : 0} tasks
+            </span>
+          )}
         </div>
       )}
 

@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ai-assistant' | 'user-management'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ea-tasks' | 'ai-assistant' | 'user-management'
 
 interface NavItem {
   id: ActivePage
@@ -157,11 +157,21 @@ export function LaxreeSidebar() {
       if (Array.isArray(r)) return r
       return []
     }).catch(() => []),
-    enabled: !!currentUserId && isEmployee,
+    enabled: !!currentUserId && (isEmployee || isEA),
   })
   const empActiveTasks = Array.isArray(empTasksData)
     ? empTasksData.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
     : 0
+
+  // EA's personal "My Tasks" — where EA can do/revise/reassign their own work
+  // (Declared here because it depends on empActiveTasks count above)
+  const eaMyTasks: NavItem[] = [
+    {
+      id: 'ea-tasks', label: 'My Tasks',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
+      badge: empActiveTasks > 0 ? <span className="nb nb-live">{empActiveTasks}</span> : undefined,
+    },
+  ]
 
   const employeeTasks: NavItem[] = [
     {
@@ -212,10 +222,11 @@ export function LaxreeSidebar() {
       { label: 'Management', items: management },
     ]
   } else {
-    // EA: Dashboard + Task Management + Intelligence + Departments + Management + Leaves + EA + User Management
+    // EA: Dashboard + My Tasks + Task Management + Intelligence + Departments + Management + Leaves + EA + User Management
     // (NO Executive View, NO Monday Meeting, NO Scorecard, NO CEO sections)
     sections = [
       { label: 'Dashboard', items: eaDashboard },
+      { label: 'My Work', items: eaMyTasks },
       { label: 'Task Management', items: taskMgmt },
       { label: 'Intelligence', items: intelligence },
       { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
