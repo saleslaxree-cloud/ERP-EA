@@ -16,6 +16,7 @@ import { LaxreeNotifPanel } from '@/components/laxree/laxree-notif-panel'
 import { LaxreeLogin } from '@/components/laxree/laxree-login'
 import { LaxreeEmployeeDashboard } from '@/components/laxree/laxree-employee-dashboard'
 import { LaxreeEaMyTasks } from '@/components/laxree/laxree-ea-my-tasks'
+import { LaxreeEmpMyTasks } from '@/components/laxree/laxree-emp-my-tasks'
 import { LaxreeLeaveManagement } from '@/components/laxree/laxree-leave-management'
 import { LaxreeEmployeeLeaves } from '@/components/laxree/laxree-employee-leaves'
 import { LaxreeAiAssistant } from '@/components/laxree/laxree-ai-assistant'
@@ -105,7 +106,7 @@ function ActiveView() {
       case 'employee-dashboard':
         return <LaxreeEmployeeDashboard />
       case 'emp-tasks':
-        return <LaxreeEmployeeDashboard />  // Employee tasks shown via dashboard with tasks tab
+        return <LaxreeEmpMyTasks />  // Employee's dedicated My Tasks page (separate from Dashboard)
       case 'ea-tasks':
         return <LaxreeEaMyTasks />          // EA's personal My Tasks page (Done/Revise/Reassign)
       case 'leaves':

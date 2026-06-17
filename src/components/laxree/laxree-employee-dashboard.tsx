@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 // Avatar colors
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
@@ -16,21 +16,17 @@ function getInitials(name: string) {
 }
 
 export function LaxreeEmployeeDashboard() {
-  const { currentUserId, currentUserName, currentRole, addToast, setActivePage, activePage } = useWorkflowStore()
+  const { currentUserId, currentUserName, currentRole, addToast, setActivePage } = useWorkflowStore()
   const queryClient = useQueryClient()
   const userInitials = getInitials(currentUserName || 'E')
   const userAvatarBg = avatarColor(currentUserName || 'Employee')
 
   // Tab navigation for employee dashboard
   const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
-  const [taskFilter, setTaskFilter] = useState<string>('today')
+  const [taskFilter, setTaskFilter] = useState<string>('all')
 
-  // When coming from sidebar "My Tasks" link, auto-switch to tasks tab
-  useEffect(() => {
-    if (activePage === 'emp-tasks') {
-      setEmpTab('tasks')
-    }
-  }, [activePage])
+  // NOTE: 'emp-tasks' is now a dedicated page (LaxreeEmpMyTasks) — no need to auto-switch tabs here.
+  // The 'tasks' tab below remains as a quick preview inside the dashboard Overview.
 
   // Fetch employee's tasks (read-only) — tasks where employee is owner OR step assignee
   const { data: tasksData = [] } = useQuery({
@@ -439,8 +435,13 @@ export function LaxreeEmployeeDashboard() {
       {/* ===================== MY TASKS TAB (READ ONLY) ===================== */}
       {empTab === 'tasks' && (
         <>
-          {/* Task Stats Summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+          {/* Task Stats Summary — clickable cards to filter tasks (now includes 'All') */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'all' ? '3px solid var(--t2)' : undefined, background: taskFilter === 'all' ? 'rgba(109,40,217,.04)' : undefined }}
+              onClick={() => setTaskFilter('all')}>
+              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>All</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--t2)' }}>{activeTasks.length}</div>
+            </div>
             <div className="lcard" style={{ padding: '12px 14px', cursor: 'pointer', borderLeft: taskFilter === 'today' ? '3px solid var(--g2)' : undefined, background: taskFilter === 'today' ? 'rgba(180,83,9,.04)' : undefined }}
               onClick={() => setTaskFilter('today')}>
               <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 2 }}>Today</div>
@@ -463,13 +464,14 @@ export function LaxreeEmployeeDashboard() {
               <div className="ct">📋 All My Assigned Tasks</div>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
-                  {taskFilter === 'today' ? `${todayTasks.length} today` : taskFilter === 'upcoming' ? `${upcomingTasks.length} upcoming` : `${overdueTasks.length} overdue`}
+                  {taskFilter === 'all' ? `${activeTasks.length} all` : taskFilter === 'today' ? `${todayTasks.length} today` : taskFilter === 'upcoming' ? `${upcomingTasks.length} upcoming` : `${overdueTasks.length} overdue`}
                 </span>
               </div>
             </div>
             <div className="cb" style={{ padding: 0 }}>
               {(() => {
-                const filteredTasks = taskFilter === 'today' ? todayTasks
+                const filteredTasks = taskFilter === 'all' ? activeTasks
+                  : taskFilter === 'today' ? todayTasks
                   : taskFilter === 'upcoming' ? upcomingTasks
                   : overdueTasks
 
@@ -477,7 +479,7 @@ export function LaxreeEmployeeDashboard() {
                   <div style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>
-                      {taskFilter === 'today' ? 'No tasks due today' : taskFilter === 'upcoming' ? 'No upcoming tasks' : 'No overdue tasks'}
+                      {taskFilter === 'all' ? 'No tasks assigned to you' : taskFilter === 'today' ? 'No tasks due today' : taskFilter === 'upcoming' ? 'No upcoming tasks' : 'No overdue tasks'}
                     </div>
                     <div style={{ fontSize: 11, marginTop: 4 }}>Tasks will appear here when assigned by Admin</div>
                   </div>
