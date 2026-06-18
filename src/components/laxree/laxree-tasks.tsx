@@ -1,6 +1,6 @@
 'use client'
 
-// Build: 2026-06-18-v8 — Add "All" tab as default on All Tasks page so tasks WITHOUT due dates are also visible (Admin/EA dashboards)
+// Build: 2026-06-18-v10 — 'All' tab now shows EVERY task (incl. COMPLETED/CANCELLED). Added Recent Activity section.
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
@@ -44,6 +44,16 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     refetchOnMount: 'always',
     staleTime: 0,
   })
+
+  // ─── Recent Activity feed (persistent audit log of task events) ───────
+  // Polls every 15s so newly created/deleted/revised tasks show up quickly.
+  const { data: taskActivityData } = useQuery<{ activities: any[]; count: number }>({
+    queryKey: ['task-activity-feed-tasks'],
+    queryFn: () => fetch('/api/task-activity?limit=15').then(r => r.json()),
+    refetchInterval: 15000,
+    refetchOnMount: 'always',
+  })
+  const taskActivities = Array.isArray(taskActivityData?.activities) ? taskActivityData.activities : []
 
   const { data: users = [] } = useQuery({
     queryKey: ['users-tasks'],
@@ -227,10 +237,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   }
 
   if (!showCancelled && !showExtHold && !showEscalations) {
-    // 'all' tab = every ACTIVE task regardless of whether it has a dueDate.
-    // This is the default — ensures tasks without due dates are still visible.
+    // 'all' tab = EVERY task regardless of status (includes COMPLETED, CANCELLED, etc.)
+    // User explicitly wants to see ALL saved tasks — no filtering at all on the 'All' tab.
+    // The Today/Upcoming/Overdue tabs continue to filter out COMPLETED/CANCELLED.
     if (taskTab === 'all') {
-      filtered = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+      // No status filter — show everything
     } else if (taskTab === 'today') filtered = filtered.filter((t: any) =>
       t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
@@ -240,15 +251,15 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
       t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
-    // Fallback: if taskTab is somehow empty/undefined, default to showing all active tasks
+    // Fallback: if taskTab is somehow empty/undefined, default to showing everything
     else {
-      filtered = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+      // No filter — show all
     }
   }
 
   const allTasks = Array.isArray(tasks) ? tasks : []
-  // "All" count = active tasks (excludes COMPLETED/CANCELLED) regardless of due date
-  const allCount = allTasks.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  // "All" count = EVERY task regardless of status
+  const allCount = allTasks.length
   const todayCount = allTasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const overdueCount = allTasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
@@ -431,7 +442,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 {taskTab === 'all'
-                  ? 'No active tasks found'
+                  ? 'No tasks found'
                   : taskTab === 'today'
                   ? 'No tasks due today'
                   : taskTab === 'upcoming'
@@ -442,8 +453,8 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
               </div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 {taskTab === 'all'
-                  ? 'Adjust your filters or create a new task to get started'
-                  : 'Try switching to the "All" tab to see every task including those without a due date'}
+                  ? 'No tasks exist in the system yet. Create your first task to get started.'
+                  : 'Try switching to the "All" tab to see every task including completed and cancelled ones'}
               </div>
               {taskTab !== 'all' && (
                 <button
@@ -714,6 +725,62 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
           )
         })}
       </div>
+
+      {/* ─── Recent Activity section (persistent audit log) ───────────
+          Shows the last 15 task events: CREATED, DELETED, REVISED, COMPLETED, CANCELLED.
+          This NEVER loses data — even deleted tasks appear here with their title snapshot. */}
+      {!showCancelled && !showExtHold && !showEscalations && (
+        <div className="lcard" style={{ marginTop: 18, marginBottom: 14 }}>
+          <div className="ch">
+            <div className="ct">🕐 Recent Activity</div>
+            <span className="badge b-gold" style={{ fontSize: 10 }}>Live · {taskActivities.length}</span>
+          </div>
+          <div className="cb">
+            {taskActivities.length === 0 ? (
+              <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
+                <p style={{ margin: 0, fontWeight: 700, color: 'var(--t2)' }}>No task activity yet</p>
+                <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--t3)' }}>
+                  When you create, complete, revise, or delete a task, it will be recorded here permanently.
+                </p>
+              </div>
+            ) : taskActivities.slice(0, 10).map((a: any) => {
+              const meta: Record<string, { icon: string; color: string; label: string }> = {
+                CREATED:        { icon: '✨', color: '#15803D', label: 'Created' },
+                UPDATED:        { icon: '✏️', color: '#1D4ED8', label: 'Updated' },
+                DELETED:        { icon: '🗑️', color: '#DC2626', label: 'Deleted' },
+                COMPLETED:      { icon: '✅', color: '#15803D', label: 'Completed' },
+                REVISED:        { icon: '🔁', color: '#D97706', label: 'Revised' },
+                CANCELLED:      { icon: '🚫', color: '#6B7280', label: 'Cancelled' },
+                STATUS_CHANGED: { icon: '🔄', color: '#6D28D9', label: 'Status Change' },
+              }
+              const m = meta[a.action] || meta.UPDATED
+              const actorName = a.actor?.name || 'System'
+              return (
+                <div key={a.id} className="feed-item" style={{ padding: '10px 6px', borderBottom: '1px solid var(--b1)' }}>
+                  <div className="feed-dot" style={{ background: m.color, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                    {m.icon}
+                  </div>
+                  <div className="feed-body" style={{ flex: 1, minWidth: 0 }}>
+                    <div className="feed-text" style={{ fontSize: 12.5, color: 'var(--t1)', lineHeight: 1.4 }}>
+                      <span style={{ fontWeight: 700, color: m.color, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                        {m.label}
+                      </span>
+                      {a.description || `Task "${a.taskTitle}" ${m.label.toLowerCase()}`}
+                    </div>
+                    <div className="feed-time" style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span>by <strong style={{ color: 'var(--t2)' }}>{actorName}</strong></span>
+                      {a.department && <span>· {a.department}</span>}
+                      {a.priority && <span>· {a.priority}</span>}
+                      <span>· {a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Task Detail Modal */}
       {selectedTaskId && (() => {

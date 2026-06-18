@@ -35,6 +35,16 @@ export function LaxreeEmployeeDashboard() {
     enabled: !!currentUserId,
   })
 
+  // ─── Recent Activity feed (persistent audit log) ─────────────────
+  // Shows task events for the whole system so employees can see what's happening.
+  const { data: taskActivityData } = useQuery<{ activities: any[]; count: number }>({
+    queryKey: ['emp-task-activity-feed'],
+    queryFn: () => fetch('/api/task-activity?limit=10').then(r => r.json()),
+    refetchInterval: 15000,
+    refetchOnMount: 'always',
+  })
+  const taskActivities = Array.isArray(taskActivityData?.activities) ? taskActivityData.activities : []
+
   // Fetch employee's leaves — with auto-refresh for real-time status updates
   const { data: leavesData = { leaves: [] }, refetch: refetchLeaves } = useQuery({
     queryKey: ['emp-leaves', currentUserId],
@@ -431,6 +441,57 @@ export function LaxreeEmployeeDashboard() {
           </div>
         </>
       )}
+
+      {/* ===================== RECENT ACTIVITY (always visible) ===================== */}
+      <div className="lcard" style={{ marginBottom: 14 }}>
+        <div className="ch">
+          <div className="ct">🕐 Recent Activity</div>
+          <span className="badge b-gold" style={{ fontSize: 10 }}>Live · {taskActivities.length}</span>
+        </div>
+        <div className="cb">
+          {taskActivities.length === 0 ? (
+            <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
+              <p style={{ margin: 0, fontWeight: 700, color: 'var(--t2)' }}>No task activity yet</p>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--t3)' }}>
+                When tasks are created, completed, revised, or deleted, those events will appear here permanently.
+              </p>
+            </div>
+          ) : taskActivities.slice(0, 8).map((a: any) => {
+            const meta: Record<string, { icon: string; color: string; label: string }> = {
+              CREATED:        { icon: '✨', color: '#15803D', label: 'Created' },
+              UPDATED:        { icon: '✏️', color: '#1D4ED8', label: 'Updated' },
+              DELETED:        { icon: '🗑️', color: '#DC2626', label: 'Deleted' },
+              COMPLETED:      { icon: '✅', color: '#15803D', label: 'Completed' },
+              REVISED:        { icon: '🔁', color: '#D97706', label: 'Revised' },
+              CANCELLED:      { icon: '🚫', color: '#6B7280', label: 'Cancelled' },
+              STATUS_CHANGED: { icon: '🔄', color: '#6D28D9', label: 'Status Change' },
+            }
+            const m = meta[a.action] || meta.UPDATED
+            const actorName = a.actor?.name || 'System'
+            return (
+              <div key={a.id} className="feed-item" style={{ padding: '10px 6px', borderBottom: '1px solid var(--b1)' }}>
+                <div className="feed-dot" style={{ background: m.color, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  {m.icon}
+                </div>
+                <div className="feed-body" style={{ flex: 1, minWidth: 0 }}>
+                  <div className="feed-text" style={{ fontSize: 12.5, color: 'var(--t1)', lineHeight: 1.4 }}>
+                    <span style={{ fontWeight: 700, color: m.color, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                      {m.label}
+                    </span>
+                    {a.description || `Task "${a.taskTitle}" ${m.label.toLowerCase()}`}
+                  </div>
+                  <div className="feed-time" style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>by <strong style={{ color: 'var(--t2)' }}>{actorName}</strong></span>
+                    {a.department && <span>· {a.department}</span>}
+                    <span>· {a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* ===================== MY TASKS TAB (READ ONLY) ===================== */}
       {empTab === 'tasks' && (
