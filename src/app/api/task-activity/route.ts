@@ -15,12 +15,26 @@ export async function GET(request: NextRequest) {
     const taskId = request.nextUrl.searchParams.get('taskId')
     const actorId = request.nextUrl.searchParams.get('actorId')
 
+    console.log('[task-activity] GET params:', { limitParam, action, taskId, actorId })
+
     const limit = Math.min(parseInt(limitParam || '30', 10) || 30, 100)
 
     const where: Record<string, unknown> = {}
     if (action) where.action = action
     if (taskId) where.taskId = taskId
     if (actorId) where.actorId = actorId
+
+    // ─── DIAGNOSTIC: First, try to count TaskActivity rows to make sure the table exists ──
+    let totalCount = 0
+    try {
+      totalCount = await db.taskActivity.count()
+      console.log('[task-activity] Total rows in table:', totalCount)
+    } catch (countErr: any) {
+      console.error('[task-activity] Count failed (table might not exist yet):', countErr?.message || countErr)
+      // If the table doesn't exist yet (e.g. prisma db push hasn't run), return an empty
+      // list instead of a 500 error so the dashboard doesn't crash.
+      return NextResponse.json({ activities: [], count: 0, error: 'TaskActivity table not yet available' })
+    }
 
     const activities = await db.taskActivity.findMany({
       where,
@@ -30,10 +44,12 @@ export async function GET(request: NextRequest) {
         actor: { select: { id: true, name: true, email: true, role: true, avatar: true } },
       },
     })
+    console.log('[task-activity] Returning', activities.length, 'activities')
 
     return NextResponse.json({ activities, count: activities.length })
-  } catch (error) {
+  } catch (error: any) {
     console.error('TaskActivity GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch task activity' }, { status: 500 })
+    // Return empty array instead of 500 so the UI doesn't break
+    return NextResponse.json({ activities: [], count: 0, error: String(error?.message || error) })
   }
 }

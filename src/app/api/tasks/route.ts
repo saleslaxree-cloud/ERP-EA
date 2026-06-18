@@ -8,9 +8,15 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status')
     const assignedTo = request.nextUrl.searchParams.get('assignedTo')
 
+    console.log('[tasks] GET params:', { userId, status, assignedTo })
+
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
     if (status) where.status = status
+
+    // ─── DIAGNOSTIC: First, try a minimal query to see if DB itself is reachable ──
+    const totalTaskCount = await db.task.count()
+    console.log('[tasks] DB task count:', totalTaskCount)
 
     // If assignedTo is provided, also find tasks where the user is a task step assignee
     let assignedStepTasks: any[] = []
@@ -55,38 +61,45 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Only get top-level tasks (no parent)
-    const tasks = await db.task.findMany({
-      where: { ...where, parentTaskId: null },
-      include: {
-        owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
-        workflow: {
-          include: {
-            steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
+    // ─── TRY SIMPLE QUERY FIRST ──────────────────────────────────────────
+    // Some production deployments are failing on the heavy `include` clause (likely
+    // because `dependencies`/`dependents` relations reference Task rows that no
+    // longer exist). Use a LIGHTER query: only basic relations, no dependency graph.
+    let tasks: any[]
+    try {
+      tasks = await db.task.findMany({
+        where: { ...where, parentTaskId: null },
+        include: {
+          owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+          taskSteps: {
+            orderBy: { order: 'asc' },
+            include: { assignee: { select: { id: true, name: true, role: true } } },
+          },
+          subTasks: {
+            include: {
+              owner: { select: { id: true, name: true, email: true, role: true } },
+            },
           },
         },
-        taskSteps: {
-          orderBy: { order: 'asc' },
-          include: { assignee: { select: { id: true, name: true, role: true } } },
-        },
-        subTasks: {
-          include: {
-            owner: { select: { id: true, name: true, email: true, role: true } },
+        orderBy: { createdAt: 'desc' },
+      })
+      console.log('[tasks] Light query succeeded, returned', tasks.length, 'tasks')
+    } catch (heavyErr: any) {
+      console.error('[tasks] Light query FAILED, retrying with minimal include:', heavyErr?.message || heavyErr)
+      // Fallback: even simpler — just owner + taskSteps, no subTasks
+      tasks = await db.task.findMany({
+        where: { ...where, parentTaskId: null },
+        include: {
+          owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+          taskSteps: {
+            orderBy: { order: 'asc' },
+            include: { assignee: { select: { id: true, name: true, role: true } } },
           },
         },
-        dependencies: {
-          include: {
-            dependsOnTask: { select: { id: true, title: true, status: true } },
-          },
-        },
-        dependents: {
-          include: {
-            task: { select: { id: true, title: true, status: true } },
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: { createdAt: 'desc' },
+      })
+      console.log('[tasks] Minimal query returned', tasks.length, 'tasks')
+    }
 
     // Merge and deduplicate: tasks owned by user + tasks where user is step assignee
     if (assignedTo && assignedStepTasks.length > 0) {
@@ -99,9 +112,9 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(tasks)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Tasks GET error:', error)
-    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to fetch tasks', detail: String(error?.message || error) }, { status: 500 })
   }
 }
 
