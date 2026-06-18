@@ -715,6 +715,53 @@ export function LaxreeEmployeeDashboard() {
               </div>
             </div>
           </div>
+
+          {/* ─── Revision Impact Panel (strict score system v8) ─── */}
+          <div className="lcard" style={{ marginBottom: 16, borderLeft: '3px solid var(--amber)' }}>
+            <div className="ch">
+              <div className="ct">⚠ Revision Impact on Score</div>
+              <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--t4)', background: 'var(--bg2)', padding: '2px 8px', borderRadius: 4 }}>
+                Strict Mode
+              </span>
+            </div>
+            <div className="cb">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 12 }}>
+                <div style={{ textAlign: 'center', padding: '14px 8px', borderRadius: 8, background: '#FFFBEB' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#D97706', marginBottom: 2 }}>Tasks Revised</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#D97706' }}>{score?.tasksRevised || 0}</div>
+                  <div style={{ fontSize: 9, color: '#92400E', marginTop: 2 }}>of {score?.totalTasks || 0} total</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '14px 8px', borderRadius: 8, background: '#FEF2F2' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: '#DC2626', marginBottom: 2 }}>Total Revisions</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#DC2626' }}>{score?.totalRevisions || 0}</div>
+                  <div style={{ fontSize: 9, color: '#991B1B', marginTop: 2 }}>cumulative count</div>
+                </div>
+                <div style={{ textAlign: 'center', padding: '14px 8px', borderRadius: 8, background: score?.avgRevisionPenalty && score.avgRevisionPenalty > 0 ? '#FEE2E2' : '#DCFCE7' }}>
+                  <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: score?.avgRevisionPenalty && score.avgRevisionPenalty > 0 ? '#DC2626' : '#15803D', marginBottom: 2 }}>Score Penalty</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: score?.avgRevisionPenalty && score.avgRevisionPenalty > 0 ? '#DC2626' : '#15803D' }}>
+                    -{score?.totalRevisionPenalty || 0}
+                  </div>
+                  <div style={{ fontSize: 9, color: 'var(--t3)', marginTop: 2 }}>avg -{score?.avgRevisionPenalty || 0}/task</div>
+                </div>
+              </div>
+
+              <div style={{
+                padding: '10px 14px', borderRadius: 8,
+                background: 'rgba(217,119,6,.06)',
+                border: '1px solid rgba(217,119,6,.2)',
+                fontSize: 11, color: '#92400E', lineHeight: 1.6, fontWeight: 600,
+              }}>
+                <strong>Strict scoring:</strong> Each revision reduces your task score progressively.
+                <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
+                  <li>1st revision: -10 points</li>
+                  <li>2nd revision: -15 additional (total -25)</li>
+                  <li>3rd revision: -20 additional (total -45)</li>
+                  <li>4th+ revision: -25 each (caps at 0)</li>
+                </ul>
+                Avoid unnecessary revisions to keep your PR Score high.
+              </div>
+            </div>
+          </div>
         </>
       )}
 

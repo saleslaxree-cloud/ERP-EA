@@ -741,8 +741,28 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                 )}
                 {task.reviseReason && (
                   <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 6, color: 'var(--amber)', fontWeight: 600, gridColumn: '1 / -1' }}>
-                    ↩ Revised: {task.reviseReason}
+                    ↩ Revised{task.reviseCount > 0 ? ` ×${task.reviseCount}` : ''}: {task.reviseReason}
                     {task.reviseNextDate && <span style={{ marginLeft: 8 }}>· Next date: {new Date(task.reviseNextDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>}
+                    {task.reviseCount > 0 && (
+                      <span style={{ marginLeft: 8, color: 'var(--red)', fontWeight: 800 }}>
+                        · Score penalty: {(() => {
+                          let p = 0
+                          for (let i = 1; i <= task.reviseCount; i++) {
+                            if (i === 1) p += 10
+                            else if (i === 2) p += 15
+                            else if (i === 3) p += 20
+                            else p += 25
+                          }
+                          return -p
+                        })()} pts
+                      </span>
+                    )}
+                  </div>
+                )}
+                {/* Show revise count badge even when no reason is set (e.g. cleared) */}
+                {!task.reviseReason && task.reviseCount > 0 && (
+                  <div style={{ padding: '6px 12px', background: 'var(--red-l)', borderRadius: 6, color: 'var(--red)', fontWeight: 700, gridColumn: '1 / -1' }}>
+                    ⚠ Revised ×{task.reviseCount} — score penalty applied
                   </div>
                 )}
               </div>
@@ -1040,6 +1060,36 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
 
             <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 8, marginBottom: 14, fontSize: 12, color: 'var(--amber)', fontWeight: 600 }}>
               Please provide a reason for revision and a new target date.
+            </div>
+
+            {/* Strict score penalty warning */}
+            <div style={{
+              padding: '10px 12px', borderRadius: 8, marginBottom: 14,
+              background: 'rgba(220,38,38,.06)', border: '1px solid rgba(220,38,38,.2)',
+              fontSize: 11.5, color: '#991B1B', lineHeight: 1.5,
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--red)' }}>⚠ Strict Score Penalty</div>
+              <div>
+                This will be revision <strong>#{(reviseTask.reviseCount || 0) + 1}</strong> for this task.
+                {' '}Penalty: <strong>-{(() => {
+                  const next = (reviseTask.reviseCount || 0) + 1
+                  if (next === 1) return 10
+                  if (next === 2) return 15
+                  if (next === 3) return 20
+                  return 25
+                })()} points</strong> (cumulative: -{(() => {
+                  let p = 0
+                  const next = (reviseTask.reviseCount || 0) + 1
+                  for (let i = 1; i <= next; i++) {
+                    if (i === 1) p += 10
+                    else if (i === 2) p += 15
+                    else if (i === 3) p += 20
+                    else p += 25
+                  }
+                  return p
+                })()} pts).
+                Each subsequent revise hurts the score MORE than the last.
+              </div>
             </div>
 
             <div className="form-row fr-1">

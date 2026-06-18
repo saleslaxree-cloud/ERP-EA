@@ -321,6 +321,16 @@ export function LaxreeEaMyTasks() {
                           ASSIGNED STEP
                         </span>
                       )}
+                      {task.reviseCount > 0 && (
+                        <span className="badge" style={{
+                          fontSize: 8, padding: '1px 6px',
+                          background: task.reviseCount >= 3 ? 'var(--red-l)' : 'var(--amber-l)',
+                          color: task.reviseCount >= 3 ? 'var(--red)' : 'var(--amber)',
+                          fontWeight: 800,
+                        }} title={`Revised ${task.reviseCount} time(s) — progressive score penalty applied`}>
+                          ↩ REVISED ×{task.reviseCount}
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--t3)', flexWrap: 'wrap' }}>
@@ -447,6 +457,35 @@ export function LaxreeEaMyTasks() {
               />
               <div style={{ fontSize: 10, color: 'var(--t4)', marginTop: 4 }}>
                 Task will move out of Today and appear in Upcoming/Overdue based on this date.
+              </div>
+            </div>
+
+            {/* Strict score penalty warning */}
+            <div style={{
+              marginBottom: 14, padding: '10px 12px', borderRadius: 8,
+              background: 'rgba(220,38,38,.06)', border: '1px solid rgba(220,38,38,.2)',
+              fontSize: 11, color: '#991B1B', lineHeight: 1.5,
+            }}>
+              <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--red)' }}>⚠ Score Penalty Warning</div>
+              <div>
+                This will be revision <strong>#{(reviseTask.reviseCount || 0) + 1}</strong> for this task.
+                {' '}Penalty: <strong>-{(() => {
+                  const next = (reviseTask.reviseCount || 0) + 1
+                  if (next === 1) return 10
+                  if (next === 2) return 15
+                  if (next === 3) return 20
+                  return 25
+                })()} points</strong> (cumulative total: -{(() => {
+                  let p = 0
+                  const next = (reviseTask.reviseCount || 0) + 1
+                  for (let i = 1; i <= next; i++) {
+                    if (i === 1) p += 10
+                    else if (i === 2) p += 15
+                    else if (i === 3) p += 20
+                    else p += 25
+                  }
+                  return p
+                })()} pts).
               </div>
             </div>
 

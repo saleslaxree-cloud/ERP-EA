@@ -337,6 +337,16 @@ export function LaxreeEmpMyTasks() {
                             OWNER
                           </span>
                         )}
+                        {task.reviseCount > 0 && (
+                          <span className="badge" style={{
+                            fontSize: 8, padding: '1px 6px',
+                            background: task.reviseCount >= 3 ? 'var(--red-l)' : 'var(--amber-l)',
+                            color: task.reviseCount >= 3 ? 'var(--red)' : 'var(--amber)',
+                            fontWeight: 800,
+                          }} title={`This task has been revised ${task.reviseCount} time(s). Each revision reduces your work score.`}>
+                            ↩ REVISED ×{task.reviseCount}
+                          </span>
+                        )}
                       </div>
 
                       {/* Task description (if any) */}

@@ -183,6 +183,7 @@ model Task {
   reviseReason    String?
   reviseNextDate  DateTime?
   revisedAt       DateTime?
+  reviseCount     Int       @default(0)  // Incremented every time the task is revised (used for strict score penalty)
 
   // Performance score
   score           Float?
