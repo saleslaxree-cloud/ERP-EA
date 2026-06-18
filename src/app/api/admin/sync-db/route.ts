@@ -3,131 +3,155 @@ import { db } from '@/lib/db'
 
 // POST /api/admin/sync-db
 // Syncs the production DB schema with the Prisma schema by running ALTER TABLE
-// statements directly. This is needed because:
-//   1. The vercel-build 'prisma db push' step is silently failing.
-//   2. The runtime 'npx prisma db push' approach doesn't work on Vercel serverless
-//      (no writable HOME for npm cache).
-//
-// So we do it manually with raw SQL. We use IF NOT EXISTS clauses to make this
-// idempotent — running it multiple times is safe.
+// statements directly via $executeRawUnsafe. Idempotent (uses IF NOT EXISTS).
 //
 // USAGE:
 //   curl -X POST https://erp-ea.vercel.app/api/admin/sync-db
 export async function POST(request: NextRequest) {
   const results: { step: string; status: 'ok' | 'skipped' | 'error'; message: string }[] = []
 
+  // Helper: run a SQL statement safely via $executeRawUnsafe
+  const runSql = async (sql: string, stepName: string) => {
+    try {
+      await db.$executeRawUnsafe(sql)
+      results.push({ step: stepName, status: 'ok', message: 'OK' })
+    } catch (e: any) {
+      const msg = String(e?.message || e).substring(0, 200)
+      // If error is "column already exists" or "table already exists", treat as ok
+      if (msg.toLowerCase().includes('already exists') || msg.toLowerCase().includes('duplicate column') || msg.toLowerCase().includes('duplicate object')) {
+        results.push({ step: stepName, status: 'skipped', message: 'Already exists' })
+      } else {
+        results.push({ step: stepName, status: 'error', message: msg })
+      }
+    }
+  }
+
   // ───────────────────────────────────────────────────────────────────────
   // 1. Add missing columns to Task table (additive — no data loss)
   // ───────────────────────────────────────────────────────────────────────
-  const taskColumns: { name: string; type: string }[] = [
-    { name: 'reviseReason',    type: 'TEXT' },
-    { name: 'reviseNextDate',  type: 'TIMESTAMP(3)' },
-    { name: 'revisedAt',       type: 'TIMESTAMP(3)' },
-    { name: 'reviseCount',     type: 'INTEGER DEFAULT 0' },
-    { name: 'score',           type: 'DOUBLE PRECISION' },
-    { name: 'frequency',       type: 'TEXT' },
-    { name: 'weekDays',        type: 'TEXT' },
-    { name: 'monthDates',      type: 'TEXT' },
-    { name: 'directorDependency', type: 'TEXT' },
-    { name: 'projectId',       type: 'TEXT' },
-    // Foreign key for projectId is added separately below.
+  const taskColumns: { name: string; sql: string }[] = [
+    { name: 'reviseReason',    sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "reviseReason" TEXT` },
+    { name: 'reviseNextDate',  sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "reviseNextDate" TIMESTAMP(3)` },
+    { name: 'revisedAt',       sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "revisedAt" TIMESTAMP(3)` },
+    { name: 'reviseCount',     sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "reviseCount" INTEGER DEFAULT 0` },
+    { name: 'score',           sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "score" DOUBLE PRECISION` },
+    { name: 'frequency',       sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "frequency" TEXT` },
+    { name: 'weekDays',        sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "weekDays" TEXT` },
+    { name: 'monthDates',      sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "monthDates" TEXT` },
+    { name: 'directorDependency', sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "directorDependency" TEXT` },
+    { name: 'projectId',       sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "projectId" TEXT` },
   ]
-
   for (const col of taskColumns) {
-    try {
-      await db.$executeRaw`ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`
-      results.push({ step: `Add Task.${col.name}`, status: 'ok', message: 'Column added (or already existed)' })
-    } catch (e: any) {
-      // For non-IF-NOT-EXISTS-friendly DBs we may need to handle the unique violation
-      results.push({ step: `Add Task.${col.name}`, status: 'error', message: String(e?.message || e).substring(0, 200) })
-    }
+    await runSql(col.sql, `Add Task.${col.name}`)
   }
 
   // ───────────────────────────────────────────────────────────────────────
   // 2. Add missing columns to TaskStep table
   // ───────────────────────────────────────────────────────────────────────
-  const taskStepColumns: { name: string; type: string }[] = [
-    { name: 'needsDirectorApproval', type: 'BOOLEAN DEFAULT false' },
-    { name: 'directorName',          type: 'TEXT' },
-    { name: 'directorNote',          type: 'TEXT' },
+  const taskStepColumns: { name: string; sql: string }[] = [
+    { name: 'needsDirectorApproval', sql: `ALTER TABLE "TaskStep" ADD COLUMN IF NOT EXISTS "needsDirectorApproval" BOOLEAN DEFAULT false` },
+    { name: 'directorName',          sql: `ALTER TABLE "TaskStep" ADD COLUMN IF NOT EXISTS "directorName" TEXT` },
+    { name: 'directorNote',          sql: `ALTER TABLE "TaskStep" ADD COLUMN IF NOT EXISTS "directorNote" TEXT` },
   ]
   for (const col of taskStepColumns) {
-    try {
-      await db.$executeRaw`ALTER TABLE "TaskStep" ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`
-      results.push({ step: `Add TaskStep.${col.name}`, status: 'ok', message: 'Column added (or already existed)' })
-    } catch (e: any) {
-      results.push({ step: `Add TaskStep.${col.name}`, status: 'error', message: String(e?.message || e).substring(0, 200) })
-    }
+    await runSql(col.sql, `Add TaskStep.${col.name}`)
   }
 
   // ───────────────────────────────────────────────────────────────────────
   // 3. Add missing columns to Leave table
   // ───────────────────────────────────────────────────────────────────────
-  const leaveColumns: { name: string; type: string }[] = [
-    { name: 'applicationTag', type: 'TEXT DEFAULT \'AL\'' },
-    { name: 'eaRemark',       type: 'TEXT' },
-    { name: 'approvedById',   type: 'TEXT' },
-    { name: 'approvedAt',     type: 'TIMESTAMP(3)' },
-    { name: 'totalDays',      type: 'DOUBLE PRECISION DEFAULT 1' },
+  const leaveColumns: { name: string; sql: string }[] = [
+    { name: 'applicationTag', sql: `ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS "applicationTag" TEXT DEFAULT 'AL'` },
+    { name: 'eaRemark',       sql: `ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS "eaRemark" TEXT` },
+    { name: 'approvedById',   sql: `ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS "approvedById" TEXT` },
+    { name: 'approvedAt',     sql: `ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS "approvedAt" TIMESTAMP(3)` },
+    { name: 'totalDays',      sql: `ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS "totalDays" DOUBLE PRECISION DEFAULT 1` },
   ]
   for (const col of leaveColumns) {
-    try {
-      await db.$executeRaw`ALTER TABLE "Leave" ADD COLUMN IF NOT EXISTS ${col.name} ${col.type}`
-      results.push({ step: `Add Leave.${col.name}`, status: 'ok', message: 'Column added (or already existed)' })
-    } catch (e: any) {
-      results.push({ step: `Add Leave.${col.name}`, status: 'error', message: String(e?.message || e).substring(0, 200) })
-    }
+    await runSql(col.sql, `Add Leave.${col.name}`)
   }
 
   // ───────────────────────────────────────────────────────────────────────
   // 4. Create TaskActivity table if it doesn't exist
   // ───────────────────────────────────────────────────────────────────────
-  try {
-    await db.$executeRaw`
-      CREATE TABLE IF NOT EXISTS "TaskActivity" (
-        "id"          TEXT NOT NULL,
-        "action"      TEXT NOT NULL,
-        "taskTitle"   TEXT NOT NULL,
-        "taskId"      TEXT NOT NULL,
-        "priority"    TEXT,
-        "department"  TEXT,
-        "category"    TEXT,
-        "status"      TEXT,
-        "actorId"     TEXT,
-        "description" TEXT,
-        "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT "TaskActivity_pkey" PRIMARY KEY ("id")
-      )
-    `
-    results.push({ step: 'Create TaskActivity table', status: 'ok', message: 'Table created (or already existed)' })
-  } catch (e: any) {
-    results.push({ step: 'Create TaskActivity table', status: 'error', message: String(e?.message || e).substring(0, 200) })
-  }
+  await runSql(`
+    CREATE TABLE IF NOT EXISTS "TaskActivity" (
+      "id"          TEXT NOT NULL,
+      "action"      TEXT NOT NULL,
+      "taskTitle"   TEXT NOT NULL,
+      "taskId"      TEXT NOT NULL,
+      "priority"    TEXT,
+      "department"  TEXT,
+      "category"    TEXT,
+      "status"      TEXT,
+      "actorId"     TEXT,
+      "description" TEXT,
+      "createdAt"   TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TaskActivity_pkey" PRIMARY KEY ("id")
+    )
+  `, 'Create TaskActivity table')
 
   // Create indexes on TaskActivity (idempotent)
-  for (const idx of ['taskId', 'createdAt', 'action']) {
-    try {
-      await db.$executeRaw`CREATE INDEX IF NOT EXISTS "TaskActivity_${idx}_idx" ON "TaskActivity"("${idx}")`
-      results.push({ step: `Create index TaskActivity.${idx}`, status: 'ok', message: 'Index created (or already existed)' })
-    } catch (e: any) {
-      results.push({ step: `Create index TaskActivity.${idx}`, status: 'error', message: String(e?.message || e).substring(0, 200) })
-    }
-  }
+  await runSql(`CREATE INDEX IF NOT EXISTS "TaskActivity_taskId_idx" ON "TaskActivity"("taskId")`, 'Index TaskActivity.taskId')
+  await runSql(`CREATE INDEX IF NOT EXISTS "TaskActivity_createdAt_idx" ON "TaskActivity"("createdAt")`, 'Index TaskActivity.createdAt')
+  await runSql(`CREATE INDEX IF NOT EXISTS "TaskActivity_action_idx" ON "TaskActivity"("action")`, 'Index TaskActivity.action')
 
   // Add foreign key from TaskActivity.actorId → User.id (if not exists)
-  try {
-    await db.$executeRaw`
-      ALTER TABLE "TaskActivity"
-      ADD CONSTRAINT IF NOT EXISTS "TaskActivity_actorId_fkey"
-      FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE
-    `
-    results.push({ step: 'Add FK TaskActivity.actorId → User.id', status: 'ok', message: 'FK added (or already existed)' })
-  } catch (e: any) {
-    results.push({ step: 'Add FK TaskActivity.actorId → User.id', status: 'error', message: String(e?.message || e).substring(0, 200) })
+  // Postgres doesn't support IF NOT EXISTS for ADD CONSTRAINT directly, so we use a DO block
+  await runSql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'TaskActivity_actorId_fkey' AND table_name = 'TaskActivity'
+      ) THEN
+        ALTER TABLE "TaskActivity"
+          ADD CONSTRAINT "TaskActivity_actorId_fkey"
+          FOREIGN KEY ("actorId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `, 'Add FK TaskActivity.actorId → User.id')
+
+  // ───────────────────────────────────────────────────────────────────────
+  // 5. Add missing User columns
+  // ───────────────────────────────────────────────────────────────────────
+  const userColumns: { name: string; sql: string }[] = [
+    { name: 'loginUsername',  sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "loginUsername" TEXT` },
+    { name: 'loginPassword',  sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "loginPassword" TEXT` },
+    { name: 'isActive',       sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isActive" BOOLEAN DEFAULT true` },
+    { name: 'joinDate',       sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "joinDate" TIMESTAMP(3)` },
+    { name: 'designation',    sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "designation" TEXT` },
+    { name: 'phone',          sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "phone" TEXT` },
+    { name: 'location',       sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "location" TEXT` },
+    { name: 'avatar',         sql: `ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "avatar" TEXT` },
+  ]
+  for (const col of userColumns) {
+    await runSql(col.sql, `Add User.${col.name}`)
   }
 
   // ───────────────────────────────────────────────────────────────────────
-  // 5. Final verification — count tasks to confirm DB is reachable
+  // 6. Add missing MondayMeeting columns (just in case)
+  // ───────────────────────────────────────────────────────────────────────
+  const mondayColumns: { name: string; sql: string }[] = [
+    { name: 'planRedScore',       sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "planRedScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'planYellowScore',    sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "planYellowScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'planGreenScore',     sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "planGreenScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'actualRedScore',     sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "actualRedScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'actualYellowScore', sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "actualYellowScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'actualGreenScore',   sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "actualGreenScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'nextRedScore',       sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "nextRedScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'nextYellowScore',   sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "nextYellowScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'nextGreenScore',     sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "nextGreenScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'prScore',            sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "prScore" DOUBLE PRECISION DEFAULT 0` },
+    { name: 'commitments',        sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "commitments" TEXT` },
+    { name: 'notes',              sql: `ALTER TABLE "MondayMeeting" ADD COLUMN IF NOT EXISTS "notes" TEXT` },
+  ]
+  for (const col of mondayColumns) {
+    await runSql(col.sql, `Add MondayMeeting.${col.name}`)
+  }
+
+  // ───────────────────────────────────────────────────────────────────────
+  // 7. Final verification — count tasks to confirm DB is reachable
   // ───────────────────────────────────────────────────────────────────────
   let finalTaskCount = 0
   try {
