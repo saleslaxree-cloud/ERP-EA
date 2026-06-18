@@ -81,7 +81,7 @@ const initialState = {
   mmPanelOpen: false,
   selectedTaskId: null as string | null,
   selectedWorkflowId: null as string | null,
-  taskTab: 'today',
+  taskTab: 'all',
   toasts: [] as Toast[],
 }
 

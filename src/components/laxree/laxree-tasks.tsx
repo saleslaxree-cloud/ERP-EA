@@ -1,6 +1,6 @@
 'use client'
 
-// Build: 2026-06-16-v5 — Fix Today/Overdue overlap at the API level (dashboard/employees/projects/reports/weekly-score/ai-assistant)
+// Build: 2026-06-18-v8 — Add "All" tab as default on All Tasks page so tasks WITHOUT due dates are also visible (Admin/EA dashboards)
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
@@ -227,7 +227,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   }
 
   if (!showCancelled && !showExtHold && !showEscalations) {
-    if (taskTab === 'today') filtered = filtered.filter((t: any) =>
+    // 'all' tab = every ACTIVE task regardless of whether it has a dueDate.
+    // This is the default — ensures tasks without due dates are still visible.
+    if (taskTab === 'all') {
+      filtered = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+    } else if (taskTab === 'today') filtered = filtered.filter((t: any) =>
       t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
     else if (taskTab === 'upcoming') filtered = filtered.filter((t: any) =>
@@ -236,14 +240,21 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
       t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
     )
+    // Fallback: if taskTab is somehow empty/undefined, default to showing all active tasks
+    else {
+      filtered = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+    }
   }
 
   const allTasks = Array.isArray(tasks) ? tasks : []
+  // "All" count = active tasks (excludes COMPLETED/CANCELLED) regardless of due date
+  const allCount = allTasks.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const todayCount = allTasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const overdueCount = allTasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
 
   const tabs = [
+    { id: 'all', label: 'All', count: allCount },
     { id: 'today', label: 'Today', count: todayCount },
     { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
     { id: 'overdue', label: 'Overdue', count: overdueCount },
@@ -418,8 +429,31 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
           <div className="lcard">
             <div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>No tasks found</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>Create a new task or adjust your filters</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                {taskTab === 'all'
+                  ? 'No active tasks found'
+                  : taskTab === 'today'
+                  ? 'No tasks due today'
+                  : taskTab === 'upcoming'
+                  ? 'No upcoming tasks'
+                  : taskTab === 'overdue'
+                  ? 'No overdue tasks'
+                  : 'No tasks found'}
+              </div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                {taskTab === 'all'
+                  ? 'Adjust your filters or create a new task to get started'
+                  : 'Try switching to the "All" tab to see every task including those without a due date'}
+              </div>
+              {taskTab !== 'all' && (
+                <button
+                  className="btn btn-gold"
+                  style={{ marginTop: 12, fontSize: 12, padding: '6px 16px' }}
+                  onClick={() => setTaskTab('all')}
+                >
+                  View All Tasks →
+                </button>
+              )}
             </div>
           </div>
         ) : filtered.map((task: any) => {

@@ -52,8 +52,8 @@ export function LaxreeEaMyTasks() {
   const { currentUserId, currentUserName, addToast, setSelectedTaskId, setCreateTaskOpen } = useWorkflowStore()
   const queryClient = useQueryClient()
 
-  // Today / Upcoming / Overdue filter
-  const [taskTab, setTaskTab] = useState<'today' | 'upcoming' | 'overdue'>('today')
+  // Today / Upcoming / Overdue / All filter — 'all' is the default and shows every active task regardless of due date
+  const [taskTab, setTaskTab] = useState<'today' | 'upcoming' | 'overdue' | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<string>('')
 
@@ -131,10 +131,17 @@ export function LaxreeEaMyTasks() {
   const todayTasks = filtered.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const upcomingTasks = filtered.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const overdueTasks = filtered.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  // 'all' = every active task (excludes COMPLETED/CANCELLED) regardless of whether it has a dueDate
+  const allTabTasks = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
 
-  const tabTasks = taskTab === 'today' ? todayTasks : taskTab === 'upcoming' ? upcomingTasks : overdueTasks
+  const tabTasks =
+    taskTab === 'today' ? todayTasks
+    : taskTab === 'upcoming' ? upcomingTasks
+    : taskTab === 'overdue' ? overdueTasks
+    : allTabTasks
 
   const tabs = [
+    { id: 'all' as const, label: 'All', count: allTabTasks.length },
     { id: 'today' as const, label: 'Today', count: todayTasks.length },
     { id: 'upcoming' as const, label: 'Upcoming', count: upcomingTasks.length },
     { id: 'overdue' as const, label: 'Overdue', count: overdueTasks.length },
@@ -277,14 +284,29 @@ export function LaxreeEaMyTasks() {
           <div className="lcard">
             <div className="cb" style={{ textAlign: 'center', padding: 40, color: 'var(--t3)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>No {taskTab} tasks</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>
-                {taskTab === 'today'
-                  ? 'You have no tasks due today — enjoy the lighter load!'
-                  : taskTab === 'upcoming'
-                  ? 'No upcoming tasks scheduled'
-                  : 'No overdue tasks — great job staying on track!'}
+              <div style={{ fontWeight: 700, fontSize: 14 }}>
+                {taskTab === 'all'
+                  ? 'No active tasks assigned to you'
+                  : `No ${taskTab} tasks`}
               </div>
+              <div style={{ fontSize: 12, marginTop: 4 }}>
+                {taskTab === 'all'
+                  ? 'Tasks assigned to you will appear here. Create one to get started.'
+                  : taskTab === 'today'
+                  ? 'You have no tasks due today — switch to "All" to see every task.'
+                  : taskTab === 'upcoming'
+                  ? 'No upcoming tasks scheduled — switch to "All" to see every task.'
+                  : 'No overdue tasks — great job staying on track! Switch to "All" to see every task.'}
+              </div>
+              {taskTab !== 'all' && (
+                <button
+                  className="btn btn-gold"
+                  style={{ marginTop: 12, fontSize: 12, padding: '6px 16px' }}
+                  onClick={() => setTaskTab('all')}
+                >
+                  View All My Tasks →
+                </button>
+              )}
             </div>
           </div>
         ) : tabTasks.map((task: any) => {
@@ -338,9 +360,9 @@ export function LaxreeEaMyTasks() {
                       {task.department && <span className="badge b-gray" style={{ fontSize: 9, padding: '1px 6px' }}>{task.department}</span>}
                       {task.category && <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
                       {task.dueDate && (
-                        <span style={taskTab === 'overdue' ? { color: 'var(--red)', fontWeight: 700 } : {}}>
+                        <span style={(taskTab === 'overdue' || (task.dueDate && isOverdue(task.dueDate) && task.status !== 'COMPLETED' && task.status !== 'CANCELLED')) ? { color: 'var(--red)', fontWeight: 700 } : {}}>
                           Due: {new Date(task.dueDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                          {taskTab === 'overdue' && ' (Overdue)'}
+                          {(taskTab === 'overdue' || (task.dueDate && isOverdue(task.dueDate) && task.status !== 'COMPLETED' && task.status !== 'CANCELLED')) && ' (Overdue)'}
                         </span>
                       )}
                     </div>
