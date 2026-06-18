@@ -40,6 +40,7 @@ model User {
   mondayMeetings     MondayMeeting[]     @relation("MondayMeetingUser")
   leaves             Leave[]             @relation("UserLeaves")
   approvedLeaves     Leave[]             @relation("LeaveApprover")
+  taskActivities     TaskActivity[]      @relation("TaskActivityActor")
 }
 
 model Department {
@@ -366,4 +367,38 @@ model MondayMeeting {
   user            User     @relation("MondayMeetingUser", fields: [userId], references: [id])
 
   @@unique([userId, weekNumber, year])
+}
+
+// ═══════════════════════════════════════════════════════════
+// TaskActivity — persistent audit log of every task event
+// (creation, update, deletion, completion, revision, etc.)
+// This NEVER gets cleaned up automatically — gives the user
+// a complete history they can review in the Recent Activity feed.
+// ═══════════════════════════════════════════════════════════
+model TaskActivity {
+  id          String   @id @default(cuid())
+  // Action type: CREATED | UPDATED | DELETED | COMPLETED | REVISED | CANCELLED | STATUS_CHANGED
+  action      String
+  // Snapshot of the task title at the time of the event (so we still have
+  // something to show even after the task is deleted).
+  taskTitle   String
+  // Original task ID — kept as a plain string (not a FK) so that when a
+  // task is deleted, the activity log entry survives.
+  taskId      String
+  // Optional: snapshot of task metadata for richer audit
+  priority    String?
+  department  String?
+  category    String?
+  status      String?
+  // Who performed the action
+  actorId     String?
+  // Short human-readable reason / description
+  description String?
+  createdAt   DateTime @default(now())
+
+  actor       User?    @relation("TaskActivityActor", fields: [actorId], references: [id])
+
+  @@index([taskId])
+  @@index([createdAt])
+  @@index([action])
 }

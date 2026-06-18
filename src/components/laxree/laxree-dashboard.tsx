@@ -57,6 +57,17 @@ export function LaxreeDashboard() {
     enabled: !!currentUserId,
   })
 
+  // ─── NEW: Persistent task activity feed (CREATED / DELETED / REVISED / COMPLETED / CANCELLED)
+  // This is INDEPENDENT of the dashboard's `recentActivities` (which only tracks workflow
+  // status changes). We poll every 15s so the user sees new events almost immediately.
+  const { data: taskActivityData } = useQuery<{ activities: any[]; count: number }>({
+    queryKey: ['task-activity-feed'],
+    queryFn: () => fetch('/api/task-activity?limit=20').then(r => r.json()),
+    refetchInterval: 15000,
+    refetchOnMount: 'always',
+  })
+  const taskActivities = Array.isArray(taskActivityData?.activities) ? taskActivityData.activities : []
+
   const { data: rawUsers } = useQuery<User[]>({
     queryKey: ['users'],
     queryFn: () => fetch('/api/users').then(r => r.json()),
@@ -414,21 +425,58 @@ export function LaxreeDashboard() {
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity — persistent audit log of task events (CREATED / DELETED / REVISED / etc.)
+          This feed NEVER loses data: even if a task is deleted, its activity entry survives
+          with a snapshot of the title, so the user can always see what happened. */}
       <div className="lcard" style={{ marginBottom: 14 }}>
-        <div className="ch"><div className="ct">🕐 Recent Activity</div><span className="badge b-gold" style={{ fontSize: 10 }}>Live</span></div>
+        <div className="ch">
+          <div className="ct">🕐 Recent Activity</div>
+          <span className="badge b-gold" style={{ fontSize: 10 }}>Live · {taskActivities.length}</span>
+        </div>
         <div className="cb">
-          {(dash?.recentActivities || []).length === 0 ? (
-            <div className="empty"><p>No recent activity</p></div>
-          ) : (dash?.recentActivities || []).slice(0, 8).map((a: any) => (
-            <div key={a.id} className="feed-item">
-              <div className="feed-dot" style={{ background: 'var(--g2)' }} />
-              <div className="feed-body">
-                <div className="feed-text"><strong>{a.workflow?.title || 'Workflow'}</strong> — {statusLabels[a.fromStatus] || a.fromStatus} → {statusLabels[a.toStatus] || a.toStatus}</div>
-                <div className="feed-time">{a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}</div>
-              </div>
+          {taskActivities.length === 0 ? (
+            <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
+              <p style={{ margin: 0, fontWeight: 700, color: 'var(--t2)' }}>No task activity yet</p>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--t3)' }}>
+                When you create, complete, revise, or delete a task, it will be recorded here permanently.
+              </p>
             </div>
-          ))}
+          ) : taskActivities.slice(0, 12).map((a: any) => {
+            // Pick icon + color by action type
+            const meta: Record<string, { icon: string; color: string; bg: string; label: string }> = {
+              CREATED:        { icon: '✨', color: '#15803D', bg: '#DCFCE7', label: 'Created' },
+              UPDATED:        { icon: '✏️', color: '#1D4ED8', bg: '#DBEAFE', label: 'Updated' },
+              DELETED:        { icon: '🗑️', color: '#DC2626', bg: '#FEE2E2', label: 'Deleted' },
+              COMPLETED:      { icon: '✅', color: '#15803D', bg: '#DCFCE7', label: 'Completed' },
+              REVISED:        { icon: '🔁', color: '#D97706', bg: '#FFFBEB', label: 'Revised' },
+              CANCELLED:      { icon: '🚫', color: '#6B7280', bg: '#F3F4F6', label: 'Cancelled' },
+              STATUS_CHANGED: { icon: '🔄', color: '#6D28D9', bg: '#EDE9FE', label: 'Status Change' },
+            }
+            const m = meta[a.action] || meta.UPDATED
+            const actorName = a.actor?.name || 'System'
+            return (
+              <div key={a.id} className="feed-item" style={{ padding: '10px 6px', borderBottom: '1px solid var(--b1)' }}>
+                <div className="feed-dot" style={{ background: m.color, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  {m.icon}
+                </div>
+                <div className="feed-body" style={{ flex: 1, minWidth: 0 }}>
+                  <div className="feed-text" style={{ fontSize: 12.5, color: 'var(--t1)', lineHeight: 1.4 }}>
+                    <span style={{ fontWeight: 700, color: m.color, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                      {m.label}
+                    </span>
+                    {a.description || `Task "${a.taskTitle}" ${m.label.toLowerCase()}`}
+                  </div>
+                  <div className="feed-time" style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>by <strong style={{ color: 'var(--t2)' }}>{actorName}</strong></span>
+                    {a.department && <span>· {a.department}</span>}
+                    {a.priority && <span>· {a.priority}</span>}
+                    <span>· {a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
     </>

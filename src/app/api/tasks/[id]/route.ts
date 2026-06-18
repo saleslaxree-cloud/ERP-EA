@@ -189,6 +189,50 @@ export async function PATCH(
       },
     })
 
+    // ─── Audit log: record what changed in TaskActivity ─────────────────
+    // We log only meaningful events: COMPLETED, REVISED, CANCELLED, and any
+    // status change. We do NOT log pure field updates (title/description tweaks)
+    // to keep the feed focused on what the user actually cares about.
+    try {
+      let action: string | null = null
+      let description: string | null = null
+
+      if (status === WorkflowStatus.COMPLETED) {
+        action = 'COMPLETED'
+        description = `Task "${task.title}" marked as completed`
+      } else if (status === WorkflowStatus.IN_PROGRESS && (reviseNextDate || reviseReason)) {
+        action = 'REVISED'
+        const parts: string[] = []
+        if (reviseReason) parts.push(`reason: "${reviseReason}"`)
+        if (reviseNextDate) parts.push(`new due date: ${new Date(reviseNextDate).toLocaleDateString()}`)
+        description = `Task "${task.title}" revised${parts.length ? ' (' + parts.join(', ') + ')' : ''}`
+      } else if (status === WorkflowStatus.CANCELLED) {
+        action = 'CANCELLED'
+        description = `Task "${task.title}" cancelled`
+      } else if (status && status !== task.status) {
+        action = 'STATUS_CHANGED'
+        description = `Task "${task.title}" status: ${task.status} → ${status}`
+      }
+
+      if (action) {
+        await db.taskActivity.create({
+          data: {
+            action,
+            taskId: id,
+            taskTitle: task.title,
+            priority: task.priority || null,
+            department: task.department || null,
+            category: task.category || null,
+            status: (updateData.status as string) || task.status,
+            actorId: task.ownerId, // best guess — owner triggered the change
+            description,
+          },
+        })
+      }
+    } catch (actErr) {
+      console.error('TaskActivity PATCH log error (non-fatal):', actErr)
+    }
+
     return NextResponse.json(updatedTask)
   } catch (error) {
     console.error('Task PATCH error:', error)
@@ -210,6 +254,27 @@ export async function DELETE(
 
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    }
+
+    // ─── Audit log: persist a DELETED entry BEFORE we actually delete the
+    // task. We snapshot the task title and metadata so the activity feed
+    // can still show what was deleted even after the task row is gone.
+    try {
+      await db.taskActivity.create({
+        data: {
+          action: 'DELETED',
+          taskId: id,
+          taskTitle: task.title,
+          priority: task.priority || null,
+          department: task.department || null,
+          category: task.category || null,
+          status: task.status,
+          actorId: task.ownerId, // best guess — owner triggered deletion
+          description: `Task "${task.title}" was deleted`,
+        },
+      })
+    } catch (actErr) {
+      console.error('TaskActivity DELETED log error (non-fatal):', actErr)
     }
 
     // Delete related records first

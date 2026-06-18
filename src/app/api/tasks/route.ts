@@ -167,6 +167,26 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // ─── Audit log: persist a CREATED entry in TaskActivity ──────────────
+    // This NEVER gets cleaned up automatically — gives the user a full history.
+    try {
+      await db.taskActivity.create({
+        data: {
+          action: 'CREATED',
+          taskId: task.id,
+          taskTitle: task.title,
+          priority: task.priority || null,
+          department: task.department || null,
+          category: task.category || null,
+          status: task.status,
+          actorId: ownerId, // best guess — task creator/owner
+          description: `Task "${task.title}" created and assigned to ${task.owner?.name || 'owner'}`,
+        },
+      })
+    } catch (actErr) {
+      console.error('TaskActivity CREATED log error (non-fatal):', actErr)
+    }
+
     return NextResponse.json(task, { status: 201 })
   } catch (error) {
     console.error('Tasks POST error:', error)
