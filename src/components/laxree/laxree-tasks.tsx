@@ -239,11 +239,16 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   if (!showCancelled && !showExtHold && !showEscalations) {
     // 'all' tab = EVERY task regardless of status (includes COMPLETED, CANCELLED, etc.)
     // User explicitly wants to see ALL saved tasks — no filtering at all on the 'All' tab.
-    // The Today/Upcoming/Overdue tabs continue to filter out COMPLETED/CANCELLED.
+    //
+    // Today/Upcoming/Overdue tabs:
+    //   - exclude COMPLETED / CANCELLED
+    //   - "Today" includes tasks WITHOUT a dueDate (they need attention today — better than
+    //     being invisible). Tasks WITH a dueDate use the strict date check.
     if (taskTab === 'all') {
       // No status filter — show everything
     } else if (taskTab === 'today') filtered = filtered.filter((t: any) =>
-      t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+      t.status !== 'COMPLETED' && t.status !== 'CANCELLED' &&
+      (!t.dueDate || isToday(t.dueDate))
     )
     else if (taskTab === 'upcoming') filtered = filtered.filter((t: any) =>
       t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
@@ -260,7 +265,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   const allTasks = Array.isArray(tasks) ? tasks : []
   // "All" count = EVERY task regardless of status
   const allCount = allTasks.length
-  const todayCount = allTasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  // Today count: tasks without a dueDate OR with dueDate today (excl. COMPLETED/CANCELLED)
+  const todayCount = allTasks.filter((t: any) =>
+    t.status !== 'COMPLETED' && t.status !== 'CANCELLED' &&
+    (!t.dueDate || isToday(t.dueDate))
+  ).length
   const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const overdueCount = allTasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
 
@@ -782,291 +791,6 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
         </div>
       )}
 
-      {/* Task Detail Modal */}
-      {selectedTaskId && (() => {
-        const task = tasks.find((t: any) => t.id === selectedTaskId)
-        if (!task) return null
-        const owner = task.owner
-        const stepsTotal = task.taskSteps?.length || 0
-        const stepsDone = task.taskSteps?.filter((s: any) => s.status === 'COMPLETED').length || 0
-        const sla = getSlaStatus(task)
-        const pBadge = priorityBadge[task.priority] || priorityBadge.MEDIUM
-        const sStyle = statusStyle[task.status] || statusStyle.PENDING
-
-        return (
-          <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setSelectedTaskId(null) }}>
-            <div className="modal modal-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-              <button className="mx" onClick={() => setSelectedTaskId(null)}>✕</button>
-
-              {/* Header */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}>
-                <div className="av" style={{ width: 44, height: 44, fontSize: 15, background: sStyle.color }}>
-                  {getInitials(owner?.name || 'T')}
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div className="mt" style={{ marginBottom: 4 }}>{task.title}</div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span className="badge" style={{ background: sStyle.bg, color: sStyle.color, fontWeight: 700 }}>{sStyle.label}</span>
-                    <span className="badge" style={{ background: pBadge.bg, color: pBadge.color, fontWeight: 700 }}>{task.priority}</span>
-                    {task.department && <span className="badge b-gray">{task.department}</span>}
-                    {task.category && <span className="badge" style={{ background: 'var(--amber-l)', color: 'var(--amber)' }}>{task.category}</span>}
-                    {sla && <span className="badge" style={{ background: sla.bg, color: sla.color }}>{sla.label}</span>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Description */}
-              {task.description && (
-                <div style={{ marginBottom: 14, padding: 12, background: 'var(--bg)', borderRadius: 8, fontSize: 13, color: 'var(--t2)', lineHeight: 1.6 }}>
-                  {task.description}
-                </div>
-              )}
-
-              {/* Details Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14, fontSize: 12 }}>
-                <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
-                  <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Assignee:</span> {owner?.name || 'Unassigned'}
-                </div>
-                <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
-                  <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Due:</span> {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No due date'}
-                </div>
-                {task.createdAt && (
-                  <div style={{ padding: '8px 12px', background: 'var(--bg2)', borderRadius: 6 }}>
-                    <span style={{ color: 'var(--t3)', fontWeight: 700 }}>Created:</span> {new Date(task.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                  </div>
-                )}
-                {task.completedAt && (
-                  <div style={{ padding: '8px 12px', background: 'var(--green-l)', borderRadius: 6, color: 'var(--green)', fontWeight: 600 }}>
-                    ✓ Completed: {new Date(task.completedAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                  </div>
-                )}
-                {task.reviseReason && (
-                  <div style={{ padding: '8px 12px', background: 'var(--amber-l)', borderRadius: 6, color: 'var(--amber)', fontWeight: 600, gridColumn: '1 / -1' }}>
-                    ↩ Revised{task.reviseCount > 0 ? ` ×${task.reviseCount}` : ''}: {task.reviseReason}
-                    {task.reviseNextDate && <span style={{ marginLeft: 8 }}>· Next date: {new Date(task.reviseNextDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>}
-                    {task.reviseCount > 0 && (
-                      <span style={{ marginLeft: 8, color: 'var(--red)', fontWeight: 800 }}>
-                        · Score penalty: {(() => {
-                          let p = 0
-                          for (let i = 1; i <= task.reviseCount; i++) {
-                            if (i === 1) p += 10
-                            else if (i === 2) p += 15
-                            else if (i === 3) p += 20
-                            else p += 25
-                          }
-                          return -p
-                        })()} pts
-                      </span>
-                    )}
-                  </div>
-                )}
-                {/* Show revise count badge even when no reason is set (e.g. cleared) */}
-                {!task.reviseReason && task.reviseCount > 0 && (
-                  <div style={{ padding: '6px 12px', background: 'var(--red-l)', borderRadius: 6, color: 'var(--red)', fontWeight: 700, gridColumn: '1 / -1' }}>
-                    ⚠ Revised ×{task.reviseCount} — score penalty applied
-                  </div>
-                )}
-              </div>
-
-              <div className="gold-divider" />
-
-              {/* Step Progress - simplified, no director approval */}
-              {stepsTotal > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)', marginBottom: 8 }}>
-                    Task Steps ({stepsDone}/{stepsTotal})
-                  </div>
-                  {task.taskSteps.map((step: any, i: number) => {
-                    const isCompleted = step.status === 'COMPLETED'
-                    const isCurrentStep = !isCompleted && (i === 0 || task.taskSteps[i - 1]?.status === 'COMPLETED')
-
-                    return (
-                      <div key={step.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-                        background: isCompleted ? 'var(--green-l)' : isCurrentStep ? 'var(--blue-l)' : 'var(--bg2)',
-                        borderRadius: 8, marginBottom: 6,
-                        borderLeft: `3px solid ${isCompleted ? 'var(--green)' : isCurrentStep ? 'var(--blue)' : 'var(--b2)'}`,
-                        opacity: !isCompleted && !isCurrentStep ? 0.5 : 1,
-                      }}>
-                        <div style={{
-                          width: 24, height: 24, borderRadius: '50%', fontSize: 10, fontWeight: 800,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                          background: isCompleted ? 'var(--green)' : isCurrentStep ? 'var(--blue)' : 'var(--g2)',
-                          color: '#fff',
-                        }}>
-                          {isCompleted ? '✓' : i + 1}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: 12.5, fontWeight: isCompleted ? 600 : 700, color: isCompleted ? 'var(--green)' : 'var(--t1)' }}>
-                            {step.title}
-                          </span>
-                        </div>
-                        {/* Step action button — only ADMIN/EA can complete steps */}
-                        {!isCompleted && isCurrentStep && task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && canModifyTask && (
-                          <button
-                            className="btn btn-xs"
-                            style={{
-                              background: 'var(--green-l)',
-                              color: 'var(--green)',
-                              border: '1px solid var(--green)',
-                              fontWeight: 700, whiteSpace: 'nowrap',
-                            }}
-                            onClick={() => stepDoneMutation.mutate({ taskId: task.id, stepId: step.id })}
-                            disabled={stepDoneMutation.isPending}
-                          >
-                            ✓ Complete
-                          </button>
-                        )}
-                        <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: isCompleted ? 'var(--green-l)' : 'var(--amber-l)', color: isCompleted ? 'var(--green)' : 'var(--amber)' }}>
-                          {isCompleted ? 'Done' : 'Pending'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* ACTION BUTTONS — Role-based in detail modal */}
-              <div className="gold-divider" />
-              {canModifyTask ? (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* ADMIN/EA: Full action buttons */}
-                  {task.status === 'PENDING' && (
-                    <>
-                      {stepsTotal > 0 && stepsDone < stepsTotal ? (
-                        <div style={{
-                          padding: '8px 16px',
-                          background: 'var(--blue-l)',
-                          borderRadius: 8,
-                          border: '1.5px solid var(--blue)',
-                          fontSize: 13, fontWeight: 700, color: 'var(--blue)',
-                          display: 'flex', alignItems: 'center', gap: 6,
-                        }}>
-                          ☰ Complete all steps first ({stepsDone}/{stepsTotal})
-                        </div>
-                      ) : (
-                        <button className="btn btn-green" onClick={async () => {
-                          await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
-                          queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                          addToast('ok', 'Task completed! ✓')
-                          setSelectedTaskId(null)
-                        }}>
-                          ✓ Done
-                        </button>
-                      )}
-                      <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
-                        onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
-                        ✏ Revise
-                      </button>
-                    </>
-                  )}
-                  {(task.status === 'IN_PROGRESS' || task.status === 'IN_REVIEW' || task.status === 'ON_HOLD') && (
-                    <>
-                      {stepsTotal > 0 && stepsDone < stepsTotal ? (
-                        <div style={{
-                          padding: '8px 16px',
-                          background: 'var(--blue-l)',
-                          borderRadius: 8,
-                          border: '1.5px solid var(--blue)',
-                          fontSize: 13, fontWeight: 700, color: 'var(--blue)',
-                          display: 'flex', alignItems: 'center', gap: 6,
-                        }}>
-                          ☰ Complete all steps first ({stepsDone}/{stepsTotal})
-                        </div>
-                      ) : (
-                        <button className="btn btn-green" onClick={async () => {
-                          await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'COMPLETED' }) })
-                          queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-                          addToast('ok', 'Task completed! ✓')
-                          setSelectedTaskId(null)
-                        }}>
-                          ✓ Done
-                        </button>
-                      )}
-                      <button className="btn" style={{ background: 'var(--amber-l)', color: 'var(--amber)', border: '1.5px solid var(--amber)' }}
-                        onClick={() => { setReviseTask(task); setReviseReason(''); setReviseNextDate('') }}>
-                        ✏ Revise
-                      </button>
-                    </>
-                  )}
-                  {task.status !== 'CANCELLED' && task.status !== 'COMPLETED' && (
-                    <button className="btn btn-red btn-sm" onClick={async () => {
-                      await fetch(`/api/tasks/${task.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'CANCELLED' }) })
-                      queryClient.invalidateQueries({ queryKey: ['tasks-list'] })
-                      addToast('ok', 'Task cancelled')
-                      setSelectedTaskId(null)
-                    }} style={{ marginLeft: 'auto' }}>
-                      🚫 Cancel Task
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {/* EMPLOYEE/MANAGER/DIRECTOR: Read-only notice */}
-                  {task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
-                    <div style={{
-                      padding: '8px 16px',
-                      background: 'var(--bg2)',
-                      borderRadius: 8,
-                      border: '1px solid var(--b2)',
-                      fontSize: 12, fontWeight: 600, color: 'var(--t3)',
-                      display: 'flex', alignItems: 'center', gap: 6,
-                    }}>
-                      🔒 Only Admin can mark tasks as Done/Revise
-                    </div>
-                  )}
-                </div>
-              )}
-              {/* COMPLETED → Show completion badge — everyone sees this */}
-              {task.status === 'COMPLETED' && (
-                <div style={{
-                  padding: '8px 16px',
-                  background: 'var(--green-l)',
-                  borderRadius: 8,
-                  border: '1.5px solid var(--green)',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  fontSize: 14, fontWeight: 800, color: 'var(--green)',
-                }}>
-                  Completed task ✅
-                  {task.score != null && (
-                    <span style={{
-                      fontSize: 13, fontWeight: 800,
-                      color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)',
-                      background: task.score >= 70 ? 'var(--green-l)' : task.score >= 40 ? 'var(--amber-l)' : 'var(--red-l)',
-                      padding: '2px 8px', borderRadius: 4,
-                    }}>
-                      Score: {task.score}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Audit Trail */}
-              <div style={{ marginTop: 14, padding: 12, background: 'var(--bg2)', borderRadius: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8, color: 'var(--t3)', marginBottom: 6 }}>Audit Trail</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--g2)' }} />
-                  <span style={{ fontSize: 12, color: 'var(--t2)' }}>Created — {task.createdAt ? new Date(task.createdAt).toLocaleString() : 'N/A'}</span>
-                </div>
-                {task.updatedAt && task.updatedAt !== task.createdAt && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)' }} />
-                    <span style={{ fontSize: 12, color: 'var(--t2)' }}>Last updated — {new Date(task.updatedAt).toLocaleString()}</span>
-                  </div>
-                )}
-                {task.completedAt && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)' }} />
-                    <span style={{ fontSize: 12, color: 'var(--t2)' }}>Completed — {new Date(task.completedAt).toLocaleString()}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
 
       {/* Edit Task Modal */}
       {editTask && (

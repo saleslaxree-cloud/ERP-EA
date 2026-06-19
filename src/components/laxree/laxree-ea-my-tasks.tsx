@@ -128,7 +128,11 @@ export function LaxreeEaMyTasks() {
     filtered = filtered.filter((t: any) => t.priority === priorityFilter)
   }
 
-  const todayTasks = filtered.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  // Today: tasks WITHOUT a dueDate (need attention today) OR with dueDate today
+  const todayTasks = filtered.filter((t: any) =>
+    t.status !== 'COMPLETED' && t.status !== 'CANCELLED' &&
+    (!t.dueDate || isToday(t.dueDate))
+  )
   const upcomingTasks = filtered.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const overdueTasks = filtered.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   // 'all' = every active task (excludes COMPLETED/CANCELLED) regardless of whether it has a dueDate

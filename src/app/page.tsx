@@ -21,6 +21,8 @@ import { LaxreeLeaveManagement } from '@/components/laxree/laxree-leave-manageme
 import { LaxreeEmployeeLeaves } from '@/components/laxree/laxree-employee-leaves'
 import { LaxreeAiAssistant } from '@/components/laxree/laxree-ai-assistant'
 import { LaxreeUserManagement } from '@/components/laxree/laxree-user-management'
+import { LaxreeTaskDetail } from '@/components/laxree/laxree-task-detail'
+import { LaxreePushNotifications } from '@/components/laxree/laxree-push-notifications'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -1035,6 +1037,13 @@ export default function HomePage() {
         <LaxreeCreateTask />
         <LaxreeCommandPalette />
         <LaxreeNotifPanel />
+        {/* Global Task Detail Modal — renders when selectedTaskId is set in the store.
+            Works on ANY page (Admin/EA/Employee), fixing the bug where employees
+            clicking "View Details" saw nothing happen. */}
+        <LaxreeTaskDetail />
+        {/* Push-notification helper — requests permission, registers SW, shows
+            browser notifications when new task-assignment notifications arrive. */}
+        <LaxreePushNotifications />
         <div id="toastArea" />
       </div>
     </ErrorBoundary>

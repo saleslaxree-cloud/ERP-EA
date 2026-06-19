@@ -124,7 +124,8 @@ export function LaxreeEmpMyTasks() {
   // Compute tab buckets
   // 'all' includes everything (including tasks without a due date and including COMPLETED/CANCELLED for context)
   const activeFiltered = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
-  const todayTasks = activeFiltered.filter((t: any) => t.dueDate && isToday(t.dueDate))
+  // Today: tasks WITHOUT a dueDate (need attention today) OR with dueDate today
+  const todayTasks = activeFiltered.filter((t: any) => !t.dueDate || isToday(t.dueDate))
   const upcomingTasks = activeFiltered.filter((t: any) => t.dueDate && isUpcoming(t.dueDate))
   const overdueTasks = activeFiltered.filter((t: any) => t.dueDate && isOverdue(t.dueDate))
   // 'all' = active (non-completed/cancelled) tasks regardless of due date

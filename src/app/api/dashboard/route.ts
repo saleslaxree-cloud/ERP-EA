@@ -23,8 +23,15 @@ export async function GET(request: NextRequest) {
         dueDate: { lt: todayStart },
       },
     })
+    // Today count: tasks without a dueDate OR with dueDate today (excludes COMPLETED/CANCELLED)
     const todayTasks = await db.task.count({
-      where: { dueDate: { gte: todayStart, lt: todayEnd } },
+      where: {
+        status: { notIn: [WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] },
+        OR: [
+          { dueDate: null },
+          { dueDate: { gte: todayStart, lt: todayEnd } },
+        ],
+      },
     })
 
     const nextWeekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
@@ -112,7 +119,12 @@ export async function GET(request: NextRequest) {
     })
 
     // ══ FILTERED LISTS ══
-    const todayTasksList = allTasks.filter(t => t.dueDate && new Date(t.dueDate) >= todayStart && new Date(t.dueDate) < todayEnd)
+    // Today: tasks WITHOUT a dueDate (need attention today) OR with dueDate today.
+    // Excludes COMPLETED/CANCELLED so they don't clutter the "Today" panel.
+    const todayTasksList = allTasks.filter(t =>
+      t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED &&
+      (!t.dueDate || (new Date(t.dueDate) >= todayStart && new Date(t.dueDate) < todayEnd))
+    )
     const upcomingTasksList = allTasks.filter(t =>
       t.dueDate && new Date(t.dueDate) >= todayEnd && new Date(t.dueDate) < nextWeekEnd &&
       t.status !== WorkflowStatus.COMPLETED && t.status !== WorkflowStatus.CANCELLED

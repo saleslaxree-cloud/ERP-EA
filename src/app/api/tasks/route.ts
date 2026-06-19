@@ -180,6 +180,29 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    // ─── Also notify any step assignees (so employees assigned to a specific
+    // step also receive a push notification about the new task). We exclude
+    // the ownerId since they already got notified above. ──────────────────
+    try {
+      const stepAssigneeIds = Array.from(new Set(
+        (taskStepsData || [])
+          .map((s: any) => s.assigneeId)
+          .filter((id: string) => id && id !== ownerId)
+      )) as string[]
+      for (const assigneeId of stepAssigneeIds) {
+        await db.notification.create({
+          data: {
+            type: 'STATUS_CHANGE',
+            title: `New Task Assigned: ${title}`,
+            message: `You have been assigned a step in task "${title}". Open the task to see your steps.`,
+            receiverId: assigneeId,
+          },
+        })
+      }
+    } catch (stepNotifErr) {
+      console.error('[tasks] Step assignee notification error (non-fatal):', stepNotifErr)
+    }
+
     // ─── Audit log: persist a CREATED entry in TaskActivity ──────────────
     // This NEVER gets cleaned up automatically — gives the user a full history.
     try {

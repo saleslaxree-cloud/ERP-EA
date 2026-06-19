@@ -107,7 +107,11 @@ export function LaxreeEmployeeDashboard() {
     const dueDayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate())
     return dueDayStart < todayStart
   }
-  const todayTasks = tasks.filter((t: any) => t.dueDate && isToday(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  // Today: tasks WITHOUT a dueDate (need attention today) OR with dueDate today
+  const todayTasks = tasks.filter((t: any) =>
+    t.status !== 'COMPLETED' && t.status !== 'CANCELLED' &&
+    (!t.dueDate || isToday(t.dueDate))
+  )
   const upcomingTasks = tasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const overdueTasks = tasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const activeTasks = tasks.filter((t: any) => t.status === 'IN_PROGRESS' || t.status === 'PENDING' || t.status === 'ON_HOLD')
