@@ -53,7 +53,7 @@ const priorityBadge: Record<string, { bg: string; color: string; label: string }
   LOW: { bg: '#EFF6FF', color: '#2563EB', label: '🔵 Low' },
 }
 
-type EmpTab = 'today' | 'upcoming' | 'overdue' | 'all'
+type EmpTab = 'today' | 'upcoming' | 'complete' | 'overdue' | 'all'
 
 export function LaxreeEmpMyTasks() {
   const { currentUserId, currentUserName, setActivePage, setSelectedTaskId } = useWorkflowStore()
@@ -128,12 +128,15 @@ export function LaxreeEmpMyTasks() {
   const todayTasks = activeFiltered.filter((t: any) => !t.dueDate || isToday(t.dueDate))
   const upcomingTasks = activeFiltered.filter((t: any) => t.dueDate && isUpcoming(t.dueDate))
   const overdueTasks = activeFiltered.filter((t: any) => t.dueDate && isOverdue(t.dueDate))
+  // 'complete' = tasks that have been marked COMPLETED (so employees can review past work)
+  const completedTasks = filtered.filter((t: any) => t.status === 'COMPLETED')
   // 'all' = active (non-completed/cancelled) tasks regardless of due date
   const allTabTasks = activeFiltered
 
   const tabTasks =
     taskTab === 'today' ? todayTasks
     : taskTab === 'upcoming' ? upcomingTasks
+    : taskTab === 'complete' ? completedTasks
     : taskTab === 'overdue' ? overdueTasks
     : allTabTasks
 
@@ -141,6 +144,7 @@ export function LaxreeEmpMyTasks() {
     { id: 'all', label: 'All', count: allTabTasks.length },
     { id: 'today', label: 'Today', count: todayTasks.length },
     { id: 'upcoming', label: 'Upcoming', count: upcomingTasks.length },
+    { id: 'complete', label: 'Complete', count: completedTasks.length },
     { id: 'overdue', label: 'Overdue', count: overdueTasks.length },
   ]
 
@@ -268,6 +272,8 @@ export function LaxreeEmpMyTasks() {
                 ? 'No tasks due today'
                 : taskTab === 'upcoming'
                 ? 'No upcoming tasks'
+                : taskTab === 'complete'
+                ? 'No completed tasks yet'
                 : 'No overdue tasks'}
             </div>
             <div style={{ fontSize: 12, marginTop: 4 }}>
@@ -277,6 +283,8 @@ export function LaxreeEmpMyTasks() {
                 ? 'Switch to the "All" tab to see every task assigned to you.'
                 : taskTab === 'upcoming'
                 ? 'Switch to the "All" tab to see every task assigned to you.'
+                : taskTab === 'complete'
+                ? 'Tasks you finish will appear here for your records.'
                 : 'Great job staying on track! Switch to "All" to see all your tasks.'}
             </div>
             {taskTab !== 'all' && (
@@ -431,6 +439,7 @@ export function LaxreeEmpMyTasks() {
         {' · '}Active: <strong style={{ color: 'var(--g2)' }}>{allTabTasks.length}</strong>
         {' · '}Today: <strong style={{ color: 'var(--g2)' }}>{todayTasks.length}</strong>
         {' · '}Upcoming: <strong style={{ color: 'var(--blue)' }}>{upcomingTasks.length}</strong>
+        {' · '}Complete: <strong style={{ color: 'var(--green)' }}>{completedTasks.length}</strong>
         {' · '}Overdue: <strong style={{ color: 'var(--red)' }}>{overdueTasks.length}</strong>
       </div>
     </>
