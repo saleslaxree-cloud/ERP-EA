@@ -225,11 +225,19 @@ export function LaxreeSidebar() {
   let sections: { label: string; items: NavItem[] }[]
 
   if (isDirector) {
-    // DIRECTOR: Dashboard (filtered to their tasks) + All Tasks (filtered to their tasks)
+    // DIRECTOR gets the SAME rich sidebar as ADMIN — same Dashboard, Executive View,
+    // Monday Meeting, Scorecard, All Tasks, Analytics, Departments, Team, etc.
+    // The ONLY difference: when the Director navigates to Dashboard or All Tasks,
+    // the data is filtered to tasks they assigned (plus legacy NULL-assignedBy tasks
+    // that predate the assignedBy feature, so no historical data is hidden).
     sections = [
-      { label: 'Director Command Center', items: directorDashboard },
-      { label: 'Task Management', items: directorTasks },
-      { label: 'AI Assistant', items: employeeAI },
+      { label: 'Director Command Center', items: adminCEOCommandCenter },
+      { label: 'Weekly Review', items: adminWeeklyReview },
+      { label: 'Scorecard', items: adminScorecard },
+      { label: 'Task Management', items: taskMgmt },
+      { label: 'Intelligence', items: intelligence },
+      { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
+      { label: 'Management', items: management },
     ]
   } else if (isEmployee) {
     sections = [

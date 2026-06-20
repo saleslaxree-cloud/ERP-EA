@@ -14,7 +14,18 @@ export async function GET(request: NextRequest) {
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
     if (status) where.status = status
-    if (assignedById) where.assignedById = assignedById
+    // ─── BACKWARD COMPATIBILITY ──────────────────────────────────────
+    // Old tasks created BEFORE the `assignedById` field was added have NULL values.
+    // These tasks belong to no specific director — we show them to ALL directors so
+    // no historical data is "lost" when a director logs in.
+    // New tasks (created via the form with explicit Assigned By) appear ONLY on the
+    // assigned director's dashboard, as intended.
+    if (assignedById) {
+      where.OR = [
+        { assignedById: assignedById },
+        { assignedById: null },
+      ]
+    }
 
     // ─── DIAGNOSTIC: First, try a minimal query to see if DB itself is reachable ──
     const totalTaskCount = await db.task.count()
@@ -31,7 +42,13 @@ export async function GET(request: NextRequest) {
       if (taskIdsFromSteps.length > 0) {
         const stepWhere: Record<string, unknown> = { id: { in: taskIdsFromSteps }, parentTaskId: null }
         if (status) stepWhere.status = status
-        if (assignedById) stepWhere.assignedById = assignedById
+        // Same NULL-compatible filter as the main `where` above
+        if (assignedById) {
+          stepWhere.OR = [
+            { assignedById: assignedById },
+            { assignedById: null },
+          ]
+        }
         assignedStepTasks = await db.task.findMany({
           where: stepWhere,
           include: {

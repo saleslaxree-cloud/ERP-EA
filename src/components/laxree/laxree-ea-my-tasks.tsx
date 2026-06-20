@@ -150,8 +150,8 @@ export function LaxreeEaMyTasks() {
   const tabs = [
     { id: 'all' as const, label: 'All', count: allTabTasks.length },
     { id: 'today' as const, label: 'Today', count: todayTasks.length },
+    { id: 'complete' as const, label: 'Completed', count: completedTasks.length },
     { id: 'upcoming' as const, label: 'Upcoming', count: upcomingTasks.length },
-    { id: 'complete' as const, label: 'Complete', count: completedTasks.length },
     { id: 'overdue' as const, label: 'Overdue', count: overdueTasks.length },
   ]
 

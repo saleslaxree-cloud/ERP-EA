@@ -579,6 +579,12 @@ textarea.fi{resize:vertical;min-height:80px}
 .tdm-btn:hover{background:var(--bg2);border-color:var(--b3);color:var(--t1)}
 
 /* ══ RESPONSIVE ══ */
+@media(max-width:1024px){
+  .stat-grid.sg-6{grid-template-columns:repeat(3,1fr)}
+  .stat-grid.sg-4{grid-template-columns:repeat(2,1fr)}
+  .g-70-30{grid-template-columns:1fr}
+  .g-60-40{grid-template-columns:1fr}
+}
 @media(max-width:768px){
   :root{--sb-w:0px}
   .sidebar{transform:translateX(-220px);transition:transform .3s;width:220px;z-index:400}
@@ -593,6 +599,27 @@ textarea.fi{resize:vertical;min-height:80px}
   .stat-grid.sg-3{grid-template-columns:repeat(1,1fr)}
   .g2,.g3,.g-70-30,.g-60-40{grid-template-columns:1fr}
   .fr-2,.fr-3{grid-template-columns:1fr}
+  /* Hide topbar clock on tablets & smaller to save space */
+  .tb-center .tb-search input{font-size:11px}
+  /* Page header — stack vertically on mobile */
+  .ph{flex-direction:column;align-items:flex-start;gap:8px}
+  .ph-left h2{font-size:22px}
+  .ph-right{flex-wrap:wrap;width:100%}
+  /* Modal — full width on mobile */
+  .modal{max-width:calc(100vw - 28px)!important;margin:14px auto!important}
+  .modal-lg{max-width:calc(100vw - 28px)!important}
+  .modal-md{max-width:calc(100vw - 28px)!important}
+  /* Tabs — horizontal scroll on mobile */
+  .tabs{max-width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .tabs::-webkit-scrollbar{height:3px}
+  .tabs::-webkit-scrollbar-thumb{background:rgba(0,0,0,.2);border-radius:3px}
+  /* Tables — already have .tw wrapper; ensure min-width for horizontal scroll */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .ltable{min-width:560px}
+  /* Form-row inside cards */
+  .fr-2,.fr-3{gap:8px}
+  /* Notification panel — full width */
+  .np{width:calc(100vw - 24px);right:12px;left:12px;max-height:70vh}
 }
 @media(max-width:480px){
   .stat-grid.sg-6,.stat-grid.sg-4,.stat-grid.sg-3,.stat-grid.sg-2{grid-template-columns:1fr}
@@ -601,6 +628,38 @@ textarea.fi{resize:vertical;min-height:80px}
   .ph-right{flex-wrap:wrap}
   .main-area{padding:14px}
   .modal{padding:18px}
+  /* Topbar — hide search box on very small screens, show only icons */
+  .tb-search{display:none}
+  .tb-center{padding:0 8px;justify-content:flex-end}
+  .tb-center span{font-size:10px}
+  .tb-right{padding-right:10px;gap:6px}
+  /* Hide user name on very small screens — keep only avatar */
+  .tb-right > div:last-child > span:last-child{display:none}
+  /* Smaller stat cards */
+  .sc{padding:10px!important}
+  .sc-val{font-size:22px!important}
+  .sc-label{font-size:9px!important}
+  .sc-sub{font-size:9px!important}
+  /* Smaller card headers */
+  .ch{padding:10px 12px}
+  .ct{font-size:12px}
+  .cb{padding:12px}
+  /* Smaller page header */
+  .ph-left h2{font-size:19px}
+  .ph-left p{font-size:11px}
+  /* Bottom action buttons — full width stack */
+  .form-actions{flex-direction:column-reverse;gap:8px}
+  .form-actions .btn{width:100%}
+}
+@media(max-width:360px){
+  /* Very small phones (iPhone SE 1st gen, older Androids) */
+  .main-area{padding:10px}
+  .sc-val{font-size:18px!important}
+  .ph-left h2{font-size:17px}
+  .modal{padding:14px}
+  /* Hide topbar clock entirely on tiny phones */
+  .tb-center span{display:none}
+  .tb-center{padding:0 6px}
 }
 
 /* ══ UTILS ══ */

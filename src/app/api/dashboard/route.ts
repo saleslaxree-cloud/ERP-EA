@@ -11,8 +11,13 @@ export async function GET(request: NextRequest) {
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
     // Common task filter — applied to every stat below.
-    // If `assignedById` is provided (director dashboard), only count tasks that director assigned.
-    const taskWhere = assignedById ? { assignedById } : {}
+    // If `assignedById` is provided (director dashboard), only count tasks that director
+    // assigned — INCLUDING legacy tasks that have NULL `assignedById` (those were created
+    // before the field existed, so they belong to no specific director and are shown to
+    // EVERY director to avoid historical data loss).
+    const taskWhere = assignedById
+      ? { OR: [{ assignedById: assignedById }, { assignedById: null }] }
+      : {}
 
     // ══ TASK STATS (lightweight counts) ══
     const totalTasks = await db.task.count({ where: taskWhere })

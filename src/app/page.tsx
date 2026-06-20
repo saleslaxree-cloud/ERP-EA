@@ -82,22 +82,26 @@ function ActiveView() {
   const isAdmin = currentRole === 'ADMIN'
   const isEA = currentRole === 'EA'
   const isDirector = currentRole === 'DIRECTOR'
+  // DIRECTOR gets the same admin-level access (Executive View, Monday Meeting, etc.)
+  // — only difference is task data is filtered to tasks they assigned.
+  const isAdminOrDirector = isAdmin || isDirector
 
   const renderView = () => {
     switch (activePage) {
       case 'dashboard':
         // DIRECTOR sees the same admin dashboard UI, but filtered to only tasks they assigned
+        // (plus legacy NULL-assignedBy tasks so no historical data disappears).
         if (isDirector) {
           return <LaxreeDashboard assignedById={currentUserId} directorName={currentUserName || 'Director'} />
         }
         return <LaxreeDashboard />
       case 'executive':
-        // Executive View is ADMIN-only — EA gets redirected to dashboard
-        if (!isAdmin) return <LaxreeDashboard />
+        // Executive View is ADMIN+DIRECTOR — EA gets redirected to dashboard
+        if (!isAdminOrDirector) return <LaxreeDashboard />
         return <ExecutiveView />
       // approvals removed
       case 'tasks':
-        // DIRECTOR sees only tasks they assigned
+        // DIRECTOR sees only tasks they assigned (plus legacy NULL-assignedBy tasks)
         if (isDirector) {
           return <LaxreeTasks assignedById={currentUserId} />
         }
@@ -138,8 +142,8 @@ function ActiveView() {
         return <LaxreeEscalations />
       case 'monday':
       case 'workflows':
-        // Monday Meeting is ADMIN-only — EA gets redirected to dashboard
-        if (!isAdmin) return <LaxreeDashboard />
+        // Monday Meeting is ADMIN+DIRECTOR — EA gets redirected to dashboard
+        if (!isAdminOrDirector) return <LaxreeDashboard />
         return <LaxreeMonday />
       case 'notifications':
         return <div style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>Notifications coming soon</div>

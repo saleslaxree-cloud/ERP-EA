@@ -143,8 +143,8 @@ export function LaxreeEmpMyTasks() {
   const tabs: { id: EmpTab; label: string; count: number }[] = [
     { id: 'all', label: 'All', count: allTabTasks.length },
     { id: 'today', label: 'Today', count: todayTasks.length },
+    { id: 'complete', label: 'Completed', count: completedTasks.length },
     { id: 'upcoming', label: 'Upcoming', count: upcomingTasks.length },
-    { id: 'complete', label: 'Complete', count: completedTasks.length },
     { id: 'overdue', label: 'Overdue', count: overdueTasks.length },
   ]
 

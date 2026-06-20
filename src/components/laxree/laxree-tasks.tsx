@@ -283,9 +283,9 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations, assig
   const tabs = [
     { id: 'all', label: 'All', count: allCount },
     { id: 'today', label: 'Today', count: todayCount },
+    { id: 'complete', label: 'Completed', count: completeCount },
     { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
     { id: 'overdue', label: 'Overdue', count: overdueCount },
-    { id: 'complete', label: 'Complete', count: completeCount },
   ]
 
   const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?'
