@@ -40,6 +40,13 @@ export async function POST(request: NextRequest) {
     { name: 'monthDates',      sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "monthDates" TEXT` },
     { name: 'directorDependency', sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "directorDependency" TEXT` },
     { name: 'projectId',       sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "projectId" TEXT` },
+    // ─── assignedById: Director who assigned the task (Samarth Sir / Ashish Sir) ───
+    // This column is REQUIRED for the Director Dashboard feature. Without it, every
+    // /api/tasks call returns HTTP 500 because Prisma tries to JOIN via this column
+    // in the `include: { assignedBy: ... }` clause, and the DB rejects the query.
+    // Adding it as nullable TEXT preserves all 36 existing rows (they get NULL, which
+    // the API now treats as "legacy task — visible to every director").
+    { name: 'assignedById',    sql: `ALTER TABLE "Task" ADD COLUMN IF NOT EXISTS "assignedById" TEXT` },
   ]
   for (const col of taskColumns) {
     await runSql(col.sql, `Add Task.${col.name}`)

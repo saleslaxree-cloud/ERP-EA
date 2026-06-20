@@ -31,6 +31,26 @@ export async function GET(request: NextRequest) {
     const totalTaskCount = await db.task.count()
     console.log('[tasks] DB task count:', totalTaskCount)
 
+    // ─── SCHEMA-DRIFT DEFENSE ──────────────────────────────────────────
+    // If the `assignedById` column doesn't exist in the production DB yet (e.g., the
+    // Vercel build hasn't run `prisma db push` yet), the WHERE clause above will throw
+    // P2022. Detect this and clear the assignedById filter so the API still returns all
+    // tasks instead of crashing with HTTP 500 (which is what was making the 35-40
+    // tasks invisible on the EA/Admin dashboard).
+    if (assignedById) {
+      try {
+        await db.task.count({ where })
+      } catch (probeErr: any) {
+        const msg = String(probeErr?.message || probeErr).toLowerCase()
+        if (msg.includes('assignedbyid') && msg.includes('does not exist')) {
+          console.warn('[tasks] assignedById column missing in DB — dropping assignedById filter (showing all tasks)')
+          delete where.OR
+        } else {
+          throw probeErr
+        }
+      }
+    }
+
     // If assignedTo is provided, also find tasks where the user is a task step assignee
     let assignedStepTasks: any[] = []
     if (assignedTo) {
@@ -110,20 +130,41 @@ export async function GET(request: NextRequest) {
       console.log('[tasks] Light query succeeded, returned', tasks.length, 'tasks')
     } catch (heavyErr: any) {
       console.error('[tasks] Light query FAILED, retrying with minimal include:', heavyErr?.message || heavyErr)
-      // Fallback: even simpler — just owner + taskSteps, no subTasks
-      tasks = await db.task.findMany({
-        where: { ...where, parentTaskId: null },
-        include: {
-          owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
-          assignedBy: { select: { id: true, name: true, role: true } },
-          taskSteps: {
-            orderBy: { order: 'asc' },
-            include: { assignee: { select: { id: true, name: true, role: true } } },
+      // Fallback #1: drop subTasks (often the cause of relation errors)
+      try {
+        tasks = await db.task.findMany({
+          where: { ...where, parentTaskId: null },
+          include: {
+            owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+            assignedBy: { select: { id: true, name: true, role: true } },
+            taskSteps: {
+              orderBy: { order: 'asc' },
+              include: { assignee: { select: { id: true, name: true, role: true } } },
+            },
           },
-        },
-        orderBy: { createdAt: 'desc' },
-      })
-      console.log('[tasks] Minimal query returned', tasks.length, 'tasks')
+          orderBy: { createdAt: 'desc' },
+        })
+        console.log('[tasks] Minimal query returned', tasks.length, 'tasks')
+      } catch (minErr: any) {
+        // Fallback #2: drop `assignedBy` too — this happens when the `assignedById`
+        // column hasn't been added to the production DB yet. Returning tasks without
+        // the assignedBy relation is FAR better than returning 0 tasks (which is what
+        // was happening on the EA/Admin dashboard, causing the user to think their
+        // 35-40 tasks were deleted).
+        console.error('[tasks] Minimal query also FAILED, retrying WITHOUT assignedBy include:', minErr?.message || minErr)
+        tasks = await db.task.findMany({
+          where: { ...where, parentTaskId: null },
+          include: {
+            owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+            taskSteps: {
+              orderBy: { order: 'asc' },
+              include: { assignee: { select: { id: true, name: true, role: true } } },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+        console.log('[tasks] Bare-minimum query (no assignedBy) returned', tasks.length, 'tasks')
+      }
     }
 
     // Merge and deduplicate: tasks owned by user + tasks where user is step assignee

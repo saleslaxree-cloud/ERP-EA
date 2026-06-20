@@ -15,9 +15,34 @@ export async function GET(request: NextRequest) {
     // assigned — INCLUDING legacy tasks that have NULL `assignedById` (those were created
     // before the field existed, so they belong to no specific director and are shown to
     // EVERY director to avoid historical data loss).
-    const taskWhere = assignedById
+    //
+    // IMPORTANT: If the `assignedById` column doesn't exist in the DB yet (schema drift),
+    // we fall back to `{}` (no filter) so the dashboard still loads — better to show ALL
+    // tasks than to crash with HTTP 500 and show nothing.
+    //
+    // ─── SCHEMA-DRIFT DEFENSE ────────────────────────────────────────────
+    // We try a probe count with the assignedById filter. If it throws P2022 (column
+    // missing), we know the column doesn't exist yet — reset taskWhere to `{}` and
+    // continue. This way, the dashboard loads for Admin/EA/Director even before
+    // `prisma db push` has synced the production schema.
+    let taskWhere: Record<string, unknown> = assignedById
       ? { OR: [{ assignedById: assignedById }, { assignedById: null }] }
       : {}
+    if (assignedById) {
+      try {
+        // Probe: if assignedById column doesn't exist, this throws P2022
+        await db.task.count({ where: taskWhere })
+      } catch (probeErr: any) {
+        const msg = String(probeErr?.message || probeErr).toLowerCase()
+        if (msg.includes('assignedbyid') && msg.includes('does not exist')) {
+          console.warn('[dashboard] assignedById column missing in DB — using unfiltered taskWhere (showing all tasks)')
+          taskWhere = {}
+        } else {
+          // Some other error — rethrow to outer catch
+          throw probeErr
+        }
+      }
+    }
 
     // ══ TASK STATS (lightweight counts) ══
     const totalTasks = await db.task.count({ where: taskWhere })
@@ -58,19 +83,41 @@ export async function GET(request: NextRequest) {
     const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
     // ══ ALL TASKS (lightweight - no taskSteps) ══
-    const allTasks = await db.task.findMany({
-      where: taskWhere,
-      select: {
-        id: true, title: true, description: true, status: true, priority: true,
-        department: true, category: true, dueDate: true, completedAt: true, createdAt: true,
-        frequency: true, weekDays: true, monthDates: true, directorDependency: true,
-        owner: { select: { id: true, name: true, department: true, role: true } },
-        assignedBy: { select: { id: true, name: true, role: true } },
-        taskSteps: { select: { id: true, title: true, status: true, order: true }, orderBy: { order: 'asc' } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    })
+    // Defensive: if the `assignedBy` relation fails (e.g., `assignedById` column missing
+    // in production DB), retry without it. Better to return tasks without the assignedBy
+    // field than to crash the entire dashboard.
+    let allTasks: any[]
+    try {
+      allTasks = await db.task.findMany({
+        where: taskWhere,
+        select: {
+          id: true, title: true, description: true, status: true, priority: true,
+          department: true, category: true, dueDate: true, completedAt: true, createdAt: true,
+          frequency: true, weekDays: true, monthDates: true, directorDependency: true,
+          owner: { select: { id: true, name: true, department: true, role: true } },
+          assignedBy: { select: { id: true, name: true, role: true } },
+          taskSteps: { select: { id: true, title: true, status: true, order: true }, orderBy: { order: 'asc' } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      })
+    } catch (tasksErr: any) {
+      const msg = String(tasksErr?.message || tasksErr).toLowerCase()
+      console.warn('[dashboard] allTasks query failed, retrying without assignedBy:', msg)
+      // Fallback: same query but WITHOUT the assignedBy relation
+      allTasks = await db.task.findMany({
+        where: taskWhere,
+        select: {
+          id: true, title: true, description: true, status: true, priority: true,
+          department: true, category: true, dueDate: true, completedAt: true, createdAt: true,
+          frequency: true, weekDays: true, monthDates: true, directorDependency: true,
+          owner: { select: { id: true, name: true, department: true, role: true } },
+          taskSteps: { select: { id: true, title: true, status: true, order: true }, orderBy: { order: 'asc' } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      })
+    }
 
     // ══ ALL USERS ══
     const allUsers = await db.user.findMany({
