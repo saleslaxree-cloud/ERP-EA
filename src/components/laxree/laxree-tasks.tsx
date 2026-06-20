@@ -10,9 +10,10 @@ interface LaxreeTasksProps {
   showCancelled?: boolean
   showExtHold?: boolean
   showEscalations?: boolean
+  assignedById?: string  // When set (Director view), only tasks assigned by this director are shown
 }
 
-export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: LaxreeTasksProps) {
+export function LaxreeTasks({ showCancelled, showExtHold, showEscalations, assignedById }: LaxreeTasksProps) {
   const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId, addToast, setCreateTaskOpen, currentRole, currentUserId } = useWorkflowStore()
   const queryClient = useQueryClient()
 
@@ -35,9 +36,10 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   const [reviseNextDate, setReviseNextDate] = useState('')
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks-list'],
+    queryKey: ['tasks-list', assignedById],
     queryFn: async () => {
-      const res = await fetch('/api/tasks')
+      const url = assignedById ? `/api/tasks?assignedById=${assignedById}` : '/api/tasks'
+      const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       return res.json()
     },
@@ -244,6 +246,7 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     //   - exclude COMPLETED / CANCELLED
     //   - "Today" includes tasks WITHOUT a dueDate (they need attention today — better than
     //     being invisible). Tasks WITH a dueDate use the strict date check.
+    // 'complete' tab = only COMPLETED tasks (so Admin/EA can review past completed work)
     if (taskTab === 'all') {
       // No status filter — show everything
     } else if (taskTab === 'today') filtered = filtered.filter((t: any) =>
@@ -255,6 +258,9 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
     )
     else if (taskTab === 'overdue') filtered = filtered.filter((t: any) =>
       t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED'
+    )
+    else if (taskTab === 'complete') filtered = filtered.filter((t: any) =>
+      t.status === 'COMPLETED'
     )
     // Fallback: if taskTab is somehow empty/undefined, default to showing everything
     else {
@@ -272,12 +278,14 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
   ).length
   const upcomingCount = allTasks.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
   const overdueCount = allTasks.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED').length
+  const completeCount = allTasks.filter((t: any) => t.status === 'COMPLETED').length
 
   const tabs = [
     { id: 'all', label: 'All', count: allCount },
     { id: 'today', label: 'Today', count: todayCount },
     { id: 'upcoming', label: 'Upcoming', count: upcomingCount },
     { id: 'overdue', label: 'Overdue', count: overdueCount },
+    { id: 'complete', label: 'Complete', count: completeCount },
   ]
 
   const getInitials = (name: string) => name?.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?'
@@ -458,11 +466,15 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations }: Lax
                   ? 'No upcoming tasks'
                   : taskTab === 'overdue'
                   ? 'No overdue tasks'
+                  : taskTab === 'complete'
+                  ? 'No completed tasks yet'
                   : 'No tasks found'}
               </div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
                 {taskTab === 'all'
                   ? 'No tasks exist in the system yet. Create your first task to get started.'
+                  : taskTab === 'complete'
+                  ? 'Completed tasks will appear here for your records. Switch to "All" to see every task.'
                   : 'Try switching to the "All" tab to see every task including completed and cancelled ones'}
               </div>
               {taskTab !== 'all' && (

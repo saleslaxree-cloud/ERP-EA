@@ -43,7 +43,7 @@ export function LaxreeTopbar() {
             letterSpacing: 3, textTransform: 'uppercase', color: 'var(--g2)',
           }}>LAXREE</div>
           {/* Build version indicator — confirms the user is seeing the latest deployment */}
-          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v14·0619</span>
+          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v15·0620</span>
         </div>
       </div>
       <div className="tb-center">
@@ -56,8 +56,8 @@ export function LaxreeTopbar() {
         <span style={{ fontSize: '11.5px', color: 'var(--t3)', whiteSpace: 'nowrap' }}>{time}</span>
       </div>
       <div className="tb-right">
-        {/* ADMIN and EA can create direct tasks */}
-        {(currentRole === 'ADMIN' || currentRole === 'EA') && (
+        {/* ADMIN, EA, and DIRECTOR can create direct tasks */}
+        {(currentRole === 'ADMIN' || currentRole === 'EA' || currentRole === 'DIRECTOR') && (
         <button
           onClick={() => setCreateTaskOpen(true)}
           style={{

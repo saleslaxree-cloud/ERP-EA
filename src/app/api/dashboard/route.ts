@@ -5,20 +5,26 @@ import { WorkflowStatus } from '@/lib/constants'
 export async function GET(request: NextRequest) {
   try {
     const userId = request.nextUrl.searchParams.get('userId')
+    const assignedById = request.nextUrl.searchParams.get('assignedById')
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
+    // Common task filter — applied to every stat below.
+    // If `assignedById` is provided (director dashboard), only count tasks that director assigned.
+    const taskWhere = assignedById ? { assignedById } : {}
+
     // ══ TASK STATS (lightweight counts) ══
-    const totalTasks = await db.task.count()
-    const completedTasks = await db.task.count({ where: { status: WorkflowStatus.COMPLETED } })
-    const pendingTasks = await db.task.count({ where: { status: WorkflowStatus.PENDING } })
-    const inProgressTasks = await db.task.count({ where: { status: WorkflowStatus.IN_PROGRESS } })
+    const totalTasks = await db.task.count({ where: taskWhere })
+    const completedTasks = await db.task.count({ where: { ...taskWhere, status: WorkflowStatus.COMPLETED } })
+    const pendingTasks = await db.task.count({ where: { ...taskWhere, status: WorkflowStatus.PENDING } })
+    const inProgressTasks = await db.task.count({ where: { ...taskWhere, status: WorkflowStatus.IN_PROGRESS } })
 
     // OVERDUE = due date strictly before TODAY (start of day), NOT before current timestamp.
     // Using `lt: now` caused today's tasks (midnight UTC) to be counted as overdue.
     const overdueTasks = await db.task.count({
       where: {
+        ...taskWhere,
         status: { in: [WorkflowStatus.PENDING, WorkflowStatus.IN_PROGRESS] },
         dueDate: { lt: todayStart },
       },
@@ -26,6 +32,7 @@ export async function GET(request: NextRequest) {
     // Today count: tasks without a dueDate OR with dueDate today (excludes COMPLETED/CANCELLED)
     const todayTasks = await db.task.count({
       where: {
+        ...taskWhere,
         status: { notIn: [WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] },
         OR: [
           { dueDate: null },
@@ -37,6 +44,7 @@ export async function GET(request: NextRequest) {
     const nextWeekEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
     const upcomingTasks = await db.task.count({
       where: {
+        ...taskWhere,
         dueDate: { gte: todayEnd, lt: nextWeekEnd },
         status: { notIn: [WorkflowStatus.COMPLETED, WorkflowStatus.CANCELLED] },
       },
@@ -46,11 +54,13 @@ export async function GET(request: NextRequest) {
 
     // ══ ALL TASKS (lightweight - no taskSteps) ══
     const allTasks = await db.task.findMany({
+      where: taskWhere,
       select: {
         id: true, title: true, description: true, status: true, priority: true,
         department: true, category: true, dueDate: true, completedAt: true, createdAt: true,
         frequency: true, weekDays: true, monthDates: true, directorDependency: true,
         owner: { select: { id: true, name: true, department: true, role: true } },
+        assignedBy: { select: { id: true, name: true, role: true } },
         taskSteps: { select: { id: true, title: true, status: true, order: true }, orderBy: { order: 'asc' } },
       },
       orderBy: { createdAt: 'desc' },

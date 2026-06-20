@@ -18,13 +18,14 @@ export function LaxreeSidebar() {
 
   const isAdmin = currentRole === 'ADMIN'
   const isEA = currentRole === 'EA'
-  const isEmployee = currentRole === 'EMPLOYEE' || currentRole === 'MANAGER' || currentRole === 'DIRECTOR'
+  const isDirector = currentRole === 'DIRECTOR'
+  const isEmployee = currentRole === 'EMPLOYEE' || currentRole === 'MANAGER'
 
   // Fetch dashboard stats for sidebar badges
   const { data: dashData } = useQuery({
     queryKey: ['sidebar-stats', currentUserId],
-    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
-    enabled: !!currentUserId && !isEmployee,
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}${isDirector ? `&assignedById=${currentUserId}` : ''}`).then(r => r.json()),
+    enabled: !!currentUserId && (isAdmin || isEA || isDirector),
   })
 
   const d = dashData as any
@@ -201,9 +202,36 @@ export function LaxreeSidebar() {
   // ═══════════════════════════════════════════════════════════
   // BUILD SECTIONS BASED ON ROLE
   // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  // DIRECTOR SIDEBAR — Same dashboard look as ADMIN, but tasks are filtered
+  // to only those assigned by this director (assignedById === currentUserId).
+  // Limited scope: Dashboard + All Tasks + Cancelled.
+  // ═══════════════════════════════════════════════════════════
+  const directorDashboard: NavItem[] = [
+    {
+      id: 'dashboard', label: 'Director Dashboard',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>,
+    },
+  ]
+
+  const directorTasks: NavItem[] = [
+    {
+      id: 'tasks', label: 'All Tasks',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>,
+      badge: <span className="nb nb-live">{activeTasks}</span>,
+    },
+  ]
+
   let sections: { label: string; items: NavItem[] }[]
 
-  if (isEmployee) {
+  if (isDirector) {
+    // DIRECTOR: Dashboard (filtered to their tasks) + All Tasks (filtered to their tasks)
+    sections = [
+      { label: 'Director Command Center', items: directorDashboard },
+      { label: 'Task Management', items: directorTasks },
+      { label: 'AI Assistant', items: employeeAI },
+    ]
+  } else if (isEmployee) {
     sections = [
       { label: 'My Space', items: employeeDashboard },
       { label: 'My Tasks', items: employeeTasks },

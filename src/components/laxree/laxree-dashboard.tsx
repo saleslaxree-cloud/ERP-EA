@@ -36,11 +36,11 @@ interface User {
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED', '#0D9488', '#B8860B']
 function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length] }
 
-export function LaxreeDashboard() {
+export function LaxreeDashboard({ assignedById, directorName }: { assignedById?: string; directorName?: string } = {}) {
   const { currentUser, setActivePage, currentUserId, currentRole } = useWorkflowStore()
 
   // Determine welcome title based on role
-  const welcomeTitle = currentRole === 'ADMIN' ? 'Owner' : currentUser?.name || 'Admin'
+  const welcomeTitle = currentRole === 'ADMIN' ? 'Owner' : directorName || currentUser?.name || 'Admin'
 
   // Fetch pending leaves for EA alert banner
   const { data: eaLeavesData } = useQuery({
@@ -52,8 +52,8 @@ export function LaxreeDashboard() {
   const pendingLeaveCount = pendingLeaves.length
 
   const { data: dash, isLoading } = useQuery<DashboardData>({
-    queryKey: ['dashboard', currentUserId],
-    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}`).then(r => r.json()),
+    queryKey: ['dashboard', currentUserId, assignedById],
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}${assignedById ? `&assignedById=${assignedById}` : ''}`).then(r => r.json()),
     enabled: !!currentUserId,
   })
 
@@ -126,8 +126,8 @@ export function LaxreeDashboard() {
         </div>
       )}
 
-      {/* Pending Leave Applications Alert */}
-      {pendingLeaveCount > 0 && (
+      {/* Pending Leave Applications Alert — only shown for ADMIN/EA, not DIRECTOR */}
+      {pendingLeaveCount > 0 && currentRole !== 'DIRECTOR' && (
         <div style={{
           padding: '14px 18px', marginBottom: 12, borderRadius: 10,
           background: 'linear-gradient(135deg, #FEF3C7, #FDE68A)',

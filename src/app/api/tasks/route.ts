@@ -7,12 +7,14 @@ export async function GET(request: NextRequest) {
     const userId = request.nextUrl.searchParams.get('userId') || request.nextUrl.searchParams.get('ownerId')
     const status = request.nextUrl.searchParams.get('status')
     const assignedTo = request.nextUrl.searchParams.get('assignedTo')
+    const assignedById = request.nextUrl.searchParams.get('assignedById')
 
-    console.log('[tasks] GET params:', { userId, status, assignedTo })
+    console.log('[tasks] GET params:', { userId, status, assignedTo, assignedById })
 
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
     if (status) where.status = status
+    if (assignedById) where.assignedById = assignedById
 
     // ─── DIAGNOSTIC: First, try a minimal query to see if DB itself is reachable ──
     const totalTaskCount = await db.task.count()
@@ -27,10 +29,14 @@ export async function GET(request: NextRequest) {
       })
       const taskIdsFromSteps = [...new Set(stepTasks.map(s => s.taskId))]
       if (taskIdsFromSteps.length > 0) {
+        const stepWhere: Record<string, unknown> = { id: { in: taskIdsFromSteps }, parentTaskId: null }
+        if (status) stepWhere.status = status
+        if (assignedById) stepWhere.assignedById = assignedById
         assignedStepTasks = await db.task.findMany({
-          where: { id: { in: taskIdsFromSteps }, parentTaskId: null, ...(status ? { status } : {}) },
+          where: stepWhere,
           include: {
             owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+            assignedBy: { select: { id: true, name: true, role: true } },
             workflow: {
               include: {
                 steps: { orderBy: { order: 'asc' }, include: { assignee: { select: { id: true, name: true, role: true } } } },
@@ -71,6 +77,7 @@ export async function GET(request: NextRequest) {
         where: { ...where, parentTaskId: null },
         include: {
           owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+          assignedBy: { select: { id: true, name: true, role: true } },
           taskSteps: {
             orderBy: { order: 'asc' },
             include: { assignee: { select: { id: true, name: true, role: true } } },
@@ -91,6 +98,7 @@ export async function GET(request: NextRequest) {
         where: { ...where, parentTaskId: null },
         include: {
           owner: { select: { id: true, name: true, email: true, role: true, department: true, avatar: true } },
+          assignedBy: { select: { id: true, name: true, role: true } },
           taskSteps: {
             orderBy: { order: 'asc' },
             include: { assignee: { select: { id: true, name: true, role: true } } },
@@ -125,6 +133,7 @@ export async function POST(request: NextRequest) {
       title, description, priority, ownerId, dueDate, parentTaskId,
       department, category,
       frequency, weekDays, monthDates,
+      assignedById,
     } = body
 
     if (!title || !ownerId) {
@@ -142,6 +151,7 @@ export async function POST(request: NextRequest) {
         status: WorkflowStatus.IN_PROGRESS,
         priority: priority || TaskPriority.MEDIUM,
         ownerId,
+        assignedById: assignedById || null,
         department: department || null,
         category: category || null,
         dueDate: dueDate ? new Date(dueDate) : null,
@@ -165,6 +175,7 @@ export async function POST(request: NextRequest) {
       },
       include: {
         owner: { select: { id: true, name: true, email: true, role: true, department: true } },
+        assignedBy: { select: { id: true, name: true, role: true } },
         workflow: { select: { id: true, title: true, status: true } },
         taskSteps: { orderBy: { order: 'asc' } },
       },

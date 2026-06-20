@@ -52,8 +52,8 @@ export function LaxreeEaMyTasks() {
   const { currentUserId, currentUserName, addToast, setSelectedTaskId, setCreateTaskOpen } = useWorkflowStore()
   const queryClient = useQueryClient()
 
-  // Today / Upcoming / Overdue / All filter — 'all' is the default and shows every active task regardless of due date
-  const [taskTab, setTaskTab] = useState<'today' | 'upcoming' | 'overdue' | 'all'>('all')
+  // Today / Upcoming / Overdue / Complete / All filter — 'all' is the default and shows every active task regardless of due date
+  const [taskTab, setTaskTab] = useState<'today' | 'upcoming' | 'complete' | 'overdue' | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [priorityFilter, setPriorityFilter] = useState<string>('')
 
@@ -135,12 +135,15 @@ export function LaxreeEaMyTasks() {
   )
   const upcomingTasks = filtered.filter((t: any) => t.dueDate && isUpcoming(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
   const overdueTasks = filtered.filter((t: any) => t.dueDate && isOverdue(t.dueDate) && t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
+  // 'complete' = tasks that have been marked COMPLETED
+  const completedTasks = filtered.filter((t: any) => t.status === 'COMPLETED')
   // 'all' = every active task (excludes COMPLETED/CANCELLED) regardless of whether it has a dueDate
   const allTabTasks = filtered.filter((t: any) => t.status !== 'COMPLETED' && t.status !== 'CANCELLED')
 
   const tabTasks =
     taskTab === 'today' ? todayTasks
     : taskTab === 'upcoming' ? upcomingTasks
+    : taskTab === 'complete' ? completedTasks
     : taskTab === 'overdue' ? overdueTasks
     : allTabTasks
 
@@ -148,6 +151,7 @@ export function LaxreeEaMyTasks() {
     { id: 'all' as const, label: 'All', count: allTabTasks.length },
     { id: 'today' as const, label: 'Today', count: todayTasks.length },
     { id: 'upcoming' as const, label: 'Upcoming', count: upcomingTasks.length },
+    { id: 'complete' as const, label: 'Complete', count: completedTasks.length },
     { id: 'overdue' as const, label: 'Overdue', count: overdueTasks.length },
   ]
 
@@ -291,6 +295,8 @@ export function LaxreeEaMyTasks() {
               <div style={{ fontWeight: 700, fontSize: 14 }}>
                 {taskTab === 'all'
                   ? 'No active tasks assigned to you'
+                  : taskTab === 'complete'
+                  ? 'No completed tasks yet'
                   : `No ${taskTab} tasks`}
               </div>
               <div style={{ fontSize: 12, marginTop: 4 }}>
@@ -300,6 +306,8 @@ export function LaxreeEaMyTasks() {
                   ? 'You have no tasks due today — switch to "All" to see every task.'
                   : taskTab === 'upcoming'
                   ? 'No upcoming tasks scheduled — switch to "All" to see every task.'
+                  : taskTab === 'complete'
+                  ? 'Tasks you finish will appear here for your records.'
                   : 'No overdue tasks — great job staying on track! Switch to "All" to see every task.'}
               </div>
               {taskTab !== 'all' && (

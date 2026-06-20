@@ -77,14 +77,19 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 }
 
 function ActiveView() {
-  const { activePage, currentRole } = useWorkflowStore()
+  const { activePage, currentRole, currentUserId, currentUserName } = useWorkflowStore()
 
   const isAdmin = currentRole === 'ADMIN'
   const isEA = currentRole === 'EA'
+  const isDirector = currentRole === 'DIRECTOR'
 
   const renderView = () => {
     switch (activePage) {
       case 'dashboard':
+        // DIRECTOR sees the same admin dashboard UI, but filtered to only tasks they assigned
+        if (isDirector) {
+          return <LaxreeDashboard assignedById={currentUserId} directorName={currentUserName || 'Director'} />
+        }
         return <LaxreeDashboard />
       case 'executive':
         // Executive View is ADMIN-only — EA gets redirected to dashboard
@@ -92,8 +97,15 @@ function ActiveView() {
         return <ExecutiveView />
       // approvals removed
       case 'tasks':
+        // DIRECTOR sees only tasks they assigned
+        if (isDirector) {
+          return <LaxreeTasks assignedById={currentUserId} />
+        }
         return <LaxreeTasks />
       case 'cancelled':
+        if (isDirector) {
+          return <LaxreeTasks showCancelled assignedById={currentUserId} />
+        }
         return <LaxreeTasks showCancelled />
       case 'analytics':
         return <AnalyticsView />

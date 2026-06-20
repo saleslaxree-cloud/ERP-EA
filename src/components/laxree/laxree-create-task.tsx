@@ -10,19 +10,37 @@ const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 const FREQUENCIES = ['One Time', 'Daily', 'Weekly', 'Monthly']
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+// Hardcoded director options — only these two directors can assign tasks.
+// The IDs match the DIRECTOR-role users in the seed file & auth route:
+//   - Samarth Sir (DIRECTOR login: samarth / Samarth@2025 → user-dir4)
+//   - Ashish Sir  (DIRECTOR login: ashish  / Ashish@2025  → user-dir3)
+// Tasks created with one of these IDs will appear on that director's dashboard.
+const DIRECTOR_OPTIONS = [
+  { id: 'user-dir4', name: 'Samarth Sir' },
+  { id: 'user-dir3', name: 'Ashish Sir' },
+]
+
 interface TaskStep {
   title: string
 }
 
 export function LaxreeCreateTask() {
-  const { createTaskOpen, setCreateTaskOpen, addToast, currentUserId } = useWorkflowStore()
+  const { createTaskOpen, setCreateTaskOpen, addToast, currentUserId, currentUserName, currentRole } = useWorkflowStore()
   const qc = useQueryClient()
   const [saving, setSaving] = useState(false)
+
+  // Default "Assigned By" — if the current user is one of the two directors, pre-select them.
+  // Otherwise default to Samarth Sir.
+  const defaultAssignedById = (() => {
+    const match = DIRECTOR_OPTIONS.find(d => d.id === currentUserId || d.name === currentUserName)
+    return match?.id || DIRECTOR_OPTIONS[0].id
+  })()
 
   const [form, setForm] = useState({
     title: '', description: '', assignTo: '', department: '',
     category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '',
     frequency: 'One Time',
+    assignedById: defaultAssignedById,
   })
 
   const [selectedWeekDays, setSelectedWeekDays] = useState<string[]>([])
@@ -98,6 +116,7 @@ export function LaxreeCreateTask() {
           description: form.description || undefined,
           priority: form.priority,
           ownerId: user?.id || currentUserId,
+          assignedById: form.assignedById || undefined,
           dueDate: form.dueDate || undefined,
           department: form.department || undefined,
           category: form.category,
@@ -115,8 +134,9 @@ export function LaxreeCreateTask() {
         qc.invalidateQueries({ queryKey: ['dashboard'] })
         qc.invalidateQueries({ queryKey: ['emp-tasks'] })
         qc.invalidateQueries({ queryKey: ['emp-leaves-sidebar'] })
+        qc.invalidateQueries({ queryKey: ['director-dashboard'] })
         setCreateTaskOpen(false)
-        setForm({ title: '', description: '', assignTo: '', department: '', category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '', frequency: 'One Time' })
+        setForm({ title: '', description: '', assignTo: '', department: '', category: CATEGORIES[0], priority: 'MEDIUM', dueDate: '', frequency: 'One Time', assignedById: defaultAssignedById })
         setSteps([])
         setSelectedWeekDays([])
         setSelectedMonthDates([])
@@ -180,6 +200,29 @@ export function LaxreeCreateTask() {
                 <option value="">Select department</option>
                 {DEPTS.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
+            </div>
+          </div>
+
+          {/* Assigned By (Director) — only 2 directors */}
+          <div className="form-row fr-2">
+            <div className="fg">
+              <label>Assigned By <span style={{ color: 'var(--red)' }}>*</span></label>
+              <select className="fi" value={form.assignedById} onChange={e => updateField('assignedById', e.target.value)}>
+                {DIRECTOR_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
+                Director who is assigning this task — each director sees only their own tasks.
+              </div>
+            </div>
+            <div className="fg">
+              <label>&nbsp;</label>
+              <div style={{
+                padding: '10px 12px', borderRadius: 8,
+                background: 'rgba(109,40,217,.06)', border: '1px solid rgba(109,40,217,.15)',
+                fontSize: 11, color: '#6D28D9', fontWeight: 700,
+              }}>
+                {DIRECTOR_OPTIONS.find(d => d.id === form.assignedById)?.name} will see this task on their Director Dashboard.
+              </div>
             </div>
           </div>
 

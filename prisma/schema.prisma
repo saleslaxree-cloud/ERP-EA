@@ -34,6 +34,7 @@ model User {
   delegatedFrom      Delegation[]        @relation("DelegatedFrom")
   comments           Comment[]           @relation("CommentAuthor")
   tasks              Task[]              @relation("TaskOwner")
+  assignedTasks      Task[]              @relation("TaskAssignedBy")  // Tasks this user (director) assigned
   assignedTaskSteps  TaskStep[]          @relation("StepAssigneeTask")
   managedProjects    Project[]           @relation("ProjectManager")
   deptHead           Department[]        @relation("DeptHead")
@@ -158,6 +159,7 @@ model Task {
   status          String    @default("PENDING")
   priority        String    @default("MEDIUM")
   ownerId         String
+  assignedById    String?  // Director who assigned the task (Samarth Sir / Ashish Sir)
   department      String?
   category        String?
   dueDate         DateTime?
@@ -168,6 +170,7 @@ model Task {
 
   workflow        WorkflowInstance? @relation(fields: [workflowId], references: [id])
   owner           User              @relation("TaskOwner", fields: [ownerId], references: [id])
+  assignedBy      User?             @relation("TaskAssignedBy", fields: [assignedById], references: [id])
   parentTask      Task?             @relation("TaskChildren", fields: [parentTaskId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   subTasks        Task[]            @relation("TaskChildren")
   dependencies    TaskDependency[]  @relation("TaskDependsOn")
