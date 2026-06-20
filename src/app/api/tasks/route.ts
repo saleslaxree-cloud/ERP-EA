@@ -8,23 +8,34 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status')
     const assignedTo = request.nextUrl.searchParams.get('assignedTo')
     const assignedById = request.nextUrl.searchParams.get('assignedById')
+    // strictAssignedBy=1 — when set, ONLY return tasks where assignedById === X.
+    // Used by FOUNDER role so they see ONLY the tasks THEY assigned (no legacy NULL fallback).
+    // When omitted (DIRECTOR case), legacy NULL-assignedBy tasks are also shown so no
+    // historical data disappears.
+    const strictAssignedBy = request.nextUrl.searchParams.get('strictAssignedBy') === '1'
 
-    console.log('[tasks] GET params:', { userId, status, assignedTo, assignedById })
+    console.log('[tasks] GET params:', { userId, status, assignedTo, assignedById, strictAssignedBy })
 
     const where: Record<string, unknown> = {}
     if (userId) where.ownerId = userId
     if (status) where.status = status
-    // ─── BACKWARD COMPATIBILITY ──────────────────────────────────────
-    // Old tasks created BEFORE the `assignedById` field was added have NULL values.
-    // These tasks belong to no specific director — we show them to ALL directors so
-    // no historical data is "lost" when a director logs in.
-    // New tasks (created via the form with explicit Assigned By) appear ONLY on the
-    // assigned director's dashboard, as intended.
+    // ─── ASSIGNED-BY FILTER ───────────────────────────────────────────
+    // Two modes:
+    //   • strictAssignedBy=1 (FOUNDER): only tasks where assignedById === X.
+    //     Founder sees ONLY tasks they assigned — never other people's tasks
+    //     and never legacy NULL-assignedBy tasks.
+    //   • default (DIRECTOR): tasks where assignedById === X OR assignedById IS NULL.
+    //     Legacy NULL-assignedBy tasks (created before the field existed) are shown
+    //     to ALL directors so historical data is never hidden.
     if (assignedById) {
-      where.OR = [
-        { assignedById: assignedById },
-        { assignedById: null },
-      ]
+      if (strictAssignedBy) {
+        where.assignedById = assignedById
+      } else {
+        where.OR = [
+          { assignedById: assignedById },
+          { assignedById: null },
+        ]
+      }
     }
 
     // ─── DIAGNOSTIC: First, try a minimal query to see if DB itself is reachable ──
@@ -45,6 +56,7 @@ export async function GET(request: NextRequest) {
         if (msg.includes('assignedbyid') && msg.includes('does not exist')) {
           console.warn('[tasks] assignedById column missing in DB — dropping assignedById filter (showing all tasks)')
           delete where.OR
+          delete where.assignedById
         } else {
           throw probeErr
         }
@@ -62,12 +74,17 @@ export async function GET(request: NextRequest) {
       if (taskIdsFromSteps.length > 0) {
         const stepWhere: Record<string, unknown> = { id: { in: taskIdsFromSteps }, parentTaskId: null }
         if (status) stepWhere.status = status
-        // Same NULL-compatible filter as the main `where` above
+        // Same ASSIGNED-BY filter as the main `where` above — strict for FOUNDER,
+        // legacy-NULL-compatible for DIRECTOR.
         if (assignedById) {
-          stepWhere.OR = [
-            { assignedById: assignedById },
-            { assignedById: null },
-          ]
+          if (strictAssignedBy) {
+            stepWhere.assignedById = assignedById
+          } else {
+            stepWhere.OR = [
+              { assignedById: assignedById },
+              { assignedById: null },
+            ]
+          }
         }
         assignedStepTasks = await db.task.findMany({
           where: stepWhere,

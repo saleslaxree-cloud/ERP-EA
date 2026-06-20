@@ -8,10 +8,11 @@ const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#
 function avatarColor(name: string) { let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h); return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length] }
 function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) }
 
-const ROLES = ['ADMIN', 'EA', 'DIRECTOR', 'MANAGER', 'EMPLOYEE']
+const ROLES = ['FOUNDER', 'ADMIN', 'EA', 'DIRECTOR', 'MANAGER', 'EMPLOYEE']
 const DEPARTMENTS = ['Sales', 'Back Office', 'Accounts', 'Management']
 
 function getLoginUsername(user: any): string {
+  if (user.role === 'FOUNDER') return 'founder'
   if (user.role === 'ADMIN') return 'admin'
   if (user.role === 'EA') return 'ea'
   return (user.name || '').split(' ')[0].toLowerCase()
@@ -191,6 +192,7 @@ export function LaxreeUserManagement() {
   }
 
   const roleBadgeStyle: Record<string, { bg: string; color: string }> = {
+    FOUNDER: { bg: 'linear-gradient(135deg, #FEF3C7, #FDE68A)', color: '#8B6914' },
     ADMIN: { bg: '#FEE2E2', color: '#DC2626' },
     EA: { bg: '#EDE9FE', color: '#6D28D9' },
     DIRECTOR: { bg: '#DBEAFE', color: '#1D4ED8' },
@@ -199,6 +201,7 @@ export function LaxreeUserManagement() {
   }
 
   // Stats
+  const founderCount = users.filter((u: any) => u.role === 'FOUNDER').length
   const adminCount = users.filter((u: any) => u.role === 'ADMIN' || u.role === 'EA').length
   const directorCount = users.filter((u: any) => u.role === 'DIRECTOR').length
   const managerCount = users.filter((u: any) => u.role === 'MANAGER').length
@@ -363,7 +366,7 @@ export function LaxreeUserManagement() {
 
       {/* Filter Tabs */}
       <div className="tabs" style={{ marginBottom: 14 }}>
-        {['ALL', 'ADMIN', 'EA', 'DIRECTOR', 'MANAGER', 'EMPLOYEE'].map(role => (
+        {['ALL', 'FOUNDER', 'ADMIN', 'EA', 'DIRECTOR', 'MANAGER', 'EMPLOYEE'].map(role => (
           <div key={role} className={`tab${filterRole === role ? ' active' : ''}`}
             onClick={() => setFilterRole(role)}>
             {role === 'ALL' ? 'All Users' : role}

@@ -2,7 +2,7 @@ import { create } from 'zustand'
 
 type ActiveView = 'dashboard' | 'workflows' | 'tasks' | 'notifications' | 'executive' | 'analytics' | 'performance' | 'departments' | 'team' | 'escalations' | 'cancelled' | 'categories' | 'director-dependency' | 'employees' | 'projects' | 'reports' | 'scorecards' | 'settings' | 'monday' | 'dirDep' | 'exthold' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ai-assistant' | 'user-management'
 
-type UserRole = 'ADMIN' | 'DIRECTOR' | 'EA' | 'MANAGER' | 'EMPLOYEE'
+type UserRole = 'FOUNDER' | 'ADMIN' | 'DIRECTOR' | 'EA' | 'MANAGER' | 'EMPLOYEE'
 
 interface Toast {
   id: string
@@ -138,6 +138,7 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     // We'll use a separate login function that calls the API
     // For now, keep the fallback client-side check
     const users: Record<string, { password: string; role: UserRole; name: string; userId: string }> = {
+      founder: { password: 'Founder@2025', role: 'FOUNDER', name: 'Founder Sir', userId: 'user-founder1' },
       admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Samarth Sir', userId: 'user-admin' },
       ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
       ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },

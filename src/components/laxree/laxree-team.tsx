@@ -213,6 +213,8 @@ export function LaxreeTeam() {
               <div className="fg">
                 <label>Role</label>
                 <select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}>
+                  <option value="FOUNDER">Founder</option>
+                  <option value="ADMIN">Admin</option>
                   <option value="EMPLOYEE">Employee</option>
                   <option value="MANAGER">Manager</option>
                   <option value="EA">EA (Executive Assistant)</option>

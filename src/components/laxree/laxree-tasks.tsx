@@ -10,17 +10,19 @@ interface LaxreeTasksProps {
   showCancelled?: boolean
   showExtHold?: boolean
   showEscalations?: boolean
-  assignedById?: string  // When set (Director view), only tasks assigned by this director are shown
+  assignedById?: string  // When set (Director/Founder view), only tasks assigned by this user are shown
+  strictAssignedBy?: boolean  // When true (FOUNDER), only tasks with assignedById === X (no NULL fallback)
 }
 
-export function LaxreeTasks({ showCancelled, showExtHold, showEscalations, assignedById }: LaxreeTasksProps) {
+export function LaxreeTasks({ showCancelled, showExtHold, showEscalations, assignedById, strictAssignedBy }: LaxreeTasksProps) {
   const { currentUser, taskTab, setTaskTab, setSelectedTaskId, selectedTaskId, addToast, setCreateTaskOpen, currentRole, currentUserId } = useWorkflowStore()
   const queryClient = useQueryClient()
 
-  // ADMIN and EA can mark tasks as Done / Revise / Edit / Delete
-  const canModifyTask = currentRole === 'ADMIN' || currentRole === 'EA'
-  // ADMIN and EA can see ALL tasks (and filter by employee). Employees only see their own.
-  const canSeeAllTasks = currentRole === 'ADMIN' || currentRole === 'EA'
+  // ADMIN, EA, and FOUNDER can mark tasks as Done / Revise / Edit / Delete
+  // (FOUNDER has full admin-level control over the tasks they assigned)
+  const canModifyTask = currentRole === 'ADMIN' || currentRole === 'EA' || currentRole === 'FOUNDER'
+  // ADMIN, EA, and FOUNDER can see ALL tasks (and filter by employee). Employees only see their own.
+  const canSeeAllTasks = currentRole === 'ADMIN' || currentRole === 'EA' || currentRole === 'FOUNDER'
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [editTask, setEditTask] = useState<any>(null)
   const [confirmAction, setConfirmAction] = useState<{ id: string; action: string } | null>(null)
@@ -36,9 +38,11 @@ export function LaxreeTasks({ showCancelled, showExtHold, showEscalations, assig
   const [reviseNextDate, setReviseNextDate] = useState('')
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks-list', assignedById],
+    queryKey: ['tasks-list', assignedById, strictAssignedBy ? 'strict' : 'legacy'],
     queryFn: async () => {
-      const url = assignedById ? `/api/tasks?assignedById=${assignedById}` : '/api/tasks'
+      const url = assignedById
+        ? `/api/tasks?assignedById=${assignedById}${strictAssignedBy ? '&strictAssignedBy=1' : ''}`
+        : '/api/tasks'
       const res = await fetch(url)
       if (!res.ok) throw new Error('Failed to fetch tasks')
       return res.json()

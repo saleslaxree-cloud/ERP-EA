@@ -15,6 +15,9 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 //   - Samarth Sir (DIRECTOR login: samarth / Samarth@2025 → user-dir4)
 //   - Ashish Sir  (DIRECTOR login: ashish  / Ashish@2025  → user-dir3)
 // Tasks created with one of these IDs will appear on that director's dashboard.
+// FOUNDER is NOT in this list because when FOUNDER creates a task, we auto-set
+// assignedById to FOUNDER's userId (currentUserId) — FOUNDER is always the assigner
+// of their own tasks. They don't pick from this dropdown.
 const DIRECTOR_OPTIONS = [
   { id: 'user-dir4', name: 'Samarth Sir' },
   { id: 'user-dir3', name: 'Ashish Sir' },
@@ -29,9 +32,14 @@ export function LaxreeCreateTask() {
   const qc = useQueryClient()
   const [saving, setSaving] = useState(false)
 
-  // Default "Assigned By" — if the current user is one of the two directors, pre-select them.
-  // Otherwise default to Samarth Sir.
+  // Default "Assigned By" —
+  // • If FOUNDER is creating the task: always themselves (currentUserId). FOUNDER is the
+  //   assigner of every task they create. The dropdown is hidden when FOUNDER is logged in.
+  // • If a known director is creating: pre-select themselves.
+  // • Otherwise (ADMIN/EA): default to Samarth Sir.
+  const isFounder = currentRole === 'FOUNDER'
   const defaultAssignedById = (() => {
+    if (isFounder) return currentUserId
     const match = DIRECTOR_OPTIONS.find(d => d.id === currentUserId || d.name === currentUserName)
     return match?.id || DIRECTOR_OPTIONS[0].id
   })()
@@ -116,7 +124,9 @@ export function LaxreeCreateTask() {
           description: form.description || undefined,
           priority: form.priority,
           ownerId: user?.id || currentUserId,
-          assignedById: form.assignedById || undefined,
+          // FOUNDER is ALWAYS the assigner of their own tasks — override any
+          // UI state to guarantee this. (For ADMIN/EA/DIRECTOR, use the dropdown.)
+          assignedById: isFounder ? currentUserId : (form.assignedById || undefined),
           dueDate: form.dueDate || undefined,
           department: form.department || undefined,
           category: form.category,
@@ -203,16 +213,37 @@ export function LaxreeCreateTask() {
             </div>
           </div>
 
-          {/* Assigned By (Director) — only 2 directors */}
+          {/* Assigned By (Director) — only 2 directors. FOUNDER sees a locked badge instead. */}
           <div className="form-row fr-2">
             <div className="fg">
-              <label>Assigned By <span style={{ color: 'var(--red)' }}>*</span></label>
-              <select className="fi" value={form.assignedById} onChange={e => updateField('assignedById', e.target.value)}>
-                {DIRECTOR_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </select>
-              <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
-                Director who is assigning this task — each director sees only their own tasks.
-              </div>
+              <label>Assigned By {isFounder ? null : <span style={{ color: 'var(--red)' }}>*</span>}</label>
+              {isFounder ? (
+                <>
+                  <div style={{
+                    padding: '10px 12px', borderRadius: 8,
+                    background: 'linear-gradient(135deg, rgba(139,105,20,.12), rgba(212,170,80,.18))',
+                    border: '1px solid rgba(139,105,20,.35)',
+                    fontSize: 12, color: '#8B6914', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{ fontSize: 14 }}>👑</span>
+                    <span>{currentUserName || 'Founder'} (FOUNDER)</span>
+                    <span style={{ marginLeft: 'auto', fontSize: 10, opacity: 0.7 }}>auto-assigned</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
+                    Every task you create is auto-assigned to you. It will appear on your Founder Dashboard with live progress.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <select className="fi" value={form.assignedById} onChange={e => updateField('assignedById', e.target.value)}>
+                    {DIRECTOR_OPTIONS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                  <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
+                    Director who is assigning this task — each director sees only their own tasks.
+                  </div>
+                </>
+              )}
             </div>
             <div className="fg">
               <label>&nbsp;</label>
@@ -221,7 +252,9 @@ export function LaxreeCreateTask() {
                 background: 'rgba(109,40,217,.06)', border: '1px solid rgba(109,40,217,.15)',
                 fontSize: 11, color: '#6D28D9', fontWeight: 700,
               }}>
-                {DIRECTOR_OPTIONS.find(d => d.id === form.assignedById)?.name} will see this task on their Director Dashboard.
+                {isFounder
+                  ? `${currentUserName || 'Founder'} will see this task on their Founder Dashboard.`
+                  : `${DIRECTOR_OPTIONS.find(d => d.id === form.assignedById)?.name} will see this task on their Director Dashboard.`}
               </div>
             </div>
           </div>

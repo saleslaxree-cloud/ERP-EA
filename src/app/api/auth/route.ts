@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 
 // Fallback credentials for when database credentials are not set yet (first-time setup)
 const FALLBACK_CREDENTIALS: Record<string, { password: string; role: string; name: string; userId: string }> = {
+  founder: { password: 'Founder@2025', role: 'FOUNDER', name: 'Founder Sir', userId: 'user-founder1' },
   admin: { password: 'Laxree@2025', role: 'ADMIN', name: 'Samarth Sir', userId: 'user-admin' },
   ea: { password: 'EA@Laxree', role: 'EA', name: 'Arti Sharma', userId: 'user-ea1' },
   ashish: { password: 'Ashish@2025', role: 'DIRECTOR', name: 'Ashish Sir', userId: 'user-dir3' },
@@ -71,6 +72,40 @@ export async function POST(request: NextRequest) {
       dbMatch = await db.user.findFirst({
         where: { role: cred.role as any, isActive: true },
       })
+    }
+
+    // ─── AUTO-CREATE missing fallback user (e.g., FOUNDER) ───────────────
+    // The FOUNDER role is new — its user record (user-founder1) doesn't exist
+    // in the production DB yet. Without it, the foreign-key constraint on
+    // Task.assignedById would reject any task FOUNDER assigns. To avoid this
+    // (and to avoid asking the user to manually run a seed), we lazily create
+    // the user record on first login. This is purely additive — it does NOT
+    // modify or delete any existing data.
+    if (!dbMatch && cred.userId) {
+      try {
+        dbMatch = await db.user.create({
+          data: {
+            id: cred.userId,
+            email: `${cred.userId}@laxree.com`,
+            name: cred.name,
+            role: cred.role,
+            department: 'Management',
+            designation: cred.role === 'FOUNDER' ? 'Founder' : cred.role.charAt(0) + cred.role.slice(1).toLowerCase(),
+            isActive: true,
+            loginUsername: username.toLowerCase(),
+            loginPassword: password,
+            joinDate: new Date(),
+          },
+        })
+        console.log(`[auth] Auto-created ${cred.role} user "${cred.name}" (id=${cred.userId})`)
+      } catch (createErr) {
+        // Race condition: another concurrent login already created it.
+        // Re-fetch instead of crashing.
+        console.warn('[auth] Auto-create failed, refetching:', createErr)
+        dbMatch = await db.user.findFirst({ where: { id: cred.userId } })
+          || await db.user.findFirst({ where: { loginUsername: username.toLowerCase() } })
+          || null
+      }
     }
 
     return NextResponse.json({

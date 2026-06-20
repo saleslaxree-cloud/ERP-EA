@@ -82,31 +82,46 @@ function ActiveView() {
   const isAdmin = currentRole === 'ADMIN'
   const isEA = currentRole === 'EA'
   const isDirector = currentRole === 'DIRECTOR'
-  // DIRECTOR gets the same admin-level access (Executive View, Monday Meeting, etc.)
+  const isFounder = currentRole === 'FOUNDER'
+  // DIRECTOR + FOUNDER get the same admin-level access (Executive View, Monday Meeting, etc.)
   // — only difference is task data is filtered to tasks they assigned.
-  const isAdminOrDirector = isAdmin || isDirector
+  // FOUNDER uses STRICT filter (only their own tasks, no legacy NULL fallback).
+  // DIRECTOR uses legacy-NULL-compatible filter (their tasks + NULL-assignedBy tasks).
+  const isAdminOrDirector = isAdmin || isDirector || isFounder
 
   const renderView = () => {
     switch (activePage) {
       case 'dashboard':
-        // DIRECTOR sees the same admin dashboard UI, but filtered to only tasks they assigned
-        // (plus legacy NULL-assignedBy tasks so no historical data disappears).
+        // FOUNDER: STRICT filter — sees ONLY tasks they assigned (no NULL fallback)
+        if (isFounder) {
+          return <LaxreeDashboard assignedById={currentUserId} strictAssignedBy directorName="Founder" />
+        }
+        // DIRECTOR: legacy-NULL-compatible filter — sees their tasks + NULL-assignedBy tasks
         if (isDirector) {
           return <LaxreeDashboard assignedById={currentUserId} directorName={currentUserName || 'Director'} />
         }
+        // ADMIN/EA: no filter — sees ALL tasks
         return <LaxreeDashboard />
       case 'executive':
-        // Executive View is ADMIN+DIRECTOR — EA gets redirected to dashboard
+        // Executive View is ADMIN+DIRECTOR+FOUNDER — EA gets redirected to dashboard
         if (!isAdminOrDirector) return <LaxreeDashboard />
         return <ExecutiveView />
       // approvals removed
       case 'tasks':
-        // DIRECTOR sees only tasks they assigned (plus legacy NULL-assignedBy tasks)
+        // FOUNDER: STRICT filter — sees ONLY tasks they assigned
+        if (isFounder) {
+          return <LaxreeTasks assignedById={currentUserId} strictAssignedBy />
+        }
+        // DIRECTOR: legacy-NULL-compatible filter
         if (isDirector) {
           return <LaxreeTasks assignedById={currentUserId} />
         }
+        // ADMIN/EA: no filter
         return <LaxreeTasks />
       case 'cancelled':
+        if (isFounder) {
+          return <LaxreeTasks showCancelled assignedById={currentUserId} strictAssignedBy />
+        }
         if (isDirector) {
           return <LaxreeTasks showCancelled assignedById={currentUserId} />
         }
@@ -657,6 +672,8 @@ function TeamView() {
               <div className="fg">
                 <label>Role</label>
                 <select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}>
+                  <option value="FOUNDER">Founder</option>
+                  <option value="ADMIN">Admin</option>
                   <option value="EMPLOYEE">Employee</option>
                   <option value="MANAGER">Manager</option>
                   <option value="EA">EA (Executive Assistant)</option>
@@ -884,7 +901,7 @@ function EmployeesView() {
               <div className="fg"><label>Email <span style={{ color: 'var(--red)' }}>*</span></label><input className="fi" type="email" placeholder="Enter email" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} /></div>
             </div>
             <div className="form-row fr-2">
-              <div className="fg"><label>Role</label><select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="EA">EA</option><option value="DIRECTOR">Director</option></select></div>
+              <div className="fg"><label>Role</label><select className="fi" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}><option value="FOUNDER">Founder</option><option value="ADMIN">Admin</option><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="EA">EA</option><option value="DIRECTOR">Director</option></select></div>
               <div className="fg"><label>Department</label><select className="fi" value={addForm.department} onChange={e => setAddForm({ ...addForm, department: e.target.value })}><option value="">Select</option><option value="Sales">Sales</option><option value="Account">Account</option><option value="HR">HR</option><option value="Coordinator">Coordinator</option><option value="Back Office">Back Office</option><option value="Admin">Admin</option><option value="Management">Management</option></select></div>
             </div>
             <div className="form-row fr-2">

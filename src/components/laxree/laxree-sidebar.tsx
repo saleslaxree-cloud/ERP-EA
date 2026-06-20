@@ -19,13 +19,18 @@ export function LaxreeSidebar() {
   const isAdmin = currentRole === 'ADMIN'
   const isEA = currentRole === 'EA'
   const isDirector = currentRole === 'DIRECTOR'
+  const isFounder = currentRole === 'FOUNDER'
   const isEmployee = currentRole === 'EMPLOYEE' || currentRole === 'MANAGER'
 
   // Fetch dashboard stats for sidebar badges
+  // FOUNDER uses STRICT assignedById filter (only their own tasks).
+  // DIRECTOR uses legacy-NULL-compatible filter (their tasks + NULL-assignedBy tasks).
+  // ADMIN/EA see ALL tasks (no filter).
+  const assignedByParam = (isFounder || isDirector) ? `&assignedById=${currentUserId}${isFounder ? '&strictAssignedBy=1' : ''}` : ''
   const { data: dashData } = useQuery({
-    queryKey: ['sidebar-stats', currentUserId],
-    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}${isDirector ? `&assignedById=${currentUserId}` : ''}`).then(r => r.json()),
-    enabled: !!currentUserId && (isAdmin || isEA || isDirector),
+    queryKey: ['sidebar-stats', currentUserId, isFounder ? 'strict' : 'legacy'],
+    queryFn: () => fetch(`/api/dashboard?userId=${currentUserId}${assignedByParam}`).then(r => r.json()),
+    enabled: !!currentUserId && (isAdmin || isEA || isDirector || isFounder),
   })
 
   const d = dashData as any
@@ -39,11 +44,11 @@ export function LaxreeSidebar() {
   })
   const empPendingLeaves = (empLeavesData as any)?.leaves?.filter((l: any) => l.status === 'PENDING')?.length || 0
 
-  // Fetch ALL pending leaves count for Admin/EAs
+  // Fetch ALL pending leaves count for Admin/EAs/Founder
   const { data: eaLeavesData } = useQuery({
     queryKey: ['ea-leaves-sidebar'],
     queryFn: () => fetch('/api/leaves?status=PENDING').then(r => r.json()),
-    enabled: isAdmin || isEA,
+    enabled: isAdmin || isEA || isFounder,
     refetchInterval: 5000,
   })
   const eaPendingLeaves = (eaLeavesData as any)?.leaves?.length || 0
@@ -214,6 +219,26 @@ export function LaxreeSidebar() {
     },
   ]
 
+  // ═══════════════════════════════════════════════════════════
+  // FOUNDER SIDEBAR — Same rich layout as ADMIN (CEO Command Center,
+  // Weekly Review, Scorecard, All Tasks, Intelligence, Departments,
+  // Management). The ONLY difference: when the Founder navigates to
+  // Dashboard or All Tasks, the data is STRICTLY filtered to tasks they
+  // assigned (assignedById === currentUserId, NO legacy NULL fallback).
+  // Founder sees ONLY their own assigned tasks + their progress.
+  // ═══════════════════════════════════════════════════════════
+  const founderDashboard: NavItem[] = [
+    {
+      id: 'dashboard', label: 'Founder Dashboard',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /></svg>,
+    },
+    {
+      id: 'executive', label: 'Executive View',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>,
+      badge: <span className="nb nb-new">FOUNDER</span>,
+    },
+  ]
+
   const directorTasks: NavItem[] = [
     {
       id: 'tasks', label: 'All Tasks',
@@ -224,7 +249,22 @@ export function LaxreeSidebar() {
 
   let sections: { label: string; items: NavItem[] }[]
 
-  if (isDirector) {
+  if (isFounder) {
+    // FOUNDER gets the SAME rich sidebar as ADMIN — same Dashboard, Executive View,
+    // Monday Meeting, Scorecard, All Tasks, Analytics, Departments, Team, etc.
+    // The ONLY difference: when the Founder navigates to Dashboard or All Tasks,
+    // the data is STRICTLY filtered to tasks they assigned (no legacy NULL fallback,
+    // so Founder sees ONLY their own assigned tasks and their progress).
+    sections = [
+      { label: 'Founder Command Center', items: founderDashboard },
+      { label: 'Weekly Review', items: adminWeeklyReview },
+      { label: 'Scorecard', items: adminScorecard },
+      { label: 'Task Management', items: taskMgmt },
+      { label: 'Intelligence', items: intelligence },
+      { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
+      { label: 'Management', items: management },
+    ]
+  } else if (isDirector) {
     // DIRECTOR gets the SAME rich sidebar as ADMIN — same Dashboard, Executive View,
     // Monday Meeting, Scorecard, All Tasks, Analytics, Departments, Team, etc.
     // The ONLY difference: when the Director navigates to Dashboard or All Tasks,

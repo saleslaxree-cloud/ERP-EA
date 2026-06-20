@@ -6,15 +6,22 @@ export async function GET(request: NextRequest) {
   try {
     const userId = request.nextUrl.searchParams.get('userId')
     const assignedById = request.nextUrl.searchParams.get('assignedById')
+    // strictAssignedBy=1 — FOUNDER sees ONLY tasks they assigned (no NULL fallback).
+    // When omitted (DIRECTOR), legacy NULL-assignedBy tasks are also shown so historical
+    // data isn't hidden.
+    const strictAssignedBy = request.nextUrl.searchParams.get('strictAssignedBy') === '1'
     const now = new Date()
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000)
 
     // Common task filter — applied to every stat below.
-    // If `assignedById` is provided (director dashboard), only count tasks that director
-    // assigned — INCLUDING legacy tasks that have NULL `assignedById` (those were created
-    // before the field existed, so they belong to no specific director and are shown to
-    // EVERY director to avoid historical data loss).
+    // Two modes:
+    //   • strictAssignedBy=1 (FOUNDER): only count tasks where assignedById === X.
+    //     Founder sees ONLY tasks they assigned — never other people's tasks
+    //     and never legacy NULL-assignedBy tasks.
+    //   • default (DIRECTOR): tasks where assignedById === X OR assignedById IS NULL.
+    //     Legacy NULL-assignedBy tasks (created before the field existed) are shown
+    //     to ALL directors so historical data is never hidden.
     //
     // IMPORTANT: If the `assignedById` column doesn't exist in the DB yet (schema drift),
     // we fall back to `{}` (no filter) so the dashboard still loads — better to show ALL
@@ -23,12 +30,13 @@ export async function GET(request: NextRequest) {
     // ─── SCHEMA-DRIFT DEFENSE ────────────────────────────────────────────
     // We try a probe count with the assignedById filter. If it throws P2022 (column
     // missing), we know the column doesn't exist yet — reset taskWhere to `{}` and
-    // continue. This way, the dashboard loads for Admin/EA/Director even before
+    // continue. This way, the dashboard loads for Admin/EA/Director/Founder even before
     // `prisma db push` has synced the production schema.
-    let taskWhere: Record<string, unknown> = assignedById
-      ? { OR: [{ assignedById: assignedById }, { assignedById: null }] }
-      : {}
+    let taskWhere: Record<string, unknown> = {}
     if (assignedById) {
+      taskWhere = strictAssignedBy
+        ? { assignedById: assignedById }
+        : { OR: [{ assignedById: assignedById }, { assignedById: null }] }
       try {
         // Probe: if assignedById column doesn't exist, this throws P2022
         await db.task.count({ where: taskWhere })
