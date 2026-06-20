@@ -1,8 +1,24 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, DM_Sans, DM_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
+
+// ─── VIEWPORT (critical for mobile responsive) ────────────────────────────
+// Next.js 14+ App Router requires `viewport` export — meta tag inside <head>
+// is IGNORED. Without this, mobile browsers render at desktop width & shrink
+// down, making the app non-responsive.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,                    // allow zoom for accessibility
+  userScalable: true,
+  viewportFit: "cover",               // iPhone notch handling
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#8B6914" },
+    { media: "(prefers-color-scheme: dark)", color: "#8B6914" },
+  ],
+};
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -56,8 +72,7 @@ export default function RootLayout({
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />
-        <meta name="app-version" content="2026-06-19-v13-push-notifications" />
-        <meta name="theme-color" content="#8B6914" />
+        <meta name="app-version" content="2026-06-20-v19-all-device-compatible" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
