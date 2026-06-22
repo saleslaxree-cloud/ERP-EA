@@ -339,9 +339,28 @@ html:not(.dark) .logout-btn:hover{background:#ef4444;color:#fff}
 .sidebar{
   position:fixed;left:0;top:var(--tb-h);bottom:0;width:var(--sb-w);
   background:#1e293b;border-right:1px solid rgba(255,255,255,.08);
-  overflow-y:auto;z-index:200;padding:10px 0 80px;
+  overflow-y:auto;overflow-x:hidden;z-index:200;padding:10px 0 80px;
   transition:background .3s,border-color .3s,transform .3s ease;
+  -webkit-overflow-scrolling:touch;scroll-behavior:smooth;
+  scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;
 }
+/* Visible scrollbar for sidebar — dark mode (white thumb on dark track) */
+.sidebar::-webkit-scrollbar{width:8px;height:8px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{
+  background:rgba(255,255,255,.25);border-radius:4px;
+  border:2px solid transparent;background-clip:padding-box;
+}
+.sidebar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.45);background-clip:padding-box}
+.sidebar::-webkit-scrollbar-thumb:active{background:rgba(255,255,255,.6);background-clip:padding-box}
+/* Light mode sidebar scrollbar — dark thumb on light track */
+html:not(.dark) .sidebar{scrollbar-color:rgba(0,0,0,.25) transparent}
+html:not(.dark) .sidebar::-webkit-scrollbar-thumb{
+  background:rgba(0,0,0,.25);border-radius:4px;
+  border:2px solid transparent;background-clip:padding-box;
+}
+html:not(.dark) .sidebar::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.45);background-clip:padding-box}
+html:not(.dark) .sidebar::-webkit-scrollbar-thumb:active{background:rgba(0,0,0,.6);background-clip:padding-box}
 /* Sidebar toggle button — always visible on ALL devices (v20·0622) */
 .sidebar-toggle-btn{
   display:flex;align-items:center;justify-content:center;
@@ -712,13 +731,19 @@ textarea.fi{resize:vertical;min-height:80px}
 @media(max-width:768px){
   :root{--sb-w:0px;--tb-h:54px}
   .sidebar{
+    position:fixed;
+    top:var(--tb-h);            /* START BELOW topbar so toggle stays visible */
+    left:0;
+    bottom:0;                   /* extends to viewport bottom */
+    height:auto;                /* let top+bottom determine height = 100vh - tb-h */
+    width:min(280px,85vw);
     transform:translateX(-100%);
     transition:transform .3s ease;
-    width:min(280px,85vw);
     z-index:400;
-    top:0;
-    height:100vh;
-    padding-top:60px;
+    padding:10px 0 80px;        /* small top + footer space (no more 60px top pad) */
+    overflow-y:auto;            /* vertical scroll when content exceeds viewport */
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;  /* iOS momentum scroll */
     box-shadow:0 0 40px rgba(0,0,0,.3);
   }
   .sidebar.open{transform:translateX(0);box-shadow:var(--s3)}
@@ -819,8 +844,8 @@ button,.btn,.fi,.lf-i,.lf-btn,a[role="button"]{min-height:36px;touch-action:mani
   /* Page header: stack + smaller text */
   .ph{flex-direction:column;align-items:stretch;gap:8px}
   .ph-right{width:100%;justify-content:flex-start}
-  /* Sidebar: drawer overlay with backdrop */
-  .sidebar{position:fixed;top:0;left:0;height:100vh;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  /* Sidebar: drawer overlay with backdrop — BELOW topbar (v22·0622) */
+  .sidebar{position:fixed;top:var(--tb-h);left:0;bottom:0;height:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 0 40px rgba(0,0,0,.3)}
   .sb-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:399;backdrop-filter:blur(2px)}
   /* Inline styles that use fixed px widths need to wrap */
   [style*="display: flex"]{flex-wrap:wrap}
@@ -930,13 +955,21 @@ a,span,p,div{overflow-wrap:break-word;word-break:break-word}
     overflow-x:hidden;
   }
 
-  /* Sidebar — drawer overlay */
+  /* Sidebar — drawer overlay, positioned BELOW topbar (v22·0622 fix) */
   .sidebar{
-    position:fixed;top:0;left:0;height:100vh;
+    position:fixed;
+    top:var(--tb-h);            /* BELOW topbar — hamburger toggle stays visible */
+    left:0;
+    bottom:0;
+    height:auto;                /* = 100vh - tb-h */
     width:min(280px,85vw);
     transform:translateX(-100%);
     transition:transform .3s cubic-bezier(.4,0,.2,1);
-    z-index:400;padding-top:60px;
+    z-index:400;
+    padding:10px 0 80px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
     box-shadow:0 0 40px rgba(0,0,0,.3);
   }
   .sidebar.open{transform:translateX(0)}
