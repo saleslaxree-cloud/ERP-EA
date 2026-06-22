@@ -154,6 +154,7 @@ export async function GET(request: NextRequest) {
       const score = userTasks.length > 0 ? Math.round((done / userTasks.length) * 100 - overdue * 5) : 0
       return {
         id: user.id, name: user.name, department: user.department, role: user.role,
+        isActive: user.isActive,
         total: userTasks.length, done, inProgress, overdue,
         score: Math.max(0, score),
         completionRate: userTasks.length > 0 ? Math.round((done / userTasks.length) * 100) : 0,

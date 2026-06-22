@@ -179,12 +179,14 @@
   display:flex;align-items:center;
   box-shadow:0 1px 3px rgba(0,0,0,.06);
   transition:background .3s,border-color .3s;
+  padding-right:0;
 }
 .tb-brand{
-  width:var(--sb-w);flex-shrink:0;padding:0 18px;
-  display:flex;align-items:center;gap:10px;
+  width:var(--sb-w);flex-shrink:0;padding:0 12px;
+  display:flex;align-items:center;gap:6px;
   border-right:1px solid #e2e8f0;height:100%;
   background:#1e293b;
+  min-width:0;
 }
 .tb-brand-name{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#fff}
 .tb-center{flex:1;padding:0 20px;display:flex;align-items:center;gap:10px}
@@ -232,7 +234,23 @@
   position:fixed;left:0;top:var(--tb-h);bottom:0;width:var(--sb-w);
   background:#1e293b;border-right:1px solid rgba(255,255,255,.08);
   overflow-y:auto;z-index:200;padding:10px 0 80px;
-  transition:background .3s,border-color .3s;
+  transition:background .3s,border-color .3s,transform .3s ease;
+}
+/* Sidebar toggle button — always visible on ALL devices (v20·0622) */
+.sidebar-toggle-btn{
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.08);border:none;cursor:pointer;
+  padding:6px;color:#fff;margin-right:6px;border-radius:6px;
+  transition:background .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.sidebar-toggle-btn:hover{background:rgba(255,255,255,.18)}
+.sidebar-toggle-btn:active{background:rgba(255,255,255,.25)}
+/* Desktop collapse: when .sidebar.collapsed is set, hide sidebar & expand main */
+.sidebar.collapsed{transform:translateX(-100%)}
+@media(min-width:769px){
+  .sidebar.collapsed ~ .main-area,
+  body.sidebar-collapsed .main-area{margin-left:0!important}
 }
 .sb-section{margin-bottom:2px}
 .sb-label{font-size:9px;font-weight:800;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.5px;padding:0 16px;margin:14px 0 4px}
@@ -586,13 +604,21 @@ textarea.fi{resize:vertical;min-height:80px}
   .g-60-40{grid-template-columns:1fr}
 }
 @media(max-width:768px){
-  :root{--sb-w:0px}
-  .sidebar{transform:translateX(-220px);transition:transform .3s;width:220px;z-index:400}
+  :root{--sb-w:0px;--tb-h:54px}
+  .sidebar{
+    transform:translateX(-100%);
+    transition:transform .3s ease;
+    width:min(280px,85vw);
+    z-index:400;
+    top:0;
+    height:100vh;
+    padding-top:60px;
+    box-shadow:0 0 40px rgba(0,0,0,.3);
+  }
   .sidebar.open{transform:translateX(0);box-shadow:var(--s3)}
   .main-area{margin-left:0!important}
   .topbar .tb-brand{width:auto;min-width:60px;background:transparent}
   .tb-brand-name{font-size:15px;letter-spacing:2px;color:var(--g2)!important}
-  .sidebar-toggle-btn{display:flex!important;align-items:center;justify-content:center;background:none;border:none;cursor:pointer;padding:4px;color:#fff;margin-right:6px}
   .tb-search{max-width:200px}
   .stat-grid.sg-6{grid-template-columns:repeat(2,1fr)}
   .stat-grid.sg-4{grid-template-columns:repeat(2,1fr)}
@@ -766,6 +792,207 @@ button,.btn,.fi,.lf-i,.lf-btn,a[role="button"]{min-height:36px;touch-action:mani
 img,video,iframe,svg{max-width:100%;height:auto}
 /* ─── Long URL/email safety: break anywhere ─── */
 a,span,p,div{overflow-wrap:break-word;word-break:break-word}
+
+/* ════════════════════════════════════════════════════════════════════════ */
+/* ══ v20·0622 — COMPLETE MOBILE-FRIENDLY OVERHAUL ══                       */
+/* ════════════════════════════════════════════════════════════════════════ */
+/* Targets: phones (320-480px), large phones (481-768px), tablets (769-1024) */
+/* Issues fixed: topbar overflow, sidebar toggle invisible, button too small, */
+/* tables overflowing, modal cut off, tabs wrapping, form inputs tiny.       */
+
+/* ─── Mobile-first base (applies to ≤768px) ─── */
+@media(max-width:768px){
+  /* Topbar — slimmer, no overflow */
+  .topbar{height:54px;padding:0}
+  .tb-brand{padding:0 8px;gap:4px}
+  .tb-brand-name{font-size:14px!important;letter-spacing:1.5px!important}
+  .tb-center{padding:0 6px;gap:6px;flex:1;min-width:0}
+  .tb-search{display:none!important}     /* hidden on mobile, replaced by cmd palette */
+  .tb-center span{font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tb-right{padding-right:8px;gap:4px}
+  .tb-right > *{flex-shrink:0}
+  /* Hide user name on mobile — keep only avatar */
+  .tb-right > div:last-child > span:not(.av){display:none}
+
+  /* Main area — full width, smaller padding */
+  .main-area{
+    margin-left:0!important;
+    margin-top:54px;
+    padding:12px;
+    min-height:calc(100vh - 54px);
+    width:100%;
+    overflow-x:hidden;
+  }
+
+  /* Sidebar — drawer overlay */
+  .sidebar{
+    position:fixed;top:0;left:0;height:100vh;
+    width:min(280px,85vw);
+    transform:translateX(-100%);
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    z-index:400;padding-top:60px;
+    box-shadow:0 0 40px rgba(0,0,0,.3);
+  }
+  .sidebar.open{transform:translateX(0)}
+  /* Backdrop behind sidebar */
+  .sb-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.5);
+    z-index:399;backdrop-filter:blur(2px);
+    -webkit-backdrop-filter:blur(2px);
+  }
+
+  /* Nav items — larger touch targets */
+  .nav-item{padding:12px 14px;font-size:13px;gap:12px}
+  .nav-item svg{width:18px;height:18px}
+  .sb-label{font-size:9.5px;padding:0 14px;margin:10px 0 4px}
+  .sb-footer{padding:14px 10px}
+
+  /* Page header — stack vertically */
+  .ph{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px}
+  .ph-left h2{font-size:20px}
+  .ph-left p{font-size:11px}
+  .ph-right{width:100%;justify-content:flex-start;flex-wrap:wrap;gap:6px}
+  .ph-right .btn{padding:7px 12px;font-size:11.5px}
+
+  /* Cards — tighter padding */
+  .lcard{border-radius:10px}
+  .ch{padding:10px 12px;flex-wrap:wrap;gap:6px}
+  .ct{font-size:12.5px}
+  .cb{padding:12px}
+
+  /* Stat grids — 2 columns on mobile */
+  .stat-grid,.sg-6,.sg-5,.sg-4,.sg-3{grid-template-columns:repeat(2,1fr)!important;gap:8px}
+  .sc{padding:10px!important}
+  .sc-val{font-size:20px!important}
+  .sc-label{font-size:9.5px!important}
+  .sc-sub{font-size:9px!important}
+
+  /* All grids → 1 column */
+  .g2,.g3,.g-70-30,.g-60-40,.fr-2,.fr-3{grid-template-columns:1fr!important;gap:10px}
+
+  /* Tables — horizontal scroll wrapper */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -12px;padding:0 12px}
+  .ltable{min-width:600px;font-size:11px}
+  .ltable th,.ltable td{padding:8px 10px;white-space:nowrap}
+
+  /* Tabs — swipeable horizontal scroll */
+  .tabs{
+    width:100%;overflow-x:auto;flex-wrap:nowrap;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+  }
+  .tabs::-webkit-scrollbar{height:3px}
+  .tabs > *{
+    scroll-snap-align:start;flex-shrink:0;
+    white-space:nowrap;padding:8px 14px;font-size:12px;
+  }
+
+  /* Modal — full-screen-ish on mobile */
+  .modal{
+    max-width:calc(100vw - 16px)!important;
+    margin:8px auto!important;
+    max-height:94vh;overflow-y:auto;
+    padding:16px!important;
+  }
+  .modal-lg,.modal-md{max-width:calc(100vw - 16px)!important}
+  .modal h2,.modal h3{font-size:16px!important}
+
+  /* Forms — stack labels above inputs, full width */
+  .form-row,.fr-2,.fr-3{grid-template-columns:1fr!important;gap:10px}
+  .fi,.lf-i{width:100%;font-size:13.5px;padding:11px 12px;min-height:42px;box-sizing:border-box}
+  label{font-size:11px;margin-bottom:4px;display:block}
+
+  /* Buttons — full-width when stacked, larger touch target */
+  .btn{padding:10px 16px;font-size:12.5px;min-height:40px}
+  .form-actions{flex-direction:column-reverse;gap:8px;width:100%}
+  .form-actions .btn{width:100%}
+
+  /* Task cards — compact, single-column */
+  .lcard .cb{padding:10px 12px}
+
+  /* Notification panel — slide-in drawer */
+  .np{
+    position:fixed;top:0;right:0;bottom:0;
+    width:min(360px,100vw);max-height:100vh;border-radius:0;
+    transform:translateX(100%);transition:transform .25s ease;
+    z-index:500;
+  }
+  .np.open{transform:translateX(0)}
+
+  /* Avatar sizes — slightly smaller on mobile */
+  .av{width:28px;height:28px;font-size:9.5px}
+
+  /* Inline flex styles — wrap to prevent overflow */
+  [style*="display: flex"]{flex-wrap:wrap}
+  [style*="display:flex"]{flex-wrap:wrap}
+  /* BUT don't break intentional non-wrapping flex (tabs, button rows) */
+  .tabs[style*="display: flex"],.tabs[style*="display:flex"]{flex-wrap:nowrap}
+  .ph-right[style*="display: flex"],.ph-right[style*="display:flex"]{flex-wrap:wrap}
+
+  /* Utility — hide on mobile */
+  .hide-mobile{display:none!important}
+  /* Utility — show only on mobile */
+  .show-mobile{display:initial!important}
+
+  /* Prevent horizontal scroll caused by long content */
+  body,html{overflow-x:hidden;max-width:100vw}
+
+  /* Long content ellipsis */
+  .truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+
+  /* Dropdown menus — anchor to right edge on mobile to prevent overflow */
+  .tdm-wrap .dropdown-menu,.tdm-menu{right:0;left:auto;min-width:180px;max-width:240px}
+
+  /* Tooltip / popover — full width on mobile */
+  [class*="popover"],[class*="tooltip"]{max-width:calc(100vw - 24px)}
+}
+
+/* ─── Very small phones (≤480px) — even tighter ─── */
+@media(max-width:480px){
+  .topbar{height:50px}
+  .main-area{margin-top:50px;padding:10px;min-height:calc(100vh - 50px)}
+  .tb-brand-name{font-size:13px!important;letter-spacing:1px!important}
+  .tb-center span{display:none}
+  .tb-right > div:last-child > .av{width:26px;height:26px;font-size:9px}
+  .ph-left h2{font-size:18px}
+  .ph-left p{font-size:10.5px}
+  .stat-grid,.sg-6,.sg-5,.sg-4,.sg-3,.sg-2{grid-template-columns:1fr!important;gap:8px}
+  .sc{padding:8px!important}
+  .sc-val{font-size:18px!important}
+  .sc-label{font-size:9px!important}
+  .tabs > *{font-size:11px;padding:7px 10px}
+  .modal{padding:14px!important;margin:6px auto!important}
+  .ltable{font-size:10.5px;min-width:500px}
+  .ltable th,.ltable td{padding:6px 8px}
+  .btn{padding:9px 12px;font-size:12px;min-height:38px}
+  .fi,.lf-i{font-size:13px;padding:10px;min-height:40px}
+}
+
+/* ─── Tiny phones (≤360px — iPhone SE 1st gen, older Androids) ─── */
+@media(max-width:360px){
+  .main-area{padding:8px}
+  .tb-brand{padding:0 6px}
+  .tb-brand-name{font-size:12px!important}
+  .ph-left h2{font-size:16px}
+  .sc-val{font-size:16px!important}
+  .ltable{font-size:10px;min-width:440px}
+  .nav-item{padding:11px 12px;font-size:12.5px}
+}
+
+/* ─── Tablet portrait (481-768px) — denser than phone, lighter than desktop ─── */
+@media(min-width:481px) and (max-width:768px){
+  .stat-grid,.sg-6,.sg-5,.sg-4,.sg-3{grid-template-columns:repeat(3,1fr)!important}
+}
+
+/* ─── Touch device tweaks (any device with coarse pointer) ─── */
+@media(pointer:coarse){
+  /* Larger tap targets on touch devices */
+  .nav-item,.btn,.fi,.lf-i,.lf-btn,.tb-icon-btn{min-height:42px}
+  /* Remove hover-only states (they get stuck on touch) */
+  .nav-item:hover,.btn:hover{background:inherit}
+  /* Prevent double-tap zoom on buttons */
+  button,.btn,a[role="button"]{touch-action:manipulation}
+}
 
 /* ══ UTILS ══ */
 .mb0{margin-bottom:0!important}

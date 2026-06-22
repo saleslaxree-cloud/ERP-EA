@@ -89,7 +89,19 @@ export function LaxreeDashboard({ assignedById, directorName, strictAssignedBy }
   const completionRate = dash?.completionRate || 0
   const effScore = Math.max(0, completionRate - Math.round(overdue / Math.max(total, 1) * 10))
 
-  const userPerf = Array.isArray(dash?.userPerformance) ? dash.userPerformance : []
+  const userPerf = (Array.isArray(dash?.userPerformance) ? dash.userPerformance : [])
+    // Filter out:
+    //   • Inactive (unavailable) employees — isActive === false means user has left / is on extended leave
+    //   • DIRECTOR / ADMIN / FOUNDER roles — they are management, not part of team performance scorecard.
+    //     (Ashish Sir = Director, Samarth Sir = Admin, Founder Sir = Founder — all excluded.)
+    //   • EA role is kept — they do operational work and have measurable task output.
+    // Only EMPLOYEE, MANAGER, EA appear in the scorecard.
+    .filter((u: any) =>
+      u.isActive !== false &&
+      u.role !== 'DIRECTOR' &&
+      u.role !== 'ADMIN' &&
+      u.role !== 'FOUNDER'
+    )
   const todayTasks = Array.isArray(dash?.todayTasksList) ? dash.todayTasksList : []
   const upcomingTasks = Array.isArray(dash?.upcomingTasksList) ? dash.upcomingTasksList : []
   const overdueTasks = Array.isArray(dash?.overdueTasksList) ? dash.overdueTasksList : []
@@ -268,7 +280,7 @@ export function LaxreeDashboard({ assignedById, directorName, strictAssignedBy }
         </div>
         <div className="cb">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8 }}>
-            {userPerf.filter(u => u.role !== 'DIRECTOR').slice(0, 8).map((u: any) => (
+            {userPerf.slice(0, 8).map((u: any) => (
               <div key={u.id} style={{
                 background: 'var(--card)', border: '1.5px solid var(--b1)', borderRadius: 'var(--r-sm)',
                 padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8,
@@ -305,7 +317,7 @@ export function LaxreeDashboard({ assignedById, directorName, strictAssignedBy }
                 <tr><th>Member</th><th>Department</th><th>Role</th><th>Tasks</th><th>Done</th><th>Score</th></tr>
               </thead>
               <tbody>
-                {userPerf.filter(u => u.role !== 'DIRECTOR').slice(0, 10).map((u: any) => (
+                {userPerf.slice(0, 10).map((u: any) => (
                   <tr key={u.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

@@ -330,7 +330,13 @@ export function LaxreeSidebar() {
                   background: activePage === item.id ? undefined : 'linear-gradient(90deg, rgba(109,40,217,.09), transparent)',
                   borderLeftColor: activePage === item.id ? undefined : 'rgba(109,40,217,.5)',
                 } : undefined}
-                onClick={() => setActivePage(item.id)}
+                onClick={() => {
+                  setActivePage(item.id)
+                  // Auto-close sidebar on mobile after navigation
+                  if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                    setSidebarOpen(false)
+                  }
+                }}
               >
                 {item.icon}
                 <span style={item.specialStyle ? { color: '#6D28D9', fontWeight: 700 } : undefined}>
