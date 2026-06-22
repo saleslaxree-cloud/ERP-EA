@@ -41,6 +41,7 @@ export function LaxreeNotifPanel() {
     REJECTED: '❌',
     ESCALATION: '🚨',
     REMINDER: '⏰',
+    DEADLINE_REMINDER: '⏰',
     STATUS_CHANGE: '🔄',
     COMMENT: '💬',
     DELEGATION: '👥',

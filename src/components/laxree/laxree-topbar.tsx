@@ -39,12 +39,12 @@ export function LaxreeTopbar() {
           </svg>
         </button>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <div style={{
+          <div className="tb-brand-name" style={{
             fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700,
-            letterSpacing: 3, textTransform: 'uppercase', color: 'var(--g2)',
+            letterSpacing: 3, textTransform: 'uppercase',
           }}>LAXREE</div>
           {/* Build version indicator — confirms the user is seeing the latest deployment */}
-          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v20·0622</span>
+          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v21·0622</span>
         </div>
       </div>
       <div className="tb-center">

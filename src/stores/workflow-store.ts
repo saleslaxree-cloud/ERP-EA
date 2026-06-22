@@ -64,6 +64,13 @@ interface WorkflowStore {
   logout: () => void
 }
 
+// v21·0622: Initialize dark mode from localStorage so the Zustand store
+// state matches the .dark class that Providers.tsx sets on <html>.
+const getInitialDarkMode = (): boolean => {
+  if (typeof localStorage === 'undefined') return false
+  try { return localStorage.getItem('laxree-dark-mode') === '1' } catch { return false }
+}
+
 const initialState = {
   activeView: 'dashboard' as ActiveView,
   activePage: 'dashboard',
@@ -72,8 +79,8 @@ const initialState = {
   currentRole: 'EMPLOYEE' as UserRole,
   currentUser: null as { username: string; role: string; name: string } | null,
   sidebarOpen: false,
-  darkMode: false,
-  isDark: false,
+  darkMode: getInitialDarkMode(),
+  isDark: getInitialDarkMode(),
   searchQuery: '',
   notifPanelOpen: false,
   cmdPaletteOpen: false,
@@ -101,6 +108,10 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', dark)
     }
+    // v21·0622: Persist dark mode preference so it survives page refresh
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.setItem('laxree-dark-mode', dark ? '1' : '0') } catch {}
+    }
     set({ darkMode: dark, isDark: dark })
   },
   toggleDarkMode: () => set((state) => {
@@ -108,12 +119,18 @@ export const useWorkflowStore = create<WorkflowStore>((set) => ({
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', newDark)
     }
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.setItem('laxree-dark-mode', newDark ? '1' : '0') } catch {}
+    }
     return { darkMode: newDark, isDark: newDark }
   }),
   toggleDark: () => set((state) => {
     const newDark = !state.isDark
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', newDark)
+    }
+    if (typeof localStorage !== 'undefined') {
+      try { localStorage.setItem('laxree-dark-mode', newDark ? '1' : '0') } catch {}
     }
     return { isDark: newDark, darkMode: newDark }
   }),

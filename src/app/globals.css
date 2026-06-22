@@ -140,6 +140,100 @@
 .dark .sb-footer { background: #0D0E12; }
 .dark .main-area { background: var(--bg); }
 
+/* ════════════════════════════════════════════════════════════════════════ */
+/* ══ v21·0622 — LIGHT MODE NAV BAR THEME ADAPTATION ══                     */
+/* ════════════════════════════════════════════════════════════════════════ */
+/* User requirement: In LIGHT mode, nav bars (topbar brand + sidebar) should
+   show WHITE/LIGHT background with BLACK/DARK elements. In DARK mode, they
+   should show DARK background with WHITE elements. This mixing applies ONLY
+   to navigation bars, not to main content. */
+
+/* ─── LIGHT MODE (default, no .dark class) ─── */
+/* Topbar brand area — change from dark blue to white with dark text */
+html:not(.dark) .tb-brand{
+  background:#fff;
+  border-right:1px solid #e2e8f0;
+}
+html:not(.dark) .tb-brand-name{
+  color:#1e293b!important;        /* dark text instead of white */
+}
+html:not(.dark) .sidebar-toggle-btn{
+  color:#1e293b!important;        /* dark hamburger icon */
+  background:rgba(0,0,0,.05);
+}
+html:not(.dark) .sidebar-toggle-btn:hover{background:rgba(0,0,0,.1)}
+html:not(.dark) .sidebar-toggle-btn:active{background:rgba(0,0,0,.15)}
+
+/* Topbar icon buttons — dark icons on white topbar */
+html:not(.dark) .tb-icon-btn{
+  background:#f1f5f9;border:1.5px solid #e2e8f0;color:#475569;
+}
+html:not(.dark) .tb-icon-btn:hover{border-color:#3b82f6;color:#3b82f6;background:rgba(59,130,246,.06)}
+
+/* Sidebar — light background with dark text */
+html:not(.dark) .sidebar{
+  background:#fff;
+  border-right:1px solid #e2e8f0;
+}
+html:not(.dark) .sb-label{
+  color:#64748b;                   /* dark gray instead of faded white */
+}
+html:not(.dark) .nav-item{
+  color:#475569;                   /* dark gray text */
+}
+html:not(.dark) .nav-item svg{
+  color:#64748b;                   /* dark gray icons */
+  opacity:1;
+}
+html:not(.dark) .nav-item:hover{
+  background:rgba(0,0,0,.05);
+  color:#1e293b;
+}
+html:not(.dark) .nav-item:hover svg{color:#1e293b}
+html:not(.dark) .nav-item.active{
+  background:rgba(59,130,246,.1);
+  color:#1d4ed8;
+  border-left-color:#3b82f6;
+}
+html:not(.dark) .nav-item.active svg{color:#3b82f6}
+
+/* Badges — keep colored but adjust for light bg */
+html:not(.dark) .nb-live{background:rgba(34,197,94,.15);color:#15803d}
+html:not(.dark) .nb-warn{background:rgba(245,158,11,.15);color:#b45309}
+html:not(.dark) .nb-alert{background:rgba(239,68,68,.15);color:#b91c1c}
+html:not(.dark) .nb-new{background:rgba(59,130,246,.15);color:#1d4ed8}
+
+/* Sidebar footer */
+html:not(.dark) .sb-footer{
+  background:#fff;
+  border-top:1px solid #e2e8f0;
+}
+html:not(.dark) .logout-btn{
+  background:rgba(239,68,68,.08);
+  border:1px solid rgba(239,68,68,.2);
+  color:#b91c1c;
+}
+html:not(.dark) .logout-btn:hover{background:#ef4444;color:#fff}
+
+/* ─── DARK MODE (already had .dark overrides, now ensure elements are white) ─── */
+.dark .tb-brand-name{color:#fff!important}
+.dark .sidebar-toggle-btn{color:#fff!important;background:rgba(255,255,255,.08)}
+.dark .sidebar-toggle-btn:hover{background:rgba(255,255,255,.18)}
+.dark .sb-label{color:rgba(255,255,255,.4)}
+.dark .nav-item{color:rgba(255,255,255,.7)}
+.dark .nav-item svg{color:rgba(255,255,255,.6)}
+.dark .nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.dark .nav-item:hover svg{color:rgba(255,255,255,.9)}
+.dark .nav-item.active{background:rgba(59,130,246,.2);color:#fff;border-left-color:#3b82f6}
+.dark .nav-item.active svg{color:#3b82f6}
+.dark .sb-footer{background:#0D0E12;border-top:1px solid rgba(255,255,255,.08)}
+.dark .logout-btn{
+  background:rgba(239,68,68,.15);
+  border:1px solid rgba(239,68,68,.25);
+  color:#f87171;
+}
+.dark .logout-btn:hover{background:#ef4444;color:#fff}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -173,6 +267,11 @@
 .ap-pending-ring{animation:ap-pulse 2s infinite}
 
 /* ══ TOPBAR ══ */
+/* v21·0622: Nav bars (topbar + sidebar) are now THEME-ADAPTIVE.
+   • Light mode → light background + dark elements (black text/icons)
+   • Dark mode  → dark background  + light elements (white text/icons)
+   This mixing applies ONLY to navigation bars (topbar + sidebar), not to the
+   main content area which already had its own theme handling. */
 .topbar{
   position:fixed;top:0;left:0;right:0;height:var(--tb-h);z-index:300;
   background:#fff;border-bottom:1px solid #e2e8f0;
@@ -187,6 +286,13 @@
   border-right:1px solid #e2e8f0;height:100%;
   background:#1e293b;
   min-width:0;
+}
+@media(max-width:768px){
+  .tb-brand{
+    width:auto!important;
+    min-width:auto!important;
+    padding:0 8px;
+  }
 }
 .tb-brand-name{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#fff}
 .tb-center{flex:1;padding:0 20px;display:flex;align-items:center;gap:10px}
