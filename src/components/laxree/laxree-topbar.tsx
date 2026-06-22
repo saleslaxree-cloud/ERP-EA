@@ -44,7 +44,7 @@ export function LaxreeTopbar() {
             letterSpacing: 3, textTransform: 'uppercase',
           }}>LAXREE</div>
           {/* Build version indicator — confirms the user is seeing the latest deployment */}
-          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v22·0622</span>
+          <span title="Build version" style={{ fontSize: 8.5, fontWeight: 700, color: 'var(--t4)', letterSpacing: 0.5, opacity: 0.7 }}>v23·0622</span>
         </div>
       </div>
       <div className="tb-center">

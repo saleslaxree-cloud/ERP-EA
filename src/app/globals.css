@@ -339,10 +339,17 @@ html:not(.dark) .logout-btn:hover{background:#ef4444;color:#fff}
 .sidebar{
   position:fixed;left:0;top:var(--tb-h);bottom:0;width:var(--sb-w);
   background:#1e293b;border-right:1px solid rgba(255,255,255,.08);
-  overflow-y:auto;overflow-x:hidden;z-index:200;padding:10px 0 80px;
+  overflow-y:auto;overflow-x:hidden;z-index:200;
+  padding:10px 0 0;             /* v23·0622: no bottom pad — sticky footer handles it */
   transition:background .3s,border-color .3s,transform .3s ease;
   -webkit-overflow-scrolling:touch;scroll-behavior:smooth;
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.25) transparent;
+  /* v23·0622: dvh = dynamic viewport height — fixes iOS Safari 100vh bug
+     where bottom items (Leaves) hide behind the address bar.
+     Fallback: vh for older browsers. */
+  height:auto;
+  max-height:calc(100vh - var(--tb-h));
+  max-height:calc(100dvh - var(--tb-h));
 }
 /* Visible scrollbar for sidebar — dark mode (white thumb on dark track) */
 .sidebar::-webkit-scrollbar{width:8px;height:8px}
@@ -395,7 +402,16 @@ html:not(.dark) .sidebar::-webkit-scrollbar-thumb:active{background:rgba(0,0,0,.
 .nb-warn{background:rgba(245,158,11,.2);color:#fbbf24}
 .nb-alert{background:rgba(239,68,68,.2);color:#f87171}
 .nb-new{background:rgba(59,130,246,.2);color:#60a5fa}
-.sb-footer{position:absolute;bottom:0;left:0;right:0;padding:12px 10px;border-top:1px solid rgba(255,255,255,.08);background:#1e293b}
+.sb-footer{
+  position:sticky;            /* v23·0622: sticky keeps footer pinned at visible bottom while scrolling */
+  bottom:0;left:0;right:0;
+  padding:12px 10px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top:1px solid rgba(255,255,255,.08);
+  background:#1e293b;
+  z-index:10;
+  margin-top:auto;            /* push footer to bottom of flex/scroll container */
+  box-shadow:0 -4px 12px rgba(0,0,0,.15);  /* visible separation from nav items above */
+}
 
 /* ══ MAIN AREA ══ */
 .main-area{margin-left:var(--sb-w);margin-top:var(--tb-h);padding:22px;min-height:calc(100vh - var(--tb-h));background:#f8fafc}
@@ -735,16 +751,20 @@ textarea.fi{resize:vertical;min-height:80px}
     top:var(--tb-h);            /* START BELOW topbar so toggle stays visible */
     left:0;
     bottom:0;                   /* extends to viewport bottom */
-    height:auto;                /* let top+bottom determine height = 100vh - tb-h */
     width:min(280px,85vw);
     transform:translateX(-100%);
     transition:transform .3s ease;
     z-index:400;
-    padding:10px 0 80px;        /* small top + footer space (no more 60px top pad) */
-    overflow-y:auto;            /* vertical scroll when content exceeds viewport */
+    padding:10px 0 0;           /* no bottom pad — sticky footer handles it */
+    overflow-y:auto;
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;  /* iOS momentum scroll */
     box-shadow:0 0 40px rgba(0,0,0,.3);
+    /* v23·0622: dvh = dynamic viewport height — fixes iOS Safari 100vh bug
+       where bottom items (Leaves) hide behind the address bar. */
+    height:auto;
+    max-height:calc(100vh - var(--tb-h));
+    max-height:calc(100dvh - var(--tb-h));
   }
   .sidebar.open{transform:translateX(0);box-shadow:var(--s3)}
   .main-area{margin-left:0!important}
@@ -844,8 +864,8 @@ button,.btn,.fi,.lf-i,.lf-btn,a[role="button"]{min-height:36px;touch-action:mani
   /* Page header: stack + smaller text */
   .ph{flex-direction:column;align-items:stretch;gap:8px}
   .ph-right{width:100%;justify-content:flex-start}
-  /* Sidebar: drawer overlay with backdrop — BELOW topbar (v22·0622) */
-  .sidebar{position:fixed;top:var(--tb-h);left:0;bottom:0;height:auto;overflow-y:auto;-webkit-overflow-scrolling:touch;box-shadow:0 0 40px rgba(0,0,0,.3)}
+  /* Sidebar: drawer overlay with backdrop — BELOW topbar (v22·0622; v23·0622 iOS dvh + sticky footer) */
+  .sidebar{position:fixed;top:var(--tb-h);left:0;bottom:0;height:auto;max-height:calc(100dvh - var(--tb-h));padding:10px 0 0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;box-shadow:0 0 40px rgba(0,0,0,.3)}
   .sb-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:399;backdrop-filter:blur(2px)}
   /* Inline styles that use fixed px widths need to wrap */
   [style*="display: flex"]{flex-wrap:wrap}
@@ -955,18 +975,20 @@ a,span,p,div{overflow-wrap:break-word;word-break:break-word}
     overflow-x:hidden;
   }
 
-  /* Sidebar — drawer overlay, positioned BELOW topbar (v22·0622 fix) */
+  /* Sidebar — drawer overlay, positioned BELOW topbar (v22·0622 fix; v23·0622 iOS dvh) */
   .sidebar{
     position:fixed;
     top:var(--tb-h);            /* BELOW topbar — hamburger toggle stays visible */
     left:0;
     bottom:0;
-    height:auto;                /* = 100vh - tb-h */
+    height:auto;
+    max-height:calc(100vh - var(--tb-h));
+    max-height:calc(100dvh - var(--tb-h));   /* iOS Safari dynamic viewport — no more clipped Leaves */
     width:min(280px,85vw);
     transform:translateX(-100%);
     transition:transform .3s cubic-bezier(.4,0,.2,1);
     z-index:400;
-    padding:10px 0 80px;
+    padding:10px 0 0;           /* v23·0622: no bottom pad — sticky footer handles it */
     overflow-y:auto;
     overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
@@ -984,7 +1006,8 @@ a,span,p,div{overflow-wrap:break-word;word-break:break-word}
   .nav-item{padding:12px 14px;font-size:13px;gap:12px}
   .nav-item svg{width:18px;height:18px}
   .sb-label{font-size:9.5px;padding:0 14px;margin:10px 0 4px}
-  .sb-footer{padding:14px 10px}
+  /* v23·0622: footer padding-bottom includes iOS safe-area-inset (notch) */
+  .sb-footer{padding:14px 10px calc(14px + env(safe-area-inset-bottom, 0px))}
 
   /* Page header — stack vertically */
   .ph{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:14px}
