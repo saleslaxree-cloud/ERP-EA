@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ea-tasks' | 'ai-assistant' | 'user-management' | 'attendance'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ea-tasks' | 'ai-assistant' | 'user-management' | 'attendance' | 'salary-slip'
 
 interface NavItem {
   id: ActivePage
@@ -205,6 +205,16 @@ export function LaxreeSidebar() {
     },
   ]
 
+  // v24·0625-salary: Standalone Salary Slip tab — employee can view/download their
+  // HRMS-computed salary slip as PDF (exact HRMS format) without leaving ERP.
+  const employeeSalarySlip: NavItem[] = [
+    {
+      id: 'salary-slip', label: 'Salary Slip',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></svg>,
+      badge: <span className="nb" style={{ background: 'rgba(180,83,9,.1)', color: '#B45309', fontWeight: 800 }}>PDF</span>,
+    },
+  ]
+
   const employeeAI: NavItem[] = [
     {
       id: 'ai-assistant', label: 'AI Assistant',
@@ -295,6 +305,7 @@ export function LaxreeSidebar() {
       { label: 'My Tasks', items: employeeTasks },
       { label: 'Leave Management', items: employeeLeaves },
       { label: 'Attendance', items: employeeAttendance },
+      { label: 'Salary', items: employeeSalarySlip },
       { label: 'AI Assistant', items: employeeAI },
     ]
   } else if (isAdmin) {
@@ -317,6 +328,7 @@ export function LaxreeSidebar() {
       { label: 'Task Management', items: taskMgmt },
       { label: 'Intelligence', items: intelligence },
       { label: 'Attendance', items: employeeAttendance },
+      { label: 'Salary', items: employeeSalarySlip },
       { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
       { label: 'Management', items: management },
       { label: 'Leaves', items: [{ id: 'leaves' as ActivePage, label: 'Leave Management', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, badge: eaPendingLeaves > 0 ? <span className="nb nb-live">{eaPendingLeaves} Pending</span> : undefined }] },

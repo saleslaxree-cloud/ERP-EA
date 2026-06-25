@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
 import { LaxreeAttendancePanel } from './laxree-attendance-panel'
+import { LaxreeSalarySlipPanel } from './laxree-salary-slip-panel'
 
 // Avatar colors
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
@@ -23,7 +24,7 @@ export function LaxreeEmployeeDashboard() {
   const userAvatarBg = avatarColor(currentUserName || 'Employee')
 
   // Tab navigation for employee dashboard
-  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard' | 'attendance'>('overview')
+  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard' | 'attendance' | 'salary-slip'>('overview')
   const [taskFilter, setTaskFilter] = useState<string>('all')
 
   // NOTE: 'emp-tasks' is now a dedicated page (LaxreeEmpMyTasks) — no need to auto-switch tabs here.
@@ -142,6 +143,7 @@ export function LaxreeEmployeeDashboard() {
     { id: 'tasks' as const, label: 'My Tasks', icon: '📋' },
     { id: 'scorecard' as const, label: 'My Scorecard', icon: '📈' },
     { id: 'attendance' as const, label: 'Attendance', icon: '📅' },
+    { id: 'salary-slip' as const, label: 'Salary Slip', icon: '🧾' },
   ]
 
   return (
@@ -447,57 +449,6 @@ export function LaxreeEmployeeDashboard() {
           </div>
         </>
       )}
-
-      {/* ===================== RECENT ACTIVITY (always visible) ===================== */}
-      <div className="lcard" style={{ marginBottom: 14 }}>
-        <div className="ch">
-          <div className="ct">🕐 Recent Activity</div>
-          <span className="badge b-gold" style={{ fontSize: 10 }}>Live · {taskActivities.length}</span>
-        </div>
-        <div className="cb">
-          {taskActivities.length === 0 ? (
-            <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
-              <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
-              <p style={{ margin: 0, fontWeight: 700, color: 'var(--t2)' }}>No task activity yet</p>
-              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--t3)' }}>
-                When tasks are created, completed, revised, or deleted, those events will appear here permanently.
-              </p>
-            </div>
-          ) : taskActivities.slice(0, 8).map((a: any) => {
-            const meta: Record<string, { icon: string; color: string; label: string }> = {
-              CREATED:        { icon: '✨', color: '#15803D', label: 'Created' },
-              UPDATED:        { icon: '✏️', color: '#1D4ED8', label: 'Updated' },
-              DELETED:        { icon: '🗑️', color: '#DC2626', label: 'Deleted' },
-              COMPLETED:      { icon: '✅', color: '#15803D', label: 'Completed' },
-              REVISED:        { icon: '🔁', color: '#D97706', label: 'Revised' },
-              CANCELLED:      { icon: '🚫', color: '#6B7280', label: 'Cancelled' },
-              STATUS_CHANGED: { icon: '🔄', color: '#6D28D9', label: 'Status Change' },
-            }
-            const m = meta[a.action] || meta.UPDATED
-            const actorName = a.actor?.name || 'System'
-            return (
-              <div key={a.id} className="feed-item" style={{ padding: '10px 6px', borderBottom: '1px solid var(--b1)' }}>
-                <div className="feed-dot" style={{ background: m.color, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
-                  {m.icon}
-                </div>
-                <div className="feed-body" style={{ flex: 1, minWidth: 0 }}>
-                  <div className="feed-text" style={{ fontSize: 12.5, color: 'var(--t1)', lineHeight: 1.4 }}>
-                    <span style={{ fontWeight: 700, color: m.color, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
-                      {m.label}
-                    </span>
-                    {a.description || `Task "${a.taskTitle}" ${m.label.toLowerCase()}`}
-                  </div>
-                  <div className="feed-time" style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span>by <strong style={{ color: 'var(--t2)' }}>{actorName}</strong></span>
-                    {a.department && <span>· {a.department}</span>}
-                    <span>· {a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
 
       {/* ===================== MY TASKS TAB (READ ONLY) ===================== */}
       {empTab === 'tasks' && (
@@ -846,6 +797,67 @@ export function LaxreeEmployeeDashboard() {
       {empTab === 'attendance' && (
         <LaxreeAttendancePanel />
       )}
+
+      {/* ===================== SALARY SLIP TAB (v24·0625-salary) ===================== */}
+      {/* Live HRMS payroll (read-only) + download/print salary slip as PDF. */}
+      {/* Sourced via /api/salary-slip/bridge — never modifies HRMS data.   */}
+      {empTab === 'salary-slip' && (
+        <LaxreeSalarySlipPanel />
+      )}
+
+      {/* ===================== RECENT ACTIVITY (always last — v24·0625-layout fix) ===================== */}
+      {/* Moved from above tab content to BELOW all tab content so when the user clicks
+          Attendance / Salary Slip / Tasks / Scorecard, the tab content shows FIRST and
+          Recent Activity shows LAST (matches the user's expected layout). */}
+      <div className="lcard" style={{ marginBottom: 14 }}>
+        <div className="ch">
+          <div className="ct">🕐 Recent Activity</div>
+          <span className="badge b-gold" style={{ fontSize: 10 }}>Live · {taskActivities.length}</span>
+        </div>
+        <div className="cb">
+          {taskActivities.length === 0 ? (
+            <div className="empty" style={{ padding: 24, textAlign: 'center' }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
+              <p style={{ margin: 0, fontWeight: 700, color: 'var(--t2)' }}>No task activity yet</p>
+              <p style={{ margin: '4px 0 0', fontSize: 11, color: 'var(--t3)' }}>
+                When tasks are created, completed, revised, or deleted, those events will appear here permanently.
+              </p>
+            </div>
+          ) : taskActivities.slice(0, 8).map((a: any) => {
+            const meta: Record<string, { icon: string; color: string; label: string }> = {
+              CREATED:        { icon: '✨', color: '#15803D', label: 'Created' },
+              UPDATED:        { icon: '✏️', color: '#1D4ED8', label: 'Updated' },
+              DELETED:        { icon: '🗑️', color: '#DC2626', label: 'Deleted' },
+              COMPLETED:      { icon: '✅', color: '#15803D', label: 'Completed' },
+              REVISED:        { icon: '🔁', color: '#D97706', label: 'Revised' },
+              CANCELLED:      { icon: '🚫', color: '#6B7280', label: 'Cancelled' },
+              STATUS_CHANGED: { icon: '🔄', color: '#6D28D9', label: 'Status Change' },
+            }
+            const m = meta[a.action] || meta.UPDATED
+            const actorName = a.actor?.name || 'System'
+            return (
+              <div key={a.id} className="feed-item" style={{ padding: '10px 6px', borderBottom: '1px solid var(--b1)' }}>
+                <div className="feed-dot" style={{ background: m.color, width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  {m.icon}
+                </div>
+                <div className="feed-body" style={{ flex: 1, minWidth: 0 }}>
+                  <div className="feed-text" style={{ fontSize: 12.5, color: 'var(--t1)', lineHeight: 1.4 }}>
+                    <span style={{ fontWeight: 700, color: m.color, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 6 }}>
+                      {m.label}
+                    </span>
+                    {a.description || `Task "${a.taskTitle}" ${m.label.toLowerCase()}`}
+                  </div>
+                  <div className="feed-time" style={{ fontSize: 10, color: 'var(--t3)', marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span>by <strong style={{ color: 'var(--t2)' }}>{actorName}</strong></span>
+                    {a.department && <span>· {a.department}</span>}
+                    <span>· {a.createdAt ? new Date(a.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
     </>
   )

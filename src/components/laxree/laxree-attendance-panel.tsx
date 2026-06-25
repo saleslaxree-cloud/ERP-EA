@@ -205,9 +205,12 @@ export function LaxreeAttendancePanel() {
                     ID: {employee.employeeId} · {employee.department || '—'} · {employee.designation || '—'}
                   </div>
                 </div>
+                <span style={{ fontSize: 9, padding: '3px 8px', borderRadius: 10, fontWeight: 800, background: 'rgba(15,118,110,.1)', color: '#0F766E' }}>
+                  HRMS LIVE
+                </span>
               </div>
 
-              {/* Summary cards */}
+              {/* ─── Summary Stat Tiles (creative color-coded cards) ─── */}
               {summary && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 8, marginBottom: 14 }}>
                   <StatTile label="Present" value={summary.present ?? 0} bg="var(--green-l)" color="var(--green)" />
@@ -215,61 +218,49 @@ export function LaxreeAttendancePanel() {
                   <StatTile label="Late" value={summary.late ?? 0} bg="var(--amber-l)" color="var(--amber)" />
                   <StatTile label="Half Day" value={summary.halfDay ?? 0} bg="#FEF3C7" color="#92400E" />
                   <StatTile label="Early Out" value={summary.earlyOuts ?? 0} bg="#EDE9FE" color="#6D28D9" />
-                  <StatTile label="Overtime hrs" value={summary.totalOvertimeHours ?? 0} bg="var(--blue-l)" color="var(--blue)" />
+                  <StatTile label="OT Hrs" value={summary.totalOvertimeHours ?? 0} bg="var(--blue-l)" color="var(--blue)" />
                 </div>
               )}
 
-              {/* Daily records table (scrollable on mobile) */}
-              {records.length > 0 ? (
-                <div className="tw" style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid var(--b1)', borderRadius: 8 }}>
-                  <table className="ltable" style={{ width: '100%', fontSize: 11 }}>
-                    <thead style={{ background: 'var(--bg)', position: 'sticky', top: 0 }}>
-                      <tr>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)' }}>Date</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)' }}>Check-In</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)' }}>Check-Out</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)' }}>Hours</th>
-                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, color: 'var(--t2)' }}>Status</th>
+              {/* ─── Monthly Calendar Grid (HRMS-style, color-coded per day) ─── */}
+              <MonthlyCalendarGrid records={records} year={year} month={month} />
+
+              {/* ─── Summary Spreadsheet Table (HRMS-style, like AttendanceTracker) ─── */}
+              {summary && (
+                <div style={{ marginTop: 14, overflowX: 'auto', borderRadius: 8, border: '1px solid var(--b1)' }}>
+                  <table className="ltable" style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#059669', color: 'white' }}>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Days Present</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Days Absent</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Half Days</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Late</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Early Out</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>Total Work Hrs</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5, borderRight: '1px solid rgba(255,255,255,.2)' }}>OT Hrs</th>
+                        <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Records</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {records.map((r: any, i: number) => (
-                        <tr key={i} style={{ borderTop: '1px solid var(--b1)' }}>
-                          <td style={{ padding: '7px 10px', color: 'var(--t1)' }}>
-                            {new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                          </td>
-                          <td style={{ padding: '7px 10px', color: 'var(--t2)' }}>{r.checkIn || '—'}</td>
-                          <td style={{ padding: '7px 10px', color: 'var(--t2)' }}>{r.checkOut || '—'}</td>
-                          <td style={{ padding: '7px 10px', color: 'var(--t2)' }}>{r.totalHours || 0}</td>
-                          <td style={{ padding: '7px 10px' }}>
-                            <span style={{
-                              padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 700,
-                              background:
-                                r.status === 'present' ? 'var(--green-l)' :
-                                r.status === 'absent' ? 'var(--red-l)' :
-                                r.status === 'late' ? 'var(--amber-l)' :
-                                r.status === 'half-day' ? '#FEF3C7' :
-                                r.status === 'early-out' ? '#EDE9FE' : 'var(--bg2)',
-                              color:
-                                r.status === 'present' ? 'var(--green)' :
-                                r.status === 'absent' ? 'var(--red)' :
-                                r.status === 'late' ? 'var(--amber)' :
-                                r.status === 'half-day' ? '#92400E' :
-                                r.status === 'early-out' ? '#6D28D9' : 'var(--t2)',
-                            }}>
-                              {r.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                      <tr style={{ background: 'var(--bg2)' }}>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--green)', borderRight: '1px solid var(--b1)' }}>{summary.present ?? 0}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--red)', borderRight: '1px solid var(--b1)' }}>{summary.absent ?? 0}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: '#92400E', borderRight: '1px solid var(--b1)' }}>{summary.halfDay ?? 0}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--amber)', borderRight: '1px solid var(--b1)' }}>{summary.late ?? 0}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: '#6D28D9', borderRight: '1px solid var(--b1)' }}>{summary.earlyOuts ?? 0}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--blue)', borderRight: '1px solid var(--b1)' }}>{formatHoursDecimal(summary.totalWorkHours ?? 0)}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--amber)', borderRight: '1px solid var(--b1)' }}>{formatHoursDecimal(summary.totalOvertimeHours ?? 0)}</td>
+                        <td style={{ padding: '10px', fontWeight: 700, color: 'var(--g2)' }}>{summary.totalRecords ?? records.length}</td>
+                      </tr>
                     </tbody>
                   </table>
                 </div>
-              ) : (
-                <div style={{ padding: 20, textAlign: 'center', color: 'var(--t3)', fontSize: 12 }}>
-                  No attendance records found for this month.
-                </div>
               )}
+
+              {/* ─── Daily Breakdown Table — HRMS-style full month view ─── */}
+              {/* Shows every day of the month (even missing days = "No Record"). */}
+              {/* Sundays are highlighted blue. Status color-coded per cell. */}
+              <DailyBreakdownTable records={records} year={year} month={month} />
             </>
           )}
         </div>
@@ -406,3 +397,256 @@ function StatTile({ label, value, bg, color }: { label: string; value: any; bg: 
     </div>
   )
 }
+
+// ─── Convert decimal hours (e.g. 9.5) to "9:30" display (matches HRMS formatHours) ───
+function formatHoursDecimal(decimal: number): string {
+  if (!decimal || decimal === 0) return '0:00'
+  const hours = Math.floor(decimal)
+  const minutes = Math.round((decimal - hours) * 60)
+  if (minutes >= 60) return `${hours + 1}:00`
+  return `${hours}:${String(minutes).padStart(2, '0')}`
+}
+
+// ─── Format OT hours in clear human-readable format (matches HRMS formatOT) ───
+function formatOT(decimal: number): string {
+  if (!decimal || decimal === 0) return '0m'
+  const totalMinutes = Math.round(decimal * 60)
+  if (totalMinutes < 60) return `${totalMinutes}m`
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (minutes === 0) return `${hours}h`
+  return `${hours}h ${minutes}m`
+}
+
+// ─── Color config for each attendance status (matches HRMS StatusBadge) ───
+const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; icon: string }> = {
+  present:    { bg: 'rgba(16,185,129,.15)',  text: '#10B981', label: 'P',  icon: '✓' },
+  late:       { bg: 'rgba(245,158,11,.15)',  text: '#F59E0B', label: 'L',  icon: '◐' },
+  'early-out':{ bg: 'rgba(244,63,94,.15)',   text: '#F43F5E', label: 'E',  icon: '↗' },
+  absent:     { bg: 'rgba(239,68,68,.15)',   text: '#EF4444', label: 'A',  icon: '✕' },
+  'half-day': { bg: 'rgba(245,158,11,.15)',  text: '#92400E', label: 'H',  icon: '½' },
+  half_day:   { bg: 'rgba(245,158,11,.15)',  text: '#92400E', label: 'H',  icon: '½' },
+  'weekly-off': { bg: 'rgba(59,130,246,.10)', text: '#3B82F6', label: 'W', icon: '☀' },
+  holiday:    { bg: 'rgba(168,85,247,.15)',  text: '#A855F7', label: 'PH', icon: '★' },
+}
+
+function getStatusConfig(status: string) {
+  return STATUS_CONFIG[status] || { bg: 'var(--bg2)', text: 'var(--t2)', label: '—', icon: '·' }
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// MonthlyCalendarGrid — HRMS-style creative monthly calendar
+// Renders the entire month as a grid of day cells, color-coded by status.
+// Sundays get a blue tint. Missing days are shown empty.
+// ════════════════════════════════════════════════════════════════════════
+function MonthlyCalendarGrid({ records, year, month }: { records: any[]; year: number; month: number }) {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+  // Build a map: day-of-month → record
+  const recordByDay: Record<number, any> = {}
+  for (const r of records) {
+    const d = new Date(r.date)
+    if (d.getFullYear() === year && d.getMonth() + 1 === month) {
+      recordByDay[d.getDate()] = r
+    }
+  }
+
+  // Build the cells array — start with empty cells for the first week gap
+  const firstDay = new Date(year, month - 1, 1).getDay() // 0 = Sunday
+  const cells: (number | null)[] = []
+  for (let i = 0; i < firstDay; i++) cells.push(null)
+  for (let day = 1; day <= daysInMonth; day++) cells.push(day)
+  // Pad to fill the last week
+  while (cells.length % 7 !== 0) cells.push(null)
+
+  return (
+    <div style={{
+      marginTop: 14, padding: 14, background: 'var(--bg)', borderRadius: 10,
+      border: '1px solid var(--b1)',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--t1)' }}>
+            📅 {monthNames[month - 1]} {year}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 2 }}>
+            Daily attendance calendar · click any day in the breakdown below for full details
+          </div>
+        </div>
+        {/* Legend */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {[
+            { label: 'Present', bg: STATUS_CONFIG.present.bg, color: STATUS_CONFIG.present.text },
+            { label: 'Late', bg: STATUS_CONFIG.late.bg, color: STATUS_CONFIG.late.text },
+            { label: 'Early Out', bg: STATUS_CONFIG['early-out'].bg, color: STATUS_CONFIG['early-out'].text },
+            { label: 'Half Day', bg: STATUS_CONFIG['half-day'].bg, color: STATUS_CONFIG['half-day'].text },
+            { label: 'Absent', bg: STATUS_CONFIG.absent.bg, color: STATUS_CONFIG.absent.text },
+            { label: 'Sunday', bg: STATUS_CONFIG['weekly-off'].bg, color: STATUS_CONFIG['weekly-off'].text },
+          ].map((l) => (
+            <span key={l.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, color: 'var(--t3)', fontWeight: 600 }}>
+              <span style={{ display: 'inline-block', width: 9, height: 9, borderRadius: 2, background: l.bg, border: `1px solid ${l.color}33` }} />
+              {l.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Day-name row */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 4 }}>
+        {dayNames.map((d, i) => (
+          <div key={d} style={{
+            textAlign: 'center', fontSize: 9, fontWeight: 800, color: i === 0 ? 'var(--blue)' : 'var(--t3)',
+            textTransform: 'uppercase', letterSpacing: 0.5, padding: '4px 0',
+          }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Day cells */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
+        {cells.map((day, idx) => {
+          if (day === null) {
+            return <div key={idx} style={{ minHeight: 44, background: 'transparent' }} />
+          }
+          const dateObj = new Date(year, month - 1, day)
+          const isSunday = dateObj.getDay() === 0
+          const rec = recordByDay[day]
+          const status = rec?.status || (isSunday ? 'weekly-off' : '')
+          const cfg = status ? getStatusConfig(status) : null
+
+          // Override styling for Sundays with no record
+          const cellBg = cfg?.bg || (isSunday ? 'rgba(59,130,246,.05)' : 'var(--bg2)')
+          const cellColor = cfg?.text || (isSunday ? 'var(--blue)' : 'var(--t3)')
+
+          return (
+            <div
+              key={idx}
+              style={{
+                minHeight: 44, padding: '4px 5px', borderRadius: 6,
+                background: cellBg, border: `1px solid ${cellColor}22`,
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+                transition: 'transform .12s',
+              }}
+              title={rec ? `${dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' })} · ${status}${rec.checkIn ? ` · In ${rec.checkIn}` : ''}${rec.checkOut ? ` · Out ${rec.checkOut}` : ''}` : dateObj.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' })}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: cellColor }}>{day}</span>
+                {cfg && <span style={{ fontSize: 11, fontWeight: 700, color: cellColor }}>{cfg.icon}</span>}
+              </div>
+              {cfg && (
+                <div style={{ fontSize: 8, fontWeight: 700, color: cellColor, opacity: 0.85, lineHeight: 1 }}>
+                  {cfg.label}{rec?.overtimeHours ? ` · OT ${formatOT(rec.overtimeHours)}` : ''}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// DailyBreakdownTable — HRMS-style table showing every day of the month
+// Includes missing days as "No Record", Sundays highlighted blue, sticky header.
+// ════════════════════════════════════════════════════════════════════════
+function DailyBreakdownTable({ records, year, month }: { records: any[]; year: number; month: number }) {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  const recordByDay: Record<number, any> = {}
+  for (const r of records) {
+    const d = new Date(r.date)
+    if (d.getFullYear() === year && d.getMonth() + 1 === month) {
+      recordByDay[d.getDate()] = r
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--t2)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span style={{ color: 'var(--g2)' }}>▸</span> Daily Attendance Breakdown
+        <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--t3)', marginLeft: 4 }}>
+          ({daysInMonth} days · scroll to view all)
+        </span>
+      </div>
+      <div style={{
+        borderRadius: 8, border: '1px solid var(--b1)', maxHeight: 380, overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
+      }}>
+        <table className="ltable" style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+          <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+            <tr style={{ background: 'var(--bg)' }}>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Date</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Day</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Check-In</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Check-Out</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Hrs</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>OT</th>
+              <th style={{ padding: '8px 10px', textAlign: 'left', fontWeight: 700, fontSize: 10, color: 'var(--t2)', borderBottom: '1px solid var(--b1)' }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+              const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const dateObj = new Date(dateStr + 'T00:00:00')
+              const dayName = dayNames[dateObj.getDay()]
+              const isSunday = dateObj.getDay() === 0
+              const rec = recordByDay[day]
+              const status = rec?.status || (isSunday ? 'weekly-off' : '')
+              const cfg = status ? getStatusConfig(status) : null
+
+              return (
+                <tr
+                  key={day}
+                  style={{
+                    background: isSunday ? 'rgba(59,130,246,.04)' : 'transparent',
+                    borderTop: '1px solid var(--b1)',
+                  }}
+                >
+                  <td style={{ padding: '7px 10px', fontSize: 11, fontWeight: 600, color: 'var(--t1)', whiteSpace: 'nowrap' }}>
+                    {dateObj.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                  </td>
+                  <td style={{ padding: '7px 10px', fontSize: 11, color: isSunday ? 'var(--blue)' : 'var(--t3)', fontWeight: isSunday ? 700 : 400 }}>
+                    {dayName}
+                  </td>
+                  <td style={{ padding: '7px 10px', fontSize: 11, color: 'var(--t2)', fontFamily: 'monospace' }}>{rec?.checkIn || '—'}</td>
+                  <td style={{ padding: '7px 10px', fontSize: 11, color: 'var(--t2)', fontFamily: 'monospace' }}>{rec?.checkOut || '—'}</td>
+                  <td style={{ padding: '7px 10px', fontSize: 11, color: 'var(--t2)', fontWeight: 600 }}>
+                    {rec && rec.totalHours > 0 ? `${formatHoursDecimal(rec.totalHours)}h` : '—'}
+                  </td>
+                  <td style={{ padding: '7px 10px', fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>
+                    {rec && rec.overtimeHours > 0 ? formatOT(rec.overtimeHours) : '—'}
+                  </td>
+                  <td style={{ padding: '7px 10px' }}>
+                    {cfg ? (
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 800,
+                        background: cfg.bg, color: cfg.text, whiteSpace: 'nowrap',
+                      }}>
+                        {cfg.icon} {cfg.label === 'P' ? 'Present' :
+                                   cfg.label === 'L' ? 'Late' :
+                                   cfg.label === 'E' ? 'Early Out' :
+                                   cfg.label === 'A' ? 'Absent' :
+                                   cfg.label === 'H' ? 'Half Day' :
+                                   cfg.label === 'W' ? 'Weekly Off' :
+                                   cfg.label === 'PH' ? 'Holiday' : status}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 10, color: 'var(--t4)', fontStyle: 'italic' }}>No Record</span>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+

@@ -24,6 +24,7 @@ import { LaxreeUserManagement } from '@/components/laxree/laxree-user-management
 import { LaxreeTaskDetail } from '@/components/laxree/laxree-task-detail'
 import { LaxreePushNotifications } from '@/components/laxree/laxree-push-notifications'
 import { LaxreeAttendancePanel } from '@/components/laxree/laxree-attendance-panel'
+import { LaxreeSalarySlipPanel } from '@/components/laxree/laxree-salary-slip-panel'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -167,6 +168,21 @@ function ActiveView() {
             </div>
             <div className="page-accent" />
             <LaxreeAttendancePanel />
+          </>
+        )
+      case 'salary-slip':
+        // v24·0625-salary: Standalone Salary Slip tab — view/download HRMS-computed
+        // salary slip as PDF (exact HRMS format). Read-only.
+        return (
+          <>
+            <div className="ph">
+              <div className="ph-left">
+                <h2>My Salary Slip</h2>
+                <p>Live HRMS payroll · read-only · download as PDF (exact HRMS format)</p>
+              </div>
+            </div>
+            <div className="page-accent" />
+            <LaxreeSalarySlipPanel />
           </>
         )
       case 'user-management':
