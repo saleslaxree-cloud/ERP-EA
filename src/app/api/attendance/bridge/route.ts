@@ -57,12 +57,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Call HRMS external attendance endpoint
+    // v24·0625-fix: also send the user's `name` as a fallback matching signal.
+    // HRMS employees frequently have null/empty email AND mobile fields (the
+    // operator hasn't populated them), so email+phone matching alone always
+    // fails. Name matching (case-insensitive, partial) bridges this gap without
+    // requiring any data modification on either side.
     const params = new URLSearchParams({
       month: String(month),
       year: String(year),
     })
     if (user.email) params.set('email', user.email)
     if (user.phone) params.set('phone', user.phone)
+    if (user.name) params.set('name', user.name)
 
     const hrmsResponse = await fetch(
       `${hrmsUrl.replace(/\/$/, '')}/api/external/attendance?${params.toString()}`,
