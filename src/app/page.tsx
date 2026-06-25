@@ -23,6 +23,7 @@ import { LaxreeAiAssistant } from '@/components/laxree/laxree-ai-assistant'
 import { LaxreeUserManagement } from '@/components/laxree/laxree-user-management'
 import { LaxreeTaskDetail } from '@/components/laxree/laxree-task-detail'
 import { LaxreePushNotifications } from '@/components/laxree/laxree-push-notifications'
+import { LaxreeAttendancePanel } from '@/components/laxree/laxree-attendance-panel'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { Component, useEffect, useState, Suspense, type ReactNode } from 'react'
 
@@ -152,6 +153,22 @@ function ActiveView() {
         return <LaxreeLeaveManagement />
       case 'emp-leaves':
         return <LaxreeEmployeeLeaves />
+      case 'attendance':
+        // v24·0625: Standalone Attendance tab — live HRMS attendance (read-only)
+        // + raise attendance query + view past queries. Wrapped in a page header
+        // so it matches the layout of other top-level sidebar pages.
+        return (
+          <>
+            <div className="ph">
+              <div className="ph-left">
+                <h2>My Attendance</h2>
+                <p>Live HRMS attendance · read-only · raise queries for any discrepancy</p>
+              </div>
+            </div>
+            <div className="page-accent" />
+            <LaxreeAttendancePanel />
+          </>
+        )
       case 'user-management':
         return <LaxreeUserManagement />
       case 'ai-assistant':

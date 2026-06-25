@@ -113,16 +113,60 @@ export function LaxreeAttendancePanel() {
           {attLoading ? (
             <div style={{ padding: 20, textAlign: 'center', color: 'var(--t3)', fontSize: 12 }}>Loading attendance…</div>
           ) : att.configured === false ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--amber)', fontSize: 12, background: 'var(--amber-l)', borderRadius: 8, border: '1px solid var(--amber-m)' }}>
-              ⚠ {att.message || 'HRMS bridge not configured. Please contact admin.'}
+            // v24·0625: Bridge not configured on the ERP server. Show clear,
+            // actionable instructions instead of a generic error.
+            <div style={{
+              padding: 18, fontSize: 12, background: 'var(--amber-l)', borderRadius: 8,
+              border: '1px solid var(--amber-m)', color: 'var(--t1)',
+            }}>
+              <div style={{ fontWeight: 800, color: 'var(--amber)', marginBottom: 6, fontSize: 13 }}>
+                ⚠ HRMS bridge is not configured yet
+              </div>
+              <div style={{ color: 'var(--t2)', lineHeight: 1.6, marginBottom: 10 }}>
+                Your ERP admin needs to set two environment variables on the ERP server (Vercel) for the live attendance feed to work:
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--t2)', lineHeight: 1.7 }}>
+                <li><code style={{ background: 'var(--bg)', padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>HRMS_BRIDGE_URL</code> — base URL of the HRMS deployment</li>
+                <li><code style={{ background: 'var(--bg)', padding: '1px 6px', borderRadius: 4, fontSize: 11 }}>HRMS_BRIDGE_API_KEY</code> — shared secret matching HRMS</li>
+              </ul>
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--amber-m)', color: 'var(--t3)', fontSize: 11 }}>
+                Meanwhile, you can still raise attendance queries below — HR will see them in HRMS and respond.
+              </div>
             </div>
           ) : att.error ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--red)', fontSize: 12, background: 'var(--red-l)', borderRadius: 8, border: '1px solid var(--red-m)' }}>
-              ⚠ {att.error}
+            // v24·0625: Bridge is configured but returned an error.
+            // Show the underlying error AND a hint about likely causes.
+            <div style={{
+              padding: 18, fontSize: 12, background: 'var(--red-l)', borderRadius: 8,
+              border: '1px solid var(--red-m)', color: 'var(--t1)',
+            }}>
+              <div style={{ fontWeight: 800, color: 'var(--red)', marginBottom: 6, fontSize: 13 }}>
+                ⚠ Could not fetch attendance from HRMS
+              </div>
+              <div style={{ color: 'var(--t2)', marginBottom: 8 }}>{att.error}</div>
+              <div style={{ color: 'var(--t3)', fontSize: 11, lineHeight: 1.6 }}>
+                Likely causes: HRMS deployment is sleeping / cold-starting (retry in 30s),
+                or your ERP user's email/phone doesn't match any HRMS employee record.
+                Please contact HR if the problem persists.
+              </div>
+              <button
+                className="btn"
+                style={{ marginTop: 10, padding: '5px 12px', fontSize: 11, fontWeight: 700 }}
+                onClick={() => queryClient.invalidateQueries({ queryKey: ['attendance-bridge', currentUserId, month, year] })}
+              >
+                ↻ Retry now
+              </button>
             </div>
           ) : !employee ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--t3)', fontSize: 12 }}>
-              No HRMS employee record linked to your account. Please contact HR.
+            <div style={{
+              padding: 18, textAlign: 'center', color: 'var(--t3)', fontSize: 12,
+              background: 'var(--bg2)', borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 22, marginBottom: 6 }}>🔍</div>
+              <div style={{ fontWeight: 700, color: 'var(--t2)', marginBottom: 4 }}>No HRMS record linked</div>
+              <div>
+                No HRMS employee matches your ERP email or phone. Please contact HR to update your contact details in HRMS.
+              </div>
             </div>
           ) : (
             <>

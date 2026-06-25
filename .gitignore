@@ -76,3 +76,7 @@ worklog.md
 # HTML previews
 laxree-page.htmltool-results/
 tool-results/
+
+# v24·0625: HRMS clone (kept outside ERP repo) — never commit
+/hrms/
+

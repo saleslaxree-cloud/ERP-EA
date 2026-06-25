@@ -3,7 +3,7 @@
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery } from '@tanstack/react-query'
 
-type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ea-tasks' | 'ai-assistant' | 'user-management'
+type ActivePage = 'dashboard' | 'executive' | 'tasks' | 'cancelled' | 'analytics' | 'performance' | 'departments' | 'team' | 'categories' | 'exthold' | 'monday' | 'escalations' | 'employee-dashboard' | 'leaves' | 'emp-leaves' | 'emp-tasks' | 'ea-tasks' | 'ai-assistant' | 'user-management' | 'attendance'
 
 interface NavItem {
   id: ActivePage
@@ -195,6 +195,16 @@ export function LaxreeSidebar() {
     },
   ]
 
+  // v24·0625: Standalone Attendance tab — employee/EA can view live HRMS attendance
+  // and raise attendance queries directly from this tab (no need to open the dashboard).
+  const employeeAttendance: NavItem[] = [
+    {
+      id: 'attendance', label: 'My Attendance',
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+      badge: <span className="nb" style={{ background: 'rgba(15,118,110,.1)', color: '#0F766E', fontWeight: 800 }}>HRMS</span>,
+    },
+  ]
+
   const employeeAI: NavItem[] = [
     {
       id: 'ai-assistant', label: 'AI Assistant',
@@ -284,6 +294,7 @@ export function LaxreeSidebar() {
       { label: 'My Space', items: employeeDashboard },
       { label: 'My Tasks', items: employeeTasks },
       { label: 'Leave Management', items: employeeLeaves },
+      { label: 'Attendance', items: employeeAttendance },
       { label: 'AI Assistant', items: employeeAI },
     ]
   } else if (isAdmin) {
@@ -305,6 +316,7 @@ export function LaxreeSidebar() {
       { label: 'My Work', items: eaMyTasks },
       { label: 'Task Management', items: taskMgmt },
       { label: 'Intelligence', items: intelligence },
+      { label: 'Attendance', items: employeeAttendance },
       { label: 'Departments', items: [{ id: 'departments' as ActivePage, label: 'Departments', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="8" height="8" rx="1" /><rect x="13" y="3" width="8" height="8" rx="1" /><rect x="3" y="13" width="8" height="8" rx="1" /><path d="M13 17h8M17 13v8" /></svg> }] },
       { label: 'Management', items: management },
       { label: 'Leaves', items: [{ id: 'leaves' as ActivePage, label: 'Leave Management', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>, badge: eaPendingLeaves > 0 ? <span className="nb nb-live">{eaPendingLeaves} Pending</span> : undefined }] },
