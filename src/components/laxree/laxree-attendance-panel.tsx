@@ -135,28 +135,52 @@ export function LaxreeAttendancePanel() {
             </div>
           ) : att.error ? (
             // v24·0625: Bridge is configured but returned an error.
-            // Show the underlying error AND a hint about likely causes.
-            <div style={{
-              padding: 18, fontSize: 12, background: 'var(--red-l)', borderRadius: 8,
-              border: '1px solid var(--red-m)', color: 'var(--t1)',
-            }}>
-              <div style={{ fontWeight: 800, color: 'var(--red)', marginBottom: 6, fontSize: 13 }}>
-                ⚠ Could not fetch attendance from HRMS
-              </div>
-              <div style={{ color: 'var(--t2)', marginBottom: 8 }}>{att.error}</div>
-              <div style={{ color: 'var(--t3)', fontSize: 11, lineHeight: 1.6 }}>
-                Likely causes: HRMS deployment is sleeping / cold-starting (retry in 30s),
-                or your ERP user's email/phone doesn't match any HRMS employee record.
-                Please contact HR if the problem persists.
-              </div>
-              <button
-                className="btn"
-                style={{ marginTop: 10, padding: '5px 12px', fontSize: 11, fontWeight: 700 }}
-                onClick={() => queryClient.invalidateQueries({ queryKey: ['attendance-bridge', currentUserId, month, year] })}
-              >
-                ↻ Retry now
-              </button>
-            </div>
+            // v24·0625-fix: When the error is specifically "401", the cause is almost
+            // always env-var mismatch between ERP and HRMS Vercel projects (the shared
+            // secret HRMS_BRIDGE_API_KEY must be IDENTICAL on both sides, AND both
+            // projects must have been redeployed AFTER the env vars were set).
+            (() => {
+              const is401 = String(att.error).includes('401')
+              return (
+                <div style={{
+                  padding: 18, fontSize: 12, background: 'var(--red-l)', borderRadius: 8,
+                  border: '1px solid var(--red-m)', color: 'var(--t1)',
+                }}>
+                  <div style={{ fontWeight: 800, color: 'var(--red)', marginBottom: 6, fontSize: 13 }}>
+                    ⚠ Could not fetch attendance from HRMS
+                  </div>
+                  <div style={{ color: 'var(--t2)', marginBottom: 8 }}>{att.error}</div>
+                  {is401 ? (
+                    <div style={{ color: 'var(--t3)', fontSize: 11, lineHeight: 1.6 }}>
+                      <strong style={{ color: 'var(--t2)' }}>Auth mismatch (HTTP 401).</strong> The ERP
+                      server reached HRMS, but HRMS rejected the shared secret. This almost always means:
+                      <ul style={{ margin: '6px 0 6px 18px', padding: 0 }}>
+                        <li>The <code style={{ background: 'var(--bg)', padding: '1px 5px', borderRadius: 4 }}>HRMS_BRIDGE_API_KEY</code> value on ERP Vercel ≠ the value on HRMS Vercel, OR</li>
+                        <li>One of the Vercel projects has NOT been redeployed since the env var was added (Vercel only applies env vars on the NEXT deploy), OR</li>
+                        <li>The env var was set only for "Preview" environment but the production URL is being hit.</li>
+                      </ul>
+                      <div style={{ marginTop: 6 }}>
+                        Fix: confirm both Vercel projects have <code style={{ background: 'var(--bg)', padding: '1px 5px', borderRadius: 4 }}>HRMS_BRIDGE_API_KEY</code> set
+                        to the same value for the <strong>Production</strong> environment, then trigger a redeploy on both projects.
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ color: 'var(--t3)', fontSize: 11, lineHeight: 1.6 }}>
+                      Likely causes: HRMS deployment is sleeping / cold-starting (retry in 30s),
+                      or your ERP user's email/phone doesn't match any HRMS employee record.
+                      Please contact HR if the problem persists.
+                    </div>
+                  )}
+                  <button
+                    className="btn"
+                    style={{ marginTop: 10, padding: '5px 12px', fontSize: 11, fontWeight: 700 }}
+                    onClick={() => queryClient.invalidateQueries({ queryKey: ['attendance-bridge', currentUserId, month, year] })}
+                  >
+                    ↻ Retry now
+                  </button>
+                </div>
+              )
+            })()
           ) : !employee ? (
             <div style={{
               padding: 18, textAlign: 'center', color: 'var(--t3)', fontSize: 12,
