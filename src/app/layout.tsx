@@ -72,7 +72,7 @@ export default function RootLayout({
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />
-        <meta name="app-version" content="2026-06-22-v23-ios-sidebar-sticky-footer-dvh" />
+        <meta name="app-version" content="2026-06-25-v24-hrms-attendance-bridge-emp-routing-fix" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

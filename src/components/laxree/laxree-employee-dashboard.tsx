@@ -3,6 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useState } from 'react'
+import { LaxreeAttendancePanel } from './laxree-attendance-panel'
 
 // Avatar colors
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
@@ -22,7 +23,7 @@ export function LaxreeEmployeeDashboard() {
   const userAvatarBg = avatarColor(currentUserName || 'Employee')
 
   // Tab navigation for employee dashboard
-  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard'>('overview')
+  const [empTab, setEmpTab] = useState<'overview' | 'tasks' | 'scorecard' | 'attendance'>('overview')
   const [taskFilter, setTaskFilter] = useState<string>('all')
 
   // NOTE: 'emp-tasks' is now a dedicated page (LaxreeEmpMyTasks) — no need to auto-switch tabs here.
@@ -140,6 +141,7 @@ export function LaxreeEmployeeDashboard() {
     { id: 'overview' as const, label: 'Overview', icon: '📊' },
     { id: 'tasks' as const, label: 'My Tasks', icon: '📋' },
     { id: 'scorecard' as const, label: 'My Scorecard', icon: '📈' },
+    { id: 'attendance' as const, label: 'Attendance', icon: '📅' },
   ]
 
   return (
@@ -836,6 +838,13 @@ export function LaxreeEmployeeDashboard() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ===================== ATTENDANCE TAB (v24·0625) ===================== */}
+      {/* Live HRMS attendance (read-only) + raise attendance query form. */}
+      {/* Sourced via /api/attendance/bridge — never modifies HRMS data.     */}
+      {empTab === 'attendance' && (
+        <LaxreeAttendancePanel />
       )}
 
     </>

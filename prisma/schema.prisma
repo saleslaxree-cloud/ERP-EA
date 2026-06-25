@@ -42,6 +42,8 @@ model User {
   leaves             Leave[]             @relation("UserLeaves")
   approvedLeaves     Leave[]             @relation("LeaveApprover")
   taskActivities     TaskActivity[]      @relation("TaskActivityActor")
+  // v24·0625: Attendance queries raised by this user (HRMS bridge)
+  attendanceQueries  AttendanceQuery[]   @relation("AttendanceQueryUser")
 }
 
 model Department {
@@ -404,4 +406,40 @@ model TaskActivity {
   @@index([taskId])
   @@index([createdAt])
   @@index([action])
+}
+
+// ═══════════════════════════════════════════════════════════
+// v24·0625 — ATTENDANCE QUERY (HRMS ↔ ERP BRIDGE)
+// ═══════════════════════════════════════════════════════════
+// PURELY ADDITIVE model — does NOT touch any existing table or row.
+// Employees raise queries about their HRMS attendance (e.g. "my check-in
+// is missing for 12 June"). The query is stored in ERP. HR (from HRMS)
+// reads open queries via the external API and posts a reply. The reply
+// is also stored here. NO attendance data is ever modified — this is a
+// read-only bridge with a side-channel for query/response.
+model AttendanceQuery {
+  id           String   @id @default(cuid())
+  // ERP user who raised the query
+  userId       String
+  user         User     @relation("AttendanceQueryUser", fields: [userId], references: [id])
+  // HRMS employeeId (looked up from email at raise time, stored for reference)
+  hrmsEmployeeId String?
+  // Month/Year the query is about (e.g. 6 / 2026). Free-form — kept as integers.
+  queryMonth   Int
+  queryYear    Int
+  // The employee's question / complaint
+  queryText    String
+  // Status: OPEN | RESPONDED | CLOSED
+  status       String   @default("OPEN")
+  // HR reply (set when HR responds from HRMS)
+  hrReply      String?
+  // Who in HRMS responded (stored as free-text — HRMS admin username)
+  repliedBy    String?
+  repliedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useWorkflowStore } from '@/stores/workflow-store'
 
 export function LaxreeLogin() {
-  const { login, setCurrentUserId, setCurrentUserName, setCurrentRole, setCurrentUser } = useWorkflowStore()
+  const { login, setCurrentUserId, setCurrentUserName, setCurrentRole, setCurrentUser, setActivePage } = useWorkflowStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -34,6 +34,15 @@ export function LaxreeLogin() {
         setCurrentUserName(data.name)
         setCurrentRole(data.role as any)
         setCurrentUser({ username, role: data.role, name: data.name })
+        // v24·0625 BUG FIX: route user to the correct landing page based on role.
+        // Without this, employees land on `activePage === 'dashboard'` which is the
+        // admin/EA view (the "employee sees admin page" bug). Now we explicitly send
+        // EMPLOYEE/MANAGER users to 'employee-dashboard' on login.
+        if (data.role === 'EMPLOYEE' || data.role === 'MANAGER') {
+          setActivePage('employee-dashboard')
+        } else {
+          setActivePage('dashboard')
+        }
         return
       }
     } catch (err) {

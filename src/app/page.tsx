@@ -92,6 +92,12 @@ function ActiveView() {
   const renderView = () => {
     switch (activePage) {
       case 'dashboard':
+        // EMPLOYEE / MANAGER: never see admin dashboard — always land on their own.
+        // (v24·0625 BUG FIX: previously employees fell through to <LaxreeDashboard />
+        //  which is the admin/EA view, causing the "employee sees admin page" bug.)
+        if (currentRole === 'EMPLOYEE' || currentRole === 'MANAGER') {
+          return <LaxreeEmployeeDashboard />
+        }
         // FOUNDER: STRICT filter — sees ONLY tasks they assigned (no NULL fallback)
         if (isFounder) {
           return <LaxreeDashboard assignedById={currentUserId} strictAssignedBy directorName="Founder" />

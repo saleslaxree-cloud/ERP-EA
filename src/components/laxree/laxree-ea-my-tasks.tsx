@@ -49,7 +49,7 @@ const priorityBadge: Record<string, { bg: string; color: string; label: string }
 }
 
 export function LaxreeEaMyTasks() {
-  const { currentUserId, currentUserName, addToast, setSelectedTaskId, setCreateTaskOpen } = useWorkflowStore()
+  const { currentUserId, currentUserName, addToast, setSelectedTaskId, setCreateTaskOpen, setActivePage } = useWorkflowStore()
   const queryClient = useQueryClient()
 
   // Today / Upcoming / Overdue / Complete / All filter — 'all' is the default and shows every active task regardless of due date
@@ -224,6 +224,82 @@ export function LaxreeEaMyTasks() {
         </div>
       </div>
       <div className="page-accent" />
+
+      {/* v24·0625: Leave Management quick-access card for EA — per user requirement
+          "EA dashboard ke 'My Tasks' section me Leave Management add karna hai".
+          This is purely a navigation card — no data is created/modified here. */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 12, marginBottom: 16,
+      }}>
+        <button
+          onClick={() => setActivePage('leaves')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+            background: 'var(--card)', border: '1px solid var(--b1)', borderRadius: 'var(--r)',
+            cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+            boxShadow: 'var(--s1)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--g2)'; e.currentTarget.style.boxShadow = 'var(--s2)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b1)'; e.currentTarget.style.boxShadow = 'var(--s1)' }}
+        >
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+            background: 'rgba(184,134,11,.12)', color: 'var(--g2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>Leave Management</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+              View &amp; approve/reject leave applications
+            </div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--t3)', flexShrink: 0 }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+
+        {/* Employee leave view — EA can also see their own leave applications */}
+        <button
+          onClick={() => setActivePage('emp-leaves')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px',
+            background: 'var(--card)', border: '1px solid var(--b1)', borderRadius: 'var(--r)',
+            cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+            boxShadow: 'var(--s1)',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--g2)'; e.currentTarget.style.boxShadow = 'var(--s2)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--b1)'; e.currentTarget.style.boxShadow = 'var(--s1)' }}
+        >
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+            background: 'rgba(29,78,216,.1)', color: 'var(--blue)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t1)' }}>My Leave Applications</div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
+              Apply for leave &amp; track your application status
+            </div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--t3)', flexShrink: 0 }}>
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </button>
+      </div>
 
       {/* Search + Priority Filter */}
       <div style={{ marginBottom: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
