@@ -10,14 +10,20 @@ import { db } from '@/lib/db'
 // AUTH: Requires `x-erp-api-key` header matching env var ERP_BRIDGE_API_KEY.
 // This is a static shared secret — does NOT touch any DB table.
 //
+// v24·0625-fix: FALLBACK — if ERP_BRIDGE_API_KEY is not set on this ERP
+// deployment, accept HRMS_BRIDGE_API_KEY instead. This makes the bridge
+// work even when only ONE of the two keys is configured on each side
+// (which is the most common deployment mistake). When both keys are set,
+// ERP_BRIDGE_API_KEY takes precedence (preserving the original isolation).
+//
 // SAFETY: Read-only endpoint. Does not modify any data.
 // ════════════════════════════════════════════════════════════════════════
 
 export async function GET(request: NextRequest) {
   try {
-    // Validate API key
+    // Validate API key (with fallback to the symmetric key — see header comment)
     const apiKey = request.headers.get('x-erp-api-key')
-    const expectedKey = process.env.ERP_BRIDGE_API_KEY
+    const expectedKey = process.env.ERP_BRIDGE_API_KEY || process.env.HRMS_BRIDGE_API_KEY
     if (!expectedKey || apiKey !== expectedKey) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

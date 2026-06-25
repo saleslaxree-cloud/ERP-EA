@@ -8,6 +8,10 @@ import { db } from '@/lib/db'
 //
 // AUTH: Requires `x-erp-api-key` header matching env var ERP_BRIDGE_API_KEY.
 //
+// v24·0625-fix: FALLBACK — if ERP_BRIDGE_API_KEY is not set on this ERP
+// deployment, accept HRMS_BRIDGE_API_KEY instead. See attendance-queries/route.ts
+// for full rationale.
+//
 // SAFETY: ONLY modifies the AttendanceQuery row's hrReply / repliedBy /
 // repliedAt / status fields. Never touches any other table.
 // ════════════════════════════════════════════════════════════════════════
@@ -15,9 +19,9 @@ import { db } from '@/lib/db'
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    // Validate API key
+    // Validate API key (with fallback to the symmetric key)
     const apiKey = request.headers.get('x-erp-api-key')
-    const expectedKey = process.env.ERP_BRIDGE_API_KEY
+    const expectedKey = process.env.ERP_BRIDGE_API_KEY || process.env.HRMS_BRIDGE_API_KEY
     if (!expectedKey || apiKey !== expectedKey) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

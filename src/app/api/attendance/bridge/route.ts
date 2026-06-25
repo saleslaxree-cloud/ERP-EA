@@ -40,13 +40,16 @@ export async function GET(request: NextRequest) {
     }
 
     // HRMS bridge config (env vars only — no DB lookup)
-    const hrmsUrl = process.env.HRMS_BRIDGE_URL
-    const hrmsKey = process.env.HRMS_BRIDGE_API_KEY
-    if (!hrmsUrl || !hrmsKey) {
+    // v24·0625-fix: fall back to ERP_BRIDGE_API_KEY if HRMS_BRIDGE_API_KEY is missing,
+    // and to a hardcoded production HRMS URL if HRMS_BRIDGE_URL is missing. This makes
+    // the bridge resilient to partial env var configuration on Vercel.
+    const hrmsUrl = process.env.HRMS_BRIDGE_URL || 'https://laxree-hrms.vercel.app'
+    const hrmsKey = process.env.HRMS_BRIDGE_API_KEY || process.env.ERP_BRIDGE_API_KEY
+    if (!hrmsKey) {
       // Soft-fail: return empty structure so frontend doesn't crash, with a clear flag
       return NextResponse.json({
         configured: false,
-        message: 'HRMS bridge not configured. Set HRMS_BRIDGE_URL and HRMS_BRIDGE_API_KEY env vars.',
+        message: 'HRMS bridge not configured. Set HRMS_BRIDGE_API_KEY (or ERP_BRIDGE_API_KEY as fallback) on the ERP server.',
         records: [],
         summary: null,
         employee: null,
