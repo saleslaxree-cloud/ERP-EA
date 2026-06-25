@@ -1069,13 +1069,35 @@ function SettingsView() {
    Main Page Export
    ═══════════════════════════════════════════════════════════ */
 export default function HomePage() {
-  const { darkMode, currentUser } = useWorkflowStore()
+  // v24·0625-refresh-fix: read _hasHydrated so we don't render the login gate
+  // until persist has finished rehydrating auth state from localStorage.
+  // Without this, every refresh showed the login page for a split second
+  // (because the store starts with currentUser=null until persist loads it),
+  // even though the user was actually logged in.
+  const { darkMode, currentUser, _hasHydrated } = useWorkflowStore()
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
       document.documentElement.classList.toggle('dark', darkMode)
     }
   }, [darkMode])
+
+  // v24·0625-refresh-fix: while persist hasn't rehydrated yet, render a tiny
+  // neutral placeholder so we don't flash the login screen on every refresh.
+  // This is only visible for ~1 frame on slow devices; on most clients it's
+  // imperceptible because persist hydrates synchronously from localStorage.
+  if (!_hasHydrated) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0,
+        background: '#fffcf2',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#8B6914', fontSize: 13, fontWeight: 600, letterSpacing: 0.4,
+      }}>
+        LAXREE
+      </div>
+    )
+  }
 
   // Login gate — show login page if not authenticated
   if (!currentUser) {
