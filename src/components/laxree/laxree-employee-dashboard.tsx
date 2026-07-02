@@ -777,14 +777,22 @@ export function LaxreeEmployeeDashboard() {
                 border: '1px solid rgba(217,119,6,.2)',
                 fontSize: 11, color: '#92400E', lineHeight: 1.6, fontWeight: 600,
               }}>
-                <strong>Strict scoring:</strong> Each revision reduces your task score progressively.
+                <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--blue)' }}>
+                  ✨ New scoring (tasks created on/after 27 June 2026)
+                </div>
                 <ul style={{ margin: '6px 0 0 18px', padding: 0 }}>
-                  <li>1st revision: -10 points</li>
-                  <li>2nd revision: -15 additional (total -25)</li>
-                  <li>3rd revision: -20 additional (total -45)</li>
+                  <li>1st revision: <strong>no impact</strong> (0 pts)</li>
+                  <li>2nd revision: <strong>no impact</strong> (0 pts)</li>
+                  <li>3rd revision: -20 points</li>
                   <li>4th+ revision: -25 each (caps at 0)</li>
                 </ul>
-                Avoid unnecessary revisions to keep your PR Score high.
+                <div style={{ marginTop: 8, fontSize: 10, color: 'var(--t3)', fontWeight: 500 }}>
+                  📜 Tasks created <em>before</em> 27 June 2026 keep the original progressive penalty
+                  (-10 / -15 / -20 / -25). Old scores are never recalculated.
+                </div>
+                <div style={{ marginTop: 6, fontSize: 11, color: '#92400E' }}>
+                  Avoid unnecessary revisions to keep your PR Score high.
+                </div>
               </div>
             </div>
           </div>

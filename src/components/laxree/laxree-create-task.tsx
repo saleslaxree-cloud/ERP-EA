@@ -2,7 +2,7 @@
 
 import { useWorkflowStore } from '@/stores/workflow-store'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 const DEPTS = ['Sales', 'Account', 'HR', 'Coordinator', 'Admin', 'Back Office']
 const CATEGORIES = ['Routine Work', 'Reconciliation', 'One Time Work', 'Compliance', 'Operations', 'Procurement']
@@ -54,6 +54,67 @@ export function LaxreeCreateTask() {
   const [selectedWeekDays, setSelectedWeekDays] = useState<string[]>([])
   const [selectedMonthDates, setSelectedMonthDates] = useState<number[]>([])
   const [steps, setSteps] = useState<TaskStep[]>([])
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [fileError, setFileError] = useState<string>('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ─── Attachment helpers ────────────────────────────────────────────────
+  // Files selected here are stored in component state and uploaded AFTER the
+  // task is created (attachments need a taskId to link to). The upload is a
+  // multipart POST to /api/tasks/[id]/attachments.
+  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15 MB per file
+  const MAX_TOTAL_FILES = 10
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError('')
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+
+    const accepted: File[] = []
+    for (const f of selected) {
+      if (f.size > MAX_FILE_SIZE) {
+        setFileError(`"${f.name}" is too large. Max 15 MB per file.`)
+        continue
+      }
+      if (f.size === 0) {
+        setFileError(`"${f.name}" is empty.`)
+        continue
+      }
+      accepted.push(f)
+    }
+
+    if (pendingFiles.length + accepted.length > MAX_TOTAL_FILES) {
+      setFileError(`Max ${MAX_TOTAL_FILES} files per task. You already have ${pendingFiles.length}.`)
+      return
+    }
+
+    setPendingFiles(prev => [...prev, ...accepted])
+    // Reset the input so the same file can be re-selected if needed
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const removePendingFile = (idx: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+
+  const getFileIcon = (file: File) => {
+    const t = file.type.toLowerCase()
+    const n = file.name.toLowerCase()
+    if (t.startsWith('image/')) return '🖼️'
+    if (t === 'application/pdf' || n.endsWith('.pdf')) return '📄'
+    if (t.includes('spreadsheet') || n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv')) return '📊'
+    if (t.includes('word') || n.endsWith('.docx') || n.endsWith('.doc')) return '📝'
+    if (t.includes('presentation') || n.endsWith('.pptx') || n.endsWith('.ppt')) return '📽️'
+    if (t.startsWith('text/')) return '📃'
+    if (n.endsWith('.zip') || n.endsWith('.rar') || n.endsWith('.7z')) return '🗜️'
+    return '📎'
+  }
 
   const { data: fetchedUsers = [] } = useQuery({
     queryKey: ['users-create-task'],
@@ -138,7 +199,41 @@ export function LaxreeCreateTask() {
       })
 
       if (res.ok) {
+        const createdTask = await res.json()
         addToast('ok', `Task "${form.title}" created successfully`)
+
+        // ─── Upload attachments (if any) ────────────────────────────────
+        // Files are sent as multipart/form-data to the per-task attachments
+        // endpoint. Errors here are non-fatal — the task is already created.
+        if (pendingFiles.length > 0 && createdTask?.id) {
+          try {
+            const fd = new FormData()
+            pendingFiles.forEach(f => fd.append('files', f))
+            if (currentUserId) fd.append('uploadedById', currentUserId)
+            const attRes = await fetch(`/api/tasks/${createdTask.id}/attachments`, {
+              method: 'POST',
+              body: fd,
+            })
+            if (attRes.ok) {
+              const attData = await attRes.json().catch(() => ({}))
+              const ok = attData?.uploaded?.length || 0
+              const bad = attData?.errors?.length || 0
+              if (ok > 0 && bad === 0) {
+                addToast('ok', `${ok} attachment(s) uploaded`)
+              } else if (ok > 0 && bad > 0) {
+                addToast('ok', `${ok} uploaded, ${bad} failed`)
+              } else if (bad > 0) {
+                addToast('err', `Attachment upload failed: ${attData.errors[0]?.reason || 'unknown'}`)
+              }
+            } else {
+              addToast('err', 'Attachment upload failed (task was still created)')
+            }
+          } catch (attErr) {
+            console.error('Attachment upload error (non-fatal):', attErr)
+            addToast('err', 'Attachment upload failed (task was still created)')
+          }
+        }
+
         qc.invalidateQueries({ queryKey: ['tasks'] })
         qc.invalidateQueries({ queryKey: ['tasks-list'] })
         qc.invalidateQueries({ queryKey: ['dashboard'] })
@@ -150,6 +245,8 @@ export function LaxreeCreateTask() {
         setSteps([])
         setSelectedWeekDays([])
         setSelectedMonthDates([])
+        setPendingFiles([])
+        setFileError('')
       } else {
         const err = await res.json().catch(() => ({}))
         addToast('err', err.error || 'Failed to create task')
@@ -409,6 +506,80 @@ export function LaxreeCreateTask() {
             >
               + Add Step
             </button>
+          </div>
+
+          {/* ═══ ATTACHMENTS SECTION (v25·0627) ═══ */}
+          <div className="gold-divider" />
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--g2)', marginBottom: 4 }}>
+              ATTACHMENTS (OPTIONAL)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--t3)', marginBottom: 12 }}>
+              Upload files (images, PDFs, documents, Excel, any file). Max 15 MB per file, up to 10 files per task.
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+              // Accept any file type — per spec: "File types: image, pdf, document, excel, any file"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="btn btn-ghost btn-sm"
+              style={{ border: '1px dashed var(--b2)', width: '100%', textAlign: 'center', padding: '12px' }}
+            >
+              📎 + Attach Files
+            </button>
+
+            {fileError && (
+              <div style={{
+                marginTop: 8, padding: '8px 12px', borderRadius: 6,
+                background: 'var(--red-l)', color: 'var(--red)',
+                fontSize: 11, fontWeight: 600,
+              }}>
+                ⚠ {fileError}
+              </div>
+            )}
+
+            {pendingFiles.length > 0 && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {pendingFiles.map((file, idx) => (
+                  <div key={`${file.name}-${idx}`} style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 10px', borderRadius: 6,
+                    background: 'var(--bg2)', border: '1px solid var(--b1)',
+                  }}>
+                    <span style={{ fontSize: 16 }}>{getFileIcon(file)}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--t1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {file.name}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--t3)' }}>
+                        {formatBytes(file.size)} · {file.type || 'unknown type'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePendingFile(idx)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--red)', fontSize: 14, fontWeight: 700, padding: '0 4px', flexShrink: 0,
+                      }}
+                      title="Remove file"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
+                  {pendingFiles.length} file(s) ready · will be uploaded after task creation
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}

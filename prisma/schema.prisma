@@ -44,6 +44,8 @@ model User {
   taskActivities     TaskActivity[]      @relation("TaskActivityActor")
   // v24·0625: Attendance queries raised by this user (HRMS bridge)
   attendanceQueries  AttendanceQuery[]   @relation("AttendanceQueryUser")
+  // v25·0627: Task attachments uploaded by this user (audit trail)
+  uploadedAttachments TaskAttachment[]   @relation("TaskAttachmentUploader")
 }
 
 model Department {
@@ -193,6 +195,50 @@ model Task {
 
   // Performance score
   score           Float?
+
+  // ─── v25·0627 — Task Attachments (relation) ───────────────────────────
+  // A task can have 0..N attached files (images, PDFs, docs, excel, any file).
+  // Stored as raw bytes in DB so the feature works on Vercel without any
+  // external object-storage dependency. Existing tasks simply have zero
+  // attachments until files are uploaded — NO migration of existing rows.
+  attachments     TaskAttachment[]
+}
+
+// ═══════════════════════════════════════════════════════════
+// v25·0627 — TASK ATTACHMENT
+// ═══════════════════════════════════════════════════════════
+// Purely ADDITIVE model — does NOT touch any existing table or row.
+// Files are stored as raw bytes (Bytes type → BYTEA in Postgres) so the
+// feature works on Vercel/serverless without external object storage.
+//
+// Columns:
+//   id          — cuid primary key
+//   taskId      — FK → Task.id (cascade on delete so attachments are
+//                 cleaned up automatically when a task is deleted)
+//   fileName    — original file name as uploaded by the user
+//   fileType    — MIME type (e.g. image/png, application/pdf)
+//   fileSize    — file size in bytes (for UI display)
+//   fileData    — raw file content (BYTEA)
+//   uploadedById— optional, the user who uploaded (for audit)
+//   createdAt   — auto timestamp
+//
+// No data from existing tables is read or modified — only new rows are
+// inserted here when users upload attachments to a task.
+model TaskAttachment {
+  id           String   @id @default(cuid())
+  taskId       String
+  fileName     String
+  fileType     String   @default("application/octet-stream")
+  fileSize     Int      @default(0)
+  fileData     Bytes
+  uploadedById String?
+  createdAt    DateTime @default(now())
+
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy   User?    @relation("TaskAttachmentUploader", fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Restrict)
+
+  @@index([taskId])
+  @@index([createdAt])
 }
 
 model TaskStep {

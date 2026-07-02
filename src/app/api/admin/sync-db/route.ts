@@ -120,6 +120,60 @@ export async function POST(request: NextRequest) {
   `, 'Add FK TaskActivity.actorId → User.id')
 
   // ───────────────────────────────────────────────────────────────────────
+  // 4b. Create TaskAttachment table (v25·0627) if it doesn't exist
+  // ───────────────────────────────────────────────────────────────────────
+  // Purely ADDITIVE — does NOT touch any existing table or row. Files are
+  // stored as raw BYTEA so the feature works on Vercel without external
+  // object storage. Existing tasks simply have zero attachments until the
+  // user uploads one.
+  await runSql(`
+    CREATE TABLE IF NOT EXISTS "TaskAttachment" (
+      "id"           TEXT NOT NULL,
+      "taskId"       TEXT NOT NULL,
+      "fileName"     TEXT NOT NULL,
+      "fileType"     TEXT NOT NULL DEFAULT 'application/octet-stream',
+      "fileSize"     INTEGER NOT NULL DEFAULT 0,
+      "fileData"     BYTEA NOT NULL,
+      "uploadedById" TEXT,
+      "createdAt"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT "TaskAttachment_pkey" PRIMARY KEY ("id")
+    )
+  `, 'Create TaskAttachment table')
+
+  await runSql(`CREATE INDEX IF NOT EXISTS "TaskAttachment_taskId_idx" ON "TaskAttachment"("taskId")`, 'Index TaskAttachment.taskId')
+  await runSql(`CREATE INDEX IF NOT EXISTS "TaskAttachment_createdAt_idx" ON "TaskAttachment"("createdAt")`, 'Index TaskAttachment.createdAt')
+
+  // FK: TaskAttachment.taskId → Task.id (CASCADE on delete)
+  await runSql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'TaskAttachment_taskId_fkey' AND table_name = 'TaskAttachment'
+      ) THEN
+        ALTER TABLE "TaskAttachment"
+          ADD CONSTRAINT "TaskAttachment_taskId_fkey"
+          FOREIGN KEY ("taskId") REFERENCES "Task"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `, 'Add FK TaskAttachment.taskId → Task.id')
+
+  // FK: TaskAttachment.uploadedById → User.id (SET NULL on delete)
+  await runSql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'TaskAttachment_uploadedById_fkey' AND table_name = 'TaskAttachment'
+      ) THEN
+        ALTER TABLE "TaskAttachment"
+          ADD CONSTRAINT "TaskAttachment_uploadedById_fkey"
+          FOREIGN KEY ("uploadedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+      END IF;
+    END $$;
+  `, 'Add FK TaskAttachment.uploadedById → User.id')
+
+  // ───────────────────────────────────────────────────────────────────────
   // 5. Add missing User columns
   // ───────────────────────────────────────────────────────────────────────
   const userColumns: { name: string; sql: string }[] = [

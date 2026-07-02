@@ -26,6 +26,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useWorkflowStore } from '@/stores/workflow-store'
+import { useState, useRef } from 'react'
 
 const AVATAR_COLORS = ['#B45309', '#6D28D9', '#0F766E', '#1D4ED8', '#BE123C', '#15803D', '#C2410C', '#7C3AED']
 function avatarColor(name: string) {
@@ -35,6 +36,26 @@ function avatarColor(name: string) {
 }
 function getInitials(name: string) {
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+// ─── Attachment helpers ─────────────────────────────────────────────────
+function formatBytes(bytes: number) {
+  if (!bytes) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+function getFileIconForName(fileName: string, fileType: string) {
+  const t = (fileType || '').toLowerCase()
+  const n = (fileName || '').toLowerCase()
+  if (t.startsWith('image/')) return '🖼️'
+  if (t === 'application/pdf' || n.endsWith('.pdf')) return '📄'
+  if (t.includes('spreadsheet') || n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv')) return '📊'
+  if (t.includes('word') || n.endsWith('.docx') || n.endsWith('.doc')) return '📝'
+  if (t.includes('presentation') || n.endsWith('.pptx') || n.endsWith('.ppt')) return '📽️'
+  if (t.startsWith('text/')) return '📃'
+  if (n.endsWith('.zip') || n.endsWith('.rar') || n.endsWith('.7z')) return '🗜️'
+  return '📎'
 }
 
 const statusStyle: Record<string, { bg: string; color: string; label: string }> = {
@@ -73,6 +94,9 @@ function getSlaStatus(task: any) {
 export function LaxreeTaskDetail() {
   const { selectedTaskId, setSelectedTaskId, currentRole, currentUserId, addToast } = useWorkflowStore()
   const qc = useQueryClient()
+  const [uploadingFiles, setUploadingFiles] = useState(false)
+  const [attachmentError, setAttachmentError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch all tasks (cached). Query is only enabled when a task is selected.
   const { data: tasks = [] } = useQuery<any[]>({
@@ -84,6 +108,20 @@ export function LaxreeTaskDetail() {
     enabled: !!selectedTaskId,
     staleTime: 0,
   })
+
+  // ─── Fetch attachments for the currently selected task ────────────────
+  // Kept separate from the main tasks query so adding/removing an attachment
+  // only invalidates this small query, not the whole tasks list.
+  const { data: attachmentsResp, refetch: refetchAttachments } = useQuery<{ attachments: any[] }>({
+    queryKey: ['task-attachments', selectedTaskId],
+    queryFn: () => fetch(`/api/tasks/${selectedTaskId}/attachments`).then(r => {
+      if (!r.ok) throw new Error('Failed to fetch attachments')
+      return r.json()
+    }),
+    enabled: !!selectedTaskId,
+    staleTime: 0,
+  })
+  const attachments = attachmentsResp?.attachments || []
 
   if (!selectedTaskId) return null
   const task = (Array.isArray(tasks) ? tasks : []).find(t => t.id === selectedTaskId)
@@ -149,6 +187,87 @@ export function LaxreeTaskDetail() {
     }
   }
 
+  // ─── Attachment handlers ──────────────────────────────────────────────
+  const MAX_FILE_SIZE = 15 * 1024 * 1024 // 15 MB per file
+  const MAX_TOTAL_FILES = 10
+
+  const handleAttachmentSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAttachmentError('')
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
+    if (fileInputRef.current) fileInputRef.current.value = ''
+
+    // Validate before upload
+    const accepted: File[] = []
+    for (const f of selected) {
+      if (f.size > MAX_FILE_SIZE) {
+        setAttachmentError(`"${f.name}" is too large. Max 15 MB per file.`)
+        continue
+      }
+      if (f.size === 0) {
+        setAttachmentError(`"${f.name}" is empty.`)
+        continue
+      }
+      accepted.push(f)
+    }
+    if (attachments.length + accepted.length > MAX_TOTAL_FILES) {
+      setAttachmentError(`Max ${MAX_TOTAL_FILES} files per task. Task already has ${attachments.length}.`)
+      return
+    }
+    if (accepted.length === 0) return
+
+    setUploadingFiles(true)
+    try {
+      const fd = new FormData()
+      accepted.forEach(f => fd.append('files', f))
+      if (currentUserId) fd.append('uploadedById', currentUserId)
+      const res = await fetch(`/api/tasks/${task.id}/attachments`, {
+        method: 'POST',
+        body: fd,
+      })
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const ok = data?.uploaded?.length || 0
+        const bad = data?.errors?.length || 0
+        if (ok > 0 && bad === 0) addToast('ok', `${ok} attachment(s) uploaded`)
+        else if (ok > 0 && bad > 0) addToast('ok', `${ok} uploaded, ${bad} failed`)
+        else if (bad > 0) addToast('err', `Upload failed: ${data.errors[0]?.reason || 'unknown'}`)
+        refetchAttachments()
+        qc.invalidateQueries({ queryKey: ['task-attachments', task.id] })
+      } else {
+        addToast('err', 'Attachment upload failed')
+      }
+    } catch {
+      addToast('err', 'Attachment upload failed')
+    }
+    setUploadingFiles(false)
+  }
+
+  const handleDownloadAttachment = (attachmentId: string) => {
+    // Browser handles the download via direct URL navigation
+    if (typeof window !== 'undefined') {
+      window.open(`/api/tasks/${task.id}/attachments/${attachmentId}`, '_blank')
+    }
+  }
+
+  const handleDeleteAttachment = async (attachmentId: string, fileName: string) => {
+    if (!confirm(`Delete "${fileName}"? This cannot be undone.`)) return
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        addToast('ok', 'Attachment deleted')
+        refetchAttachments()
+        qc.invalidateQueries({ queryKey: ['task-attachments', task.id] })
+      } else {
+        addToast('err', 'Failed to delete attachment')
+      }
+    } catch {
+      addToast('err', 'Failed to delete attachment')
+    }
+  }
+
   return (
     <div className="overlay show" onClick={e => { if (e.target === e.currentTarget) setSelectedTaskId(null) }}>
       <div className="modal modal-lg" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
@@ -203,9 +322,23 @@ export function LaxreeTaskDetail() {
             </div>
           )}
           {!task.reviseReason && task.reviseCount > 0 && (
-            <div style={{ padding: '6px 12px', background: 'var(--red-l)', borderRadius: 6, color: 'var(--red)', fontWeight: 700, gridColumn: '1 / -1' }}>
-              ⚠ Revised ×{task.reviseCount} — score penalty applied
-            </div>
+            (() => {
+              const created = task.createdAt ? new Date(task.createdAt) : null
+              const isV2 = created && !isNaN(created.getTime()) && created.getTime() >= new Date('2026-06-26T18:30:00.000Z').getTime()
+              return (
+                <div style={{
+                  padding: '6px 12px',
+                  background: isV2 && task.reviseCount <= 2 ? 'var(--blue-l)' : 'var(--red-l)',
+                  borderRadius: 6,
+                  color: isV2 && task.reviseCount <= 2 ? 'var(--blue)' : 'var(--red)',
+                  fontWeight: 700, gridColumn: '1 / -1',
+                }}>
+                  {isV2 && task.reviseCount <= 2
+                    ? `↩ Revised ×${task.reviseCount} — no score impact (first 2 revisions are free)`
+                    : `⚠ Revised ×${task.reviseCount} — score penalty applied`}
+                </div>
+              )
+            })()
           )}
         </div>
 
@@ -272,6 +405,137 @@ export function LaxreeTaskDetail() {
         )}
 
         {/* ACTION BUTTONS — Role-based */}
+        <div className="gold-divider" />
+
+        {/* ═══ ATTACHMENTS SECTION (v25·0627) ═══ */}
+        {/* Visible to ALL roles. Upload/delete restricted to ADMIN/EA per the
+            existing canModifyTask convention; everyone else can download. */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 11, fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--t3)' }}>
+              Attachments
+            </div>
+            <span className="badge" style={{ fontSize: 9, padding: '1px 6px', background: 'var(--bg2)', color: 'var(--t3)', fontWeight: 700 }}>
+              {attachments.length}
+            </span>
+          </div>
+
+          {canModifyTask && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                onChange={handleAttachmentSelect}
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingFiles || attachments.length >= 10}
+                className="btn btn-ghost btn-sm"
+                style={{
+                  border: '1px dashed var(--b2)',
+                  width: '100%', textAlign: 'center', padding: '10px',
+                  opacity: uploadingFiles || attachments.length >= 10 ? 0.6 : 1,
+                  cursor: uploadingFiles || attachments.length >= 10 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {uploadingFiles
+                  ? '⏳ Uploading...'
+                  : attachments.length >= 10
+                  ? '📁 Max 10 attachments reached'
+                  : '📎 + Add Attachment'}
+              </button>
+              <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 4, fontWeight: 600 }}>
+                Max 15 MB per file · Images, PDF, docs, Excel, any file · up to 10 files
+              </div>
+            </>
+          )}
+
+          {attachmentError && (
+            <div style={{
+              marginTop: 8, padding: '8px 12px', borderRadius: 6,
+              background: 'var(--red-l)', color: 'var(--red)',
+              fontSize: 11, fontWeight: 600,
+            }}>
+              ⚠ {attachmentError}
+            </div>
+          )}
+
+          {attachments.length === 0 ? (
+            <div style={{
+              marginTop: 8, padding: '12px', textAlign: 'center',
+              background: 'var(--bg2)', borderRadius: 6,
+              fontSize: 11, color: 'var(--t3)', fontWeight: 600,
+            }}>
+              📭 No attachments yet
+            </div>
+          ) : (
+            <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {attachments.map((att: any) => (
+                <div key={att.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', borderRadius: 8,
+                  background: 'var(--bg2)', border: '1px solid var(--b1)',
+                }}>
+                  <span style={{ fontSize: 18 }}>{getFileIconForName(att.fileName, att.fileType)}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--t1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {att.fileName}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--t3)', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <span>{formatBytes(att.fileSize)}</span>
+                      <span>·</span>
+                      <span>{att.fileType || 'file'}</span>
+                      {att.createdAt && (
+                        <>
+                          <span>·</span>
+                          <span>added {new Date(att.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadAttachment(att.id)}
+                    className="btn btn-xs"
+                    style={{
+                      background: 'var(--blue-l)', color: 'var(--blue)',
+                      border: '1px solid var(--blue)', fontWeight: 700,
+                      whiteSpace: 'nowrap',
+                    }}
+                    title="Download file"
+                  >
+                    ⬇ Download
+                  </button>
+                  {canModifyTask && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAttachment(att.id, att.fileName)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--red)', fontSize: 14, fontWeight: 700,
+                        padding: '0 4px', flexShrink: 0,
+                      }}
+                      title="Delete attachment"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Read-only notice for employees */}
+          {!canModifyTask && (
+            <div style={{ fontSize: 10, color: 'var(--t3)', marginTop: 6, fontWeight: 600, fontStyle: 'italic' }}>
+              🔒 Only Admin/EA can add or remove attachments. You can download existing files.
+            </div>
+          )}
+        </div>
+
         <div className="gold-divider" />
         {canModifyTask ? (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>

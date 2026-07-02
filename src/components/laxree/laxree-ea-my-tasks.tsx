@@ -570,33 +570,63 @@ export function LaxreeEaMyTasks() {
               </div>
             </div>
 
-            {/* Strict score penalty warning */}
+            {/* Date-based score penalty warning (v9 · 27 June 2026) */}
             <div style={{
               marginBottom: 14, padding: '10px 12px', borderRadius: 8,
               background: 'rgba(220,38,38,.06)', border: '1px solid rgba(220,38,38,.2)',
               fontSize: 11, color: '#991B1B', lineHeight: 1.5,
             }}>
-              <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--red)' }}>⚠ Score Penalty Warning</div>
-              <div>
-                This will be revision <strong>#{(reviseTask.reviseCount || 0) + 1}</strong> for this task.
-                {' '}Penalty: <strong>-{(() => {
-                  const next = (reviseTask.reviseCount || 0) + 1
-                  if (next === 1) return 10
-                  if (next === 2) return 15
-                  if (next === 3) return 20
-                  return 25
-                })()} points</strong> (cumulative total: -{(() => {
-                  let p = 0
-                  const next = (reviseTask.reviseCount || 0) + 1
+              <div style={{ fontWeight: 800, marginBottom: 4, color: 'var(--red)' }}>⚠ Score Penalty</div>
+              {(() => {
+                const created = reviseTask.createdAt ? new Date(reviseTask.createdAt) : null
+                const isV2 = created && !isNaN(created.getTime()) && created.getTime() >= new Date('2026-06-26T18:30:00.000Z').getTime()
+                const next = (reviseTask.reviseCount || 0) + 1
+                if (isV2) {
+                  const inc = next <= 2 ? 0 : next === 3 ? 20 : 25
+                  let cum = 0
                   for (let i = 1; i <= next; i++) {
-                    if (i === 1) p += 10
-                    else if (i === 2) p += 15
-                    else if (i === 3) p += 20
-                    else p += 25
+                    if (i <= 2) cum += 0
+                    else if (i === 3) cum += 20
+                    else cum += 25
                   }
-                  return p
-                })()} pts).
-              </div>
+                  return (
+                    <div>
+                      <div style={{ fontSize: 10, color: 'var(--blue)', fontWeight: 700, marginBottom: 4 }}>
+                        ✨ New scoring (task created on/after 27 June 2026)
+                      </div>
+                      <div>
+                        This will be revision <strong>#{next}</strong>.{' '}
+                        {inc === 0
+                          ? <>First two revisions are <strong>FREE</strong> — no score impact.</>
+                          : <>Penalty: <strong>-{inc} points</strong> (cumulative total: <strong>-{cum} pts</strong>).</>
+                        }
+                      </div>
+                      <div style={{ fontSize: 10, marginTop: 4, color: 'var(--t3)' }}>
+                        Rules: 1st & 2nd revision = 0 pts · 3rd revision = -20 pts · 4th+ = -25 pts each.
+                      </div>
+                    </div>
+                  )
+                }
+                const inc = next === 1 ? 10 : next === 2 ? 15 : next === 3 ? 20 : 25
+                let cum = 0
+                for (let i = 1; i <= next; i++) {
+                  if (i === 1) cum += 10
+                  else if (i === 2) cum += 15
+                  else if (i === 3) cum += 20
+                  else cum += 25
+                }
+                return (
+                  <div>
+                    <div style={{ fontSize: 10, color: 'var(--t3)', fontWeight: 700, marginBottom: 4 }}>
+                      📜 Original scoring (task created before 27 June 2026 — preserved)
+                    </div>
+                    <div>
+                      This will be revision <strong>#{next}</strong> for this task.
+                      {' '}Penalty: <strong>-{inc} points</strong> (cumulative total: <strong>-{cum} pts</strong>).
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
