@@ -72,24 +72,28 @@ export async function PATCH(
 
         // Auto-calculate performance score based on task completion.
         // Score is based ONLY on timeliness — revisions do NOT affect score.
-        //   On-time completion   → 100
-        //   Slightly late (≤ 2d) → 70
-        //   Significantly late   → 40
-        //   No due date set      → 80
+        // Comparison is DATE-ONLY (ignores time-of-day) so that completing a
+        // task any time on its due date counts as on-time.
+        //   On-time (due date >= today)         → 100
+        //   Slightly late (1–2 days overdue)    → 70
+        //   Significantly late (> 2 days)       → 40
+        //   No due date set                     → 80
         // Per-task score floor: 0.
         let baseScore: number
         if (score !== undefined) {
           baseScore = score
         } else if (task.dueDate) {
-          const dueDate = new Date(task.dueDate)
-          const diffMs = dueDate.getTime() - now.getTime()
-          const diffDays = diffMs / (1000 * 60 * 60 * 24)
+          const due = new Date(task.dueDate)
+          // Normalize both due date and "now" to midnight (date-only)
+          const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+          const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+          const diffDays = (dueDay - nowDay) / (1000 * 60 * 60 * 24)
           if (diffDays >= 0) {
-            baseScore = 100  // Completed on time
+            baseScore = 100  // Completed on or before due date
           } else if (diffDays >= -2) {
-            baseScore = 70   // Slightly late (within 2 days)
+            baseScore = 70   // Slightly late (1–2 days overdue)
           } else {
-            baseScore = 40   // Significantly late
+            baseScore = 40   // Significantly late (> 2 days)
           }
         } else {
           baseScore = 80  // No due date set

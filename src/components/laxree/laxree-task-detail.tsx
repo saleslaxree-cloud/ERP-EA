@@ -586,16 +586,6 @@ export function LaxreeTaskDetail() {
             fontSize: 14, fontWeight: 800, color: 'var(--green)',
           }}>
             Completed task ✅
-            {task.score != null && (
-              <span style={{
-                fontSize: 13, fontWeight: 800,
-                color: task.score >= 70 ? 'var(--green)' : task.score >= 40 ? 'var(--amber)' : 'var(--red)',
-                background: task.score >= 70 ? 'var(--green-l)' : task.score >= 40 ? 'var(--amber-l)' : 'var(--red-l)',
-                padding: '2px 8px', borderRadius: 4,
-              }}>
-                Score: {task.score}
-              </span>
-            )}
           </div>
         )}
         {/* CANCELLED → Show cancelled badge */}

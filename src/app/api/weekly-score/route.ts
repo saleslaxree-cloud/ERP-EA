@@ -95,10 +95,23 @@ export async function GET(req: NextRequest) {
       switch (task.status) {
         case WorkflowStatus.COMPLETED:
           if (task.dueDate && task.completedAt && new Date(task.completedAt) > new Date(task.dueDate)) {
-            completedLate++
-            // Late completion: check how late
-            const diffDays = (new Date(task.completedAt).getTime() - new Date(task.dueDate).getTime()) / (1000 * 60 * 60 * 24)
-            baseScore = diffDays <= 2 ? 70 : 40
+            // Date-only comparison — completing any time on the due date
+            // counts as on-time. Only compare calendar days.
+            const due = new Date(task.dueDate)
+            const comp = new Date(task.completedAt)
+            const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
+            const compDay = new Date(comp.getFullYear(), comp.getMonth(), comp.getDate()).getTime()
+            const dayDiff = (compDay - dueDay) / (1000 * 60 * 60 * 24)
+            if (dayDiff <= 0) {
+              completedOnTime++
+              baseScore = 100
+            } else if (dayDiff <= 2) {
+              completedLate++
+              baseScore = 70
+            } else {
+              completedLate++
+              baseScore = 40
+            }
           } else if (task.dueDate) {
             completedOnTime++
             baseScore = 100
