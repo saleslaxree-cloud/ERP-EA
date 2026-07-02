@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { WorkflowStatus } from '@/lib/constants'
-import { revisionPenalty, clampTaskScore } from '@/lib/score-utils'
 
 // GET /api/weekly-score?userId=xxx&weekStart=ISO&weekEnd=ISO
-// Returns per-user weekly task statistics with revision-aware scoring.
+// Returns per-user weekly task statistics.
 //
-// ─── Dual score system (v9 · 2026-06-27) ────────────────────────────────
-// Each task gets a base score (0–100) based on its current state:
+// Scoring is based ONLY on task timeliness & status — revisions do NOT
+// affect score.
 //   COMPLETED on time            → 100
 //   COMPLETED late (within 2d)   → 70
 //   COMPLETED late (> 2d)        → 40
@@ -18,21 +17,6 @@ import { revisionPenalty, clampTaskScore } from '@/lib/score-utils'
 //   REJECTED                     → 0
 //   No due date set              → 80 (treated as on-track by default)
 //
-// REVISION PENALTY — date-based:
-// ┌───────────────────────────────────────────────────────────────────────┐
-// │ Tasks created ON OR AFTER 27 June 2026 (v2 — lenient):               │
-// │   1st revision: 0   (no impact)                                      │
-// │   2nd revision: 0   (no impact)                                      │
-// │   3rd revision: -20 (penalty starts here)                            │
-// │   4th revision: -25 additional                                       │
-// │   5th+ revision: -25 each                                            │
-// ├───────────────────────────────────────────────────────────────────────┤
-// │ Tasks created BEFORE 27 June 2026 (v1 — original, preserved):        │
-// │   1st revision: -10                                                  │
-// │   2nd revision: -15  (cumulative -25)                                │
-// │   3rd revision: -20  (cumulative -45)                                │
-// │   4th+ revision: -25 each                                            │
-// └───────────────────────────────────────────────────────────────────────┘
 // Final per-task score floor: 0
 //
 // PR Score = average of per-task scores across all tasks in the week.
@@ -40,6 +24,9 @@ import { revisionPenalty, clampTaskScore } from '@/lib/score-utils'
 //   Green  = task score >= 70
 //   Yellow = task score 40–69
 //   Red    = task score < 40
+//
+// (reviseCount is still tracked for reporting — tasksRevised / totalRevisions
+//  fields remain in the response — but they no longer carry any penalty.)
 
 export async function GET(req: NextRequest) {
   try {
@@ -90,9 +77,8 @@ export async function GET(req: NextRequest) {
     let pending = 0
     let rejected = 0
 
-    let totalRevisions = 0          // Sum of reviseCount across all tasks in the week
-    let tasksRevised = 0            // How many distinct tasks have reviseCount > 0
-    let totalRevisionPenalty = 0    // Sum of penalty points across all tasks
+    let totalRevisions = 0          // Sum of reviseCount across all tasks in the week (reporting only)
+    let tasksRevised = 0            // How many distinct tasks have reviseCount > 0 (reporting only)
 
     let greenCount = 0   // task score >= 70
     let yellowCount = 0  // task score 40-69
@@ -156,18 +142,14 @@ export async function GET(req: NextRequest) {
           break
       }
 
-      // Apply revision penalty — uses date-based dual system (v9)
-      // Tasks created on/after 27 June 2026 use the lenient v2 logic;
-      // older tasks keep the original v1 logic. NO historical score is
-      // ever recalculated — only the current snapshot is computed fresh.
+      // Score is based ONLY on status & timeliness — revisions do NOT
+      // affect score. Per-task floor: 0.
       const reviseCount = (task as any).reviseCount || 0
-      const penalty = revisionPenalty(reviseCount, task.createdAt)
-      const finalScore = clampTaskScore(baseScore - penalty)
+      const finalScore = Math.max(0, Math.round(baseScore))
 
       if (reviseCount > 0) {
         tasksRevised++
         totalRevisions += reviseCount
-        totalRevisionPenalty += penalty
       }
 
       totalTaskScore += finalScore
@@ -183,15 +165,10 @@ export async function GET(req: NextRequest) {
     const yellowScore = totalTasks > 0 ? Math.round((yellowCount / totalTasks) * 100) : 0
     const redScore = totalTasks > 0 ? Math.round((redCount / totalTasks) * 100) : 0
 
-    // ─── PR Score (strict, revision-aware) ───────────────────────────
-    // Average of per-task final scores (0-100). Revisions drag this down.
+    // ─── PR Score (timeliness-only — revisions do not affect score) ────
+    // Average of per-task final scores (0-100).
     const prScore = totalTasks > 0
       ? Math.round((totalTaskScore / totalTasks) * 10) / 10
-      : 0
-
-    // Average penalty per task — useful to surface in UI
-    const avgRevisionPenalty = totalTasks > 0
-      ? Math.round((totalRevisionPenalty / totalTasks) * 10) / 10
       : 0
 
     return NextResponse.json({
@@ -206,11 +183,13 @@ export async function GET(req: NextRequest) {
       yellowScore,
       redScore,
       prScore,
-      // New strict-score fields
+      // Revision tracking is kept for reporting only — these do NOT
+      // affect prScore anymore. Penalty fields are returned as 0 for
+      // backwards-compatibility with older UI clients.
       tasksRevised,            // how many distinct tasks have been revised
       totalRevisions,          // total revision count across all tasks
-      avgRevisionPenalty,      // average score penalty per task (0 if no revisions)
-      totalRevisionPenalty,    // sum of all revision penalties
+      avgRevisionPenalty: 0,   // deprecated — always 0 now
+      totalRevisionPenalty: 0, // deprecated — always 0 now
       greenCount,
       yellowCount,
       redCount,

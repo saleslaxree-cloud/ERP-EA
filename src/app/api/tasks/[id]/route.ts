@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { WorkflowStatus } from '@/lib/constants'
-import { revisionPenalty, clampTaskScore } from '@/lib/score-utils'
 
 export async function GET(
   _request: NextRequest,
@@ -71,23 +70,13 @@ export async function PATCH(
         updateData.status = WorkflowStatus.COMPLETED
         updateData.completedAt = now
 
-        // Auto-calculate performance score based on task completion
-        // Base score logic: On-time = 100, Due soon (within 2 days) = 70, Late = 40, No due date = 80
-        // ─── Revision penalty — DATE-BASED (v9 · 2026-06-27) ──────────────
-        // Tasks created ON OR AFTER 27 June 2026 use the NEW lenient logic:
-        //   1st revision: 0   (no impact)
-        //   2nd revision: 0   (no impact)
-        //   3rd revision: -20 (penalty starts here)
-        //   4th revision: -25 additional
-        //   5th+ revision: -25 each
-        // Tasks created BEFORE 27 June 2026 keep the ORIGINAL strict logic:
-        //   1st revision: -10
-        //   2nd revision: -15  (total -25)
-        //   3rd revision: -20  (total -45)
-        //   4th+ revision: -25 each
-        // Floor at 0 (never negative). NO historical score is recalculated —
-        // existing task.score values are only overwritten when the task is
-        // explicitly marked COMPLETED again.
+        // Auto-calculate performance score based on task completion.
+        // Score is based ONLY on timeliness — revisions do NOT affect score.
+        //   On-time completion   → 100
+        //   Slightly late (≤ 2d) → 70
+        //   Significantly late   → 40
+        //   No due date set      → 80
+        // Per-task score floor: 0.
         let baseScore: number
         if (score !== undefined) {
           baseScore = score
@@ -106,11 +95,7 @@ export async function PATCH(
           baseScore = 80  // No due date set
         }
 
-        // Apply date-based revision penalty
-        // Uses task.createdAt to decide which scoring system applies.
-        const reviseCount = (task as any).reviseCount || 0
-        const penalty = revisionPenalty(reviseCount, task.createdAt)
-        updateData.score = clampTaskScore(baseScore - penalty)
+        updateData.score = Math.max(0, Math.round(baseScore))
 
         // If task has a workflow, mark it as COMPLETED too
         if (task.workflowId) {
@@ -126,22 +111,12 @@ export async function PATCH(
         if (task.status === WorkflowStatus.COMPLETED) {
           updateData.completedAt = null
         }
-        // Record revise metadata and update dueDate for ALL revise scenarios
+        // Record revise metadata. We still track reviseCount for reporting
+        // purposes — but revisions NO LONGER affect task score.
         updateData.revisedAt = now
 
-        // ─── Date-based score system (v9 · 2026-06-27) ───────────────────
-        // Each revise increments reviseCount. The weekly-score endpoint uses
-        // this count to apply a DATE-BASED penalty:
-        //   • Tasks created on/after 27 June 2026 (v2 — lenient):
-        //       1st & 2nd revision: 0 (no impact)
-        //       3rd revision:       -20 (penalty starts here)
-        //       4th+ revision:      -25 additional per revision
-        //   • Tasks created before 27 June 2026 (v1 — original, preserved):
-        //       1st revision: -10, 2nd: -15, 3rd: -20, 4th+: -25 each
-        // We only count it as a "real" revision when the user actually provides
+        // Only count it as a "real" revision when the user actually provides
         // a new next date (or a reason). Toggling status alone doesn't count.
-        // NO existing task.score is recalculated automatically — only when the
-        // task is explicitly marked COMPLETED again.
         const isActualRevise = (reviseNextDate !== undefined && reviseNextDate) || (reviseReason !== undefined && reviseReason)
         if (isActualRevise) {
           // Prisma atomic increment — never loses count even on concurrent revisions

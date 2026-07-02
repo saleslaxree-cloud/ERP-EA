@@ -322,23 +322,15 @@ export function LaxreeTaskDetail() {
             </div>
           )}
           {!task.reviseReason && task.reviseCount > 0 && (
-            (() => {
-              const created = task.createdAt ? new Date(task.createdAt) : null
-              const isV2 = created && !isNaN(created.getTime()) && created.getTime() >= new Date('2026-06-26T18:30:00.000Z').getTime()
-              return (
-                <div style={{
-                  padding: '6px 12px',
-                  background: isV2 && task.reviseCount <= 2 ? 'var(--blue-l)' : 'var(--red-l)',
-                  borderRadius: 6,
-                  color: isV2 && task.reviseCount <= 2 ? 'var(--blue)' : 'var(--red)',
-                  fontWeight: 700, gridColumn: '1 / -1',
-                }}>
-                  {isV2 && task.reviseCount <= 2
-                    ? `↩ Revised ×${task.reviseCount} — no score impact (first 2 revisions are free)`
-                    : `⚠ Revised ×${task.reviseCount} — score penalty applied`}
-                </div>
-              )
-            })()
+            <div style={{
+              padding: '6px 12px',
+              background: 'var(--blue-l)',
+              borderRadius: 6,
+              color: 'var(--blue)',
+              fontWeight: 700, gridColumn: '1 / -1',
+            }}>
+              ↩ Revised ×{task.reviseCount}
+            </div>
           )}
         </div>
 
