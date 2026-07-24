@@ -191,6 +191,25 @@ export async function POST(request: NextRequest) {
   }
 
   // ───────────────────────────────────────────────────────────────────────
+  // 5b. Ensure unique index on User.loginUsername (matches Prisma @unique)
+  // ───────────────────────────────────────────────────────────────────────
+  // Only enforce uniqueness for NON-NULL values — multiple NULLs are allowed
+  // (Prisma's standard behaviour for @unique on nullable columns).
+  await runSql(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE indexname = 'User_loginUsername_key'
+      ) THEN
+        CREATE UNIQUE INDEX "User_loginUsername_key"
+          ON "User" ("loginUsername")
+          WHERE "loginUsername" IS NOT NULL;
+      END IF;
+    END $$;
+  `, 'Ensure unique index on User.loginUsername')
+
+  // ───────────────────────────────────────────────────────────────────────
   // 6. Add missing MondayMeeting columns (just in case)
   // ───────────────────────────────────────────────────────────────────────
   const mondayColumns: { name: string; sql: string }[] = [

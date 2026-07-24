@@ -19,13 +19,21 @@ function getLoginUsername(user: any): string {
 }
 
 export function LaxreeUserManagement() {
-  const { currentUserId, addToast } = useWorkflowStore()
+  const { currentUserId, currentRole, addToast } = useWorkflowStore()
   const queryClient = useQueryClient()
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
   const [filterRole, setFilterRole] = useState('ALL')
   const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
+
+  // ─── FOUNDER-only: toggle to reveal login credentials ─────────────
+  // Only FOUNDER role can view current ID/password. Other roles
+  // (ADMIN/DIRECTOR/EA) can manage users but cannot see passwords.
+  // This toggle is LOCAL to this User Management page — it does not
+  // affect any other dashboard.
+  const [showCredentials, setShowCredentials] = useState(false)
+  const canViewCredentials = currentRole === 'FOUNDER'
 
   // Form state
   const [formName, setFormName] = useState('')
@@ -37,10 +45,11 @@ export function LaxreeUserManagement() {
   const [formLocation, setFormLocation] = useState('')
   const [formPassword, setFormPassword] = useState('')
 
-  // Fetch users
+  // Fetch users — pass includeCredentials=true ONLY when FOUNDER has
+  // toggled "Show Credentials" on this User Management page.
   const { data: rawUsers, refetch: refetchUsers } = useQuery({
-    queryKey: ['users-managed'],
-    queryFn: () => fetch('/api/users').then(r => r.json()),
+    queryKey: ['users-managed', showCredentials && canViewCredentials],
+    queryFn: () => fetch(`/api/users${showCredentials && canViewCredentials ? '?includeCredentials=true' : ''}`).then(r => r.json()),
     refetchOnMount: 'always',
     staleTime: 0,
   })
@@ -234,10 +243,39 @@ export function LaxreeUserManagement() {
             Secure Credential Management
           </div>
           <div style={{ fontSize: 11, color: 'var(--t3)', marginTop: 2 }}>
-            Passwords are never displayed. Use "Reset Password" to set a new password for any user. Only EA/Admin can access this section.
+            {canViewCredentials
+              ? 'As a FOUNDER, you can reveal login IDs and passwords for verification. Use "Show Credentials" with care.'
+              : 'Passwords are never displayed. Use "Reset Password" to set a new password for any user. Only FOUNDER can view credentials.'}
           </div>
         </div>
+        {canViewCredentials && (
+          <button
+            className="btn"
+            onClick={() => setShowCredentials(s => !s)}
+            style={{
+              fontSize: 11, padding: '6px 12px', borderRadius: 6, fontWeight: 800,
+              background: showCredentials ? '#FEE2E2' : '#EDE9FE',
+              color: showCredentials ? '#DC2626' : '#6D28D9',
+              border: `1px solid ${showCredentials ? '#DC2626' : '#6D28D9'}`,
+            }}
+          >
+            {showCredentials ? '🙈 Hide Credentials' : '👁 Show Credentials'}
+          </button>
+        )}
       </div>
+
+      {/* FOUNDER-only warning banner when credentials are revealed */}
+      {canViewCredentials && showCredentials && (
+        <div style={{
+          padding: '8px 16px', marginBottom: 12, borderRadius: 8,
+          background: 'rgba(220,38,38,.06)', border: '1px solid rgba(220,38,38,.25)',
+          fontSize: 11, color: '#991B1B', fontWeight: 600, lineHeight: 1.5,
+        }}>
+          ⚠ <strong>Credentials are now visible.</strong> Anyone looking at your screen can see them.
+          Click <em>Hide Credentials</em> when done. This view is logged for audit purposes
+          and is restricted to the FOUNDER role only.
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 16 }}>
@@ -394,6 +432,7 @@ export function LaxreeUserManagement() {
                   <th>Role</th>
                   <th>Department</th>
                   <th>Login ID</th>
+                  {canViewCredentials && showCredentials && <th>Password</th>}
                   <th>Phone</th>
                   <th>Actions</th>
                 </tr>
@@ -401,7 +440,9 @@ export function LaxreeUserManagement() {
               <tbody>
                 {filteredUsers.map((user: any) => {
                   const rs = roleBadgeStyle[user.role] || roleBadgeStyle.EMPLOYEE
-                  const loginId = getLoginUsername(user)
+                  // Use stored loginUsername when available (FOUNDER view with credentials);
+                  // otherwise fall back to the helper for display.
+                  const loginId = user.loginUsername || getLoginUsername(user)
                   return (
                     <tr key={user.id}>
                       <td>
@@ -430,6 +471,18 @@ export function LaxreeUserManagement() {
                           {loginId}
                         </code>
                       </td>
+                      {canViewCredentials && showCredentials && (
+                        <td>
+                          <code style={{
+                            fontSize: 10, padding: '2px 8px', background: '#FEE2E2',
+                            borderRadius: 4, fontWeight: 700, color: '#DC2626',
+                            border: '1px solid rgba(220,38,38,.25)',
+                            fontFamily: 'monospace',
+                          }}>
+                            {user.loginPassword || '—'}
+                          </code>
+                        </td>
+                      )}
                       <td style={{ fontSize: 11, color: 'var(--t3)' }}>{user.phone || '—'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
